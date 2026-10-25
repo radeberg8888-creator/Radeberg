@@ -80,8 +80,10 @@ jobs:
       - name: Assets importieren
         run: |
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
-          timeout 7000 $GODOT --headless --path . --import || true
-          timeout 3000 $GODOT --headless --path . --import || true
+          mkdir -p build
+          (timeout 7000 $GODOT --headless --path . --import || true) > build/import.log 2>&1
+          (timeout 3000 $GODOT --headless --path . --import || true) >> build/import.log 2>&1
+          tail -5 build/import.log
 
       - name: APK exportieren
         env:
@@ -91,8 +93,17 @@ jobs:
         run: |
           mkdir -p build
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
-          $GODOT --headless --path . --export-debug "Android" build/radeberg.apk 2>&1 | tail -60
+          $GODOT --headless --path . --export-debug "Android" build/radeberg.apk > build/export.log 2>&1 || true
+          tail -60 build/export.log
           ls -la build/
+          {
+            echo "Automatisch gebaute Testversion. APK aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
+            echo ""
+            echo "APK-Größe: $(du -h build/radeberg.apk | cut -f1)"
+            echo '```'
+            grep -E "ERROR|SCRIPT ERROR|WARNING" build/import.log build/export.log | sed 's/\x1b\[[0-9;]*m//g' | sort | uniq -c | sort -rn | head -40
+            echo '```'
+          } > build/notes.md
           test -f build/radeberg.apk
 
       - name: APK als Artefakt
@@ -107,6 +118,6 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: Radeberg Testversion ${{ github.run_number }}
-          body: "Automatisch gebaute Testversion. APK aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
+          body_path: build/notes.md
           files: build/radeberg.apk
           prerelease: true

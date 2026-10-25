@@ -31,11 +31,11 @@ func setup(k:String):
 	ab=F.aabb(self)
 	var big=ab.size.z>7.0
 	mass=6500.0 if big else 1350.0
-	kraft=22000.0 if big else 7500.0
+	kraft=17000.0 if big else 4700.0
 	max_kmh=110.0 if big else 175.0
-	if k in ["audi_r8","porsche911","bmw_m8","bugatti","hoonicorn","jdm","audi_rs7"]:kraft=10500.0;max_kmh=240.0
-	if k in ["trabant","small_car"]:kraft=5200.0;max_kmh=135.0
-	center_of_mass_mode=RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM;center_of_mass=Vector3(0,0.45,0)
+	if k in ["audi_r8","porsche911","bmw_m8","bugatti","hoonicorn","jdm","audi_rs7"]:kraft=6300.0;max_kmh=245.0
+	if k in ["trabant","small_car"]:kraft=3900.0;max_kmh=135.0
+	center_of_mass_mode=RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM;center_of_mass=Vector3(0.0,0.0,ab.get_center().z)
 	# Karosserie als Kollisionskasten (über dem Boden, damit die Räder federn können)
 	var cs=CollisionShape3D.new();var bx=BoxShape3D.new()
 	var h=ab.size.y*0.62
@@ -44,14 +44,14 @@ func setup(k:String):
 	radius=0.5 if big else 0.34
 	var wx=ab.size.x*0.5-0.24;var wz=ab.size.z*0.5-(1.6 if big else 0.82)
 	for p in [[-1,1,true],[1,1,true],[-1,-1,false],[1,-1,false]]:
-		var w=VehicleWheel3D.new();add_child(w)
-		w.position=Vector3(ab.get_center().x+wx*p[0],radius+0.12,ab.get_center().z+wz*p[1])
+		var w=VehicleWheel3D.new()
+		w.position=Vector3(ab.get_center().x+wx*p[0],radius+0.09,ab.get_center().z+wz*p[1])
 		w.use_as_steering=p[2];w.use_as_traction=not p[2] or big==false and k in ["audi_r8","bugatti","audi_rs7"]
 		if not p[2]:w.use_as_traction=true
 		w.wheel_radius=radius;w.suspension_travel=0.22;w.wheel_rest_length=0.16
 		w.suspension_stiffness=55.0 if not big else 70.0;w.damping_compression=0.9;w.damping_relaxation=1.2
-		w.wheel_friction_slip=3.2;w.wheel_roll_influence=0.08;w.suspension_max_force=60000.0 if big else 14000.0
-		wheels.append(w)
+		w.wheel_friction_slip=3.2;w.wheel_roll_influence=0.03;w.suspension_max_force=60000.0 if big else 14000.0
+		add_child(w);wheels.append(w)
 	kopf_hoehe=ab.size.y+0.3
 	parken()
 
@@ -76,25 +76,28 @@ func fahren(st,dt:float):
 	var v=linear_velocity.dot(global_transform.basis.z)
 	var speed=abs(v)*3.6
 	# Lenkung: weniger Einschlag bei hoher Geschwindigkeit
-	var maxs=lerp(0.62,0.16,clamp(speed/160.0,0.0,1.0))
+	var maxs=lerp(0.6,0.09,clamp(speed/200.0,0.0,1.0))
 	steering=move_toward(steering,-st.steer*maxs,dt*2.6)
 	var f=0.0;var b=0.0
 	if st.gas>0.05:
 		f=st.gas*kraft
-		if v<-0.5:b=st.gas*30.0;f=0.0
+		if v<-0.5:b=st.gas*45.0;f=0.0
 	if st.brake>0.05:
-		if v>0.8:b=st.brake*28.0
+		if v>0.8:b=st.brake*45.0
 		else:f=-st.brake*kraft*0.5
 	if speed>max_kmh and f>0:f=0.0
+	if v<-11.0 and f<0:f=0.0   # rückwärts höchstens ~40 km/h
 	if st.nos and nos_vorrat>0.0 and st.gas>0.1:f*=1.7;nos_vorrat=max(0.0,nos_vorrat-dt*0.25)
 	else:nos_vorrat=min(1.0,nos_vorrat+dt*0.03)
+	if st.gas<0.05 and st.brake<0.05 and not st.handbrake:b=1.5   # Motorbremse
 	engine_force=f
-	brake=b
 	for w in wheels:
-		if not w.use_as_steering:w.wheel_friction_slip=1.4 if st.handbrake else 3.2
-		if not w.use_as_steering and st.handbrake:w.brake=40.0
-		else:w.brake=0.0
-	if st.gas<0.05 and st.brake<0.05 and not st.handbrake:brake=0.6   # Motorbremse
+		if not w.use_as_steering:w.wheel_friction_slip=1.3 if st.handbrake else 3.2
+		w.brake=b
+		if not w.use_as_steering and st.handbrake:w.brake=max(b,60.0)
+	# Stabilisierung gegen Umkippen (Arcade): Rollen und Nicken sanft zurückdrehen
+	var bx=global_transform.basis
+	apply_torque(bx.z*(-bx.x.y)*mass*9.0+bx.x*(bx.z.y)*mass*4.0)
 	# Aufrichten nach Überschlag
 	if global_transform.basis.y.y<0.3 and linear_velocity.length()<2.0:
 		_kopfueber+=dt

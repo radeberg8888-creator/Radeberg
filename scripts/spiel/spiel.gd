@@ -15,6 +15,8 @@ const O=preload("res://scripts/outfit.gd")
 const TU=preload("res://scripts/tuning.gd")
 const TOR=preload("res://scripts/rolltor.gd")
 const SAVE:="user://spielstand.json"
+const MOTOR=preload("res://scripts/spiel/motor_sound.gd")
+var motor
 
 var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
@@ -137,6 +139,7 @@ func _spieler():
 	kam.yaw=home.yaw+PI*0.0
 	hud=HUD.new();hud.st=st;hud.spiel=self;ui.add_child(hud)
 	mini=MINI.new();ui.add_child(mini);mini.position=Vector2(22,22)
+	motor=MOTOR.new();add_child(motor)
 
 func _shop(typ:String)->Dictionary:
 	for s in welt.A.shops:
@@ -179,6 +182,7 @@ func _process(dt):
 	mini.zoom=lerp(mini.zoom,200.0+(auto.kmh()*2.0 if auto else 0.0),dt*2.0)
 	hud.geld=geld
 	if auto!=null:hud.tacho=auto.kmh();hud.nos=auto.nos_vorrat
+	motor.setze(auto.kmh() if auto else 0.0,st.gas if auto else 0.0,auto!=null and panel==null)
 	_verkehr_pflege(p)
 	_passanten_pflege(p,dt)
 	_interaktion()
@@ -187,7 +191,7 @@ func _process(dt):
 	elif st.pressed("karte"):
 		if panel==null:karte_oeffnen()
 	if st.pressed("kamera"):kam.nah=not kam.nah;kam.setze_ziel(ziel,auto!=null,[ziel])
-	if st.pressed("hupe") and auto!=null:hud.zeige("TUUUT!",0.6)
+	if st.pressed("hupe") and auto!=null:motor.hupe=0.5
 	st.end_frame()
 
 func uhrzeit_text()->String:
@@ -248,6 +252,7 @@ func aussteigen():
 	auto=null
 
 func _rempler(b):
+	if auto!=null and auto.kmh()>25.0 and st.e.vibration:Input.vibrate_handheld(int(clamp(auto.kmh(),40,250)))
 	if b!=null and b.get_script()==AUTO and b.modus=="ki":
 		verkehr.erase(b);b.parken();b.freeze=false;geparkt.append(b)
 
@@ -326,7 +331,8 @@ func _panel(titel:String)->VBoxContainer:
 	if panel:panel.queue_free()
 	hud.modus="menue";hud.reset_touch()
 	var pc=PanelContainer.new();pc.theme=theme_ui;ui.add_child(pc);panel=pc
-	pc.set_anchors_preset(Control.PRESET_CENTER_RIGHT);pc.position=Vector2(-560,-330);pc.size=Vector2(520,660)
+	var vs=get_viewport().get_visible_rect().size
+	pc.position=Vector2(vs.x-560,max(10.0,vs.y*0.5-330));pc.size=Vector2(520,min(660.0,vs.y-20))
 	var v=VBoxContainer.new();v.add_theme_constant_override("separation",10);pc.add_child(v)
 	var l=Label.new();l.text=titel;l.add_theme_font_size_override("font_size",36);l.add_theme_color_override("font_color",Color(0.98,0.82,0.3));v.add_child(l)
 	return v
@@ -428,7 +434,7 @@ func karte_oeffnen():
 	k.player=Vector2(p.x,p.z);k.player_dir=kam.blick_yaw()
 	ui.add_child(k);panel=k
 	var b=Button.new();b.text="  ZURÜCK  ";b.theme=theme_ui;b.custom_minimum_size=Vector2(200,64);k.add_child(b)
-	b.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT);b.position=Vector2(-240,-90)
+	var vs=get_viewport().get_visible_rect().size;b.position=Vector2(vs.x-240,vs.y-90)
 	b.pressed.connect(panel_zu)
 
 # ---------------- Pause / Einstellungen ----------------
@@ -471,6 +477,12 @@ func _slider(v:Control,t:String,key:String,a:float,b:float):
 
 func einstellungen_anwenden():
 	sun.shadow_enabled=st.e.schatten
+	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
+	var g=welt.get_node_or_null("Gebaeude")
+	if g:
+		for m in g.find_children("*","MeshInstance3D",true,false):
+			if not m.has_meta("vr"):m.set_meta("vr",m.visibility_range_end)
+			if m.get_meta("vr")>0.0:m.visibility_range_end=m.get_meta("vr")*f
 	var far=[900.0,1600.0,2600.0][int(st.e.sichtweite)]
 	kam.cam.far=far
 	env.fog_density=[0.0016,0.0009,0.0005][int(st.e.sichtweite)]
@@ -479,7 +491,7 @@ func hilfe():
 	var v=_panel("STEUERUNG")
 	var l=Label.new();l.autowrap_mode=TextServer.AUTOWRAP_WORD;l.custom_minimum_size=Vector2(460,0);l.add_theme_font_size_override("font_size",20)
 	l.text="TOUCH\n• Links: Stick zum Laufen/Lenken (erscheint, wo du tippst)\n• Rechts wischen: Kamera drehen\n• Auto: GAS, BREMSE (Rückwärts), HAND, NOS, RAUS\n• Neigen-Lenkung in den Einstellungen\n\nXBOX-CONTROLLER\n• Linker Stick: laufen/lenken, rechter Stick: Kamera\n• RT Gas, LT Bremse/Rückwärts, RB Handbremse, X NOS\n• Y Ein-/Aussteigen, A Springen, B Rennen\n• D-Pad rechts: Laden betreten, D-Pad hoch: Taxi-Job\n• Start: Pause, Back: Karte\n\nTASTATUR\n• WASD, Maus, F/E Einsteigen, Leertaste, Shift, M Karte, Esc Pause"
-	v.add_child(l)
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(470,440);v.add_child(sc);sc.add_child(l)
 	_btn(v,"Zurück",pausenmenue)
 
 # ---------------- Taxi-Job ----------------

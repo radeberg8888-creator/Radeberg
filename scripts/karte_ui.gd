@@ -30,13 +30,13 @@ func _ready():
 		get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/karte.png");get_tree().quit()
 
 func map_rect()->Rect2:
-	var s=size;var h=s.y-40;var w=h*WX/WZ
+	var s=get_viewport_rect().size;var h=s.y-40;var w=h*WX/WZ
 	return Rect2(Vector2(30,20),Vector2(w,h))
 func w2m(p:Vector2)->Vector2:
 	var r=map_rect();return r.position+Vector2((p.x-X0)/WX*r.size.x,(p.y-Z0)/WZ*r.size.y)
 
 func _draw():
-	draw_rect(Rect2(Vector2.ZERO,size),Color(0.06,0.07,0.08))
+	draw_rect(Rect2(Vector2.ZERO,get_viewport_rect().size),Color(0.06,0.07,0.08))
 	var r=map_rect()
 	draw_texture_rect(tex,r,false,Color(0.92,0.95,0.98))
 	draw_rect(r,Color(0.85,0.85,0.8),false,2.0)
