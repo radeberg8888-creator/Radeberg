@@ -1,0 +1,44 @@
+[
+ {
+  "name": "Radeberg Customs (Tuning)",
+  "typ": "werkstatt",
+  "x": -379.613311767578,
+  "z": 541.437194824219
+ },
+ {
+  "name": "Waffen Krause",
+  "typ": "waffen",
+  "x": -512.532775878906,
+  "z": 461.940368652344
+ },
+ {
+  "name": "Stoffwechsel (Kleidung)",
+  "typ": "kleider",
+  "x": 40.308406829834,
+  "z": 94.3637390136719
+ },
+ {
+  "name": "Zuhause (Speichern)",
+  "typ": "zuhause",
+  "x": -206.829650878906,
+  "z": 562.500854492188
+ },
+ {
+  "name": "Hauptbahnhof",
+  "typ": "bahnhof",
+  "x": 690.0,
+  "z": 90.0
+ },
+ {
+  "name": "Containerhafen",
+  "typ": "hafen",
+  "x": 1545.0,
+  "z": 350.0
+ },
+ {
+  "name": "Alter Flugplatz",
+  "typ": "flugplatz",
+  "x": -1080.0,
+  "z": 540.0
+ }
+]
