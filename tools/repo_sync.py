@@ -6,7 +6,7 @@ for n in os.listdir(DST):
     if n in KEEP: continue
     p=os.path.join(DST,n)
     shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
-for n in ['project.godot','CREDITS.md','icon.svg']:
+for n in ['project.godot','CREDITS.md','icon.png','icon.png.import']:
     if os.path.exists(os.path.join(SRC,n)): shutil.copy2(os.path.join(SRC,n),DST)
 for d in ['scripts','scenes','shaders','tools']:
     shutil.copytree(os.path.join(SRC,d),os.path.join(DST,d),ignore=shutil.ignore_patterns('__pycache__'))

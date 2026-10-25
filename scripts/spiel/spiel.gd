@@ -16,7 +16,8 @@ const TU=preload("res://scripts/tuning.gd")
 const TOR=preload("res://scripts/rolltor.gd")
 const SAVE:="user://spielstand.json"
 const MOTOR=preload("res://scripts/spiel/motor_sound.gd")
-var motor
+const MIS=preload("res://scripts/spiel/missionen.gd")
+var motor;var mis
 
 var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
@@ -39,6 +40,7 @@ var test_modus:=""       # für automatische Testbilder
 
 func _ready():
 	rng.randomize()
+	get_tree().quit_on_go_back=false
 	test_modus=_arg("--test")
 	st=STEU.new();add_child(st)
 	ui=CanvasLayer.new();ui.layer=10;add_child(ui)
@@ -140,6 +142,7 @@ func _spieler():
 	hud=HUD.new();hud.st=st;hud.spiel=self;ui.add_child(hud)
 	mini=MINI.new();ui.add_child(mini);mini.position=Vector2(22,22)
 	motor=MOTOR.new();add_child(motor)
+	mis=MIS.new();mis.spiel=self;add_child(mis)
 
 func _shop(typ:String)->Dictionary:
 	for s in welt.A.shops:
@@ -264,7 +267,7 @@ func _verkehr_pflege(p:Vector3):
 	for c in verkehr.duplicate():
 		if Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>360.0:verkehr.erase(c);c.queue_free()
 	for c in geparkt.duplicate():
-		if c!=auto and is_instance_valid(c) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>420.0:geparkt.erase(c);c.queue_free()
+		if c!=auto and is_instance_valid(c) and not (mis!=null and c==mis.auto_m) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>420.0:geparkt.erase(c);c.queue_free()
 	if verkehr.size()<_ziel_anzahl() and Engine.get_process_frames()%6==0:_spawn_auto(p2)
 
 func _spawn_auto(p2:Vector2):
@@ -443,10 +446,27 @@ func pausenmenue():
 	var v=_panel("PAUSE")
 	_btn(v,"Weiter",panel_zu)
 	_btn(v,"Karte",func():panel_zu();karte_oeffnen())
+	_btn(v,"Missionen ("+str(mis.erledigt.size())+"/"+str(mis.spielbare().size())+")",missionen_menue)
+	if mis.aktiv!=null:_btn(v,"Mission abbrechen",func():mis.abbrechen();panel_zu())
 	_btn(v,"Einstellungen",einstellungen_menue)
 	_btn(v,"Steuerung (Hilfe)",hilfe)
 	_btn(v,"Neu starten am Zuhause",func():panel_zu();if auto:aussteigen();_zum_zuhause())
 	_btn(v,"Beenden",func():speichern();get_tree().quit())
+
+func missionen_menue():
+	var v=_panel("MISSIONEN")
+	var info=Label.new();info.text="Fahr-Missionen sind spielbar. Kampf-Missionen kommen mit dem Waffensystem.";info.autowrap_mode=TextServer.AUTOWRAP_WORD;info.add_theme_font_size_override("font_size",18);info.custom_minimum_size=Vector2(460,0);v.add_child(info)
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(470,420);v.add_child(sc)
+	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sc.add_child(w)
+	var last=""
+	for m in mis.spielbare():
+		if m.kontakt!=last:
+			last=m.kontakt;var l=Label.new();l.text=mis.kontakt_name(m.kontakt);l.add_theme_color_override("font_color",Color(0.98,0.82,0.3));l.add_theme_font_size_override("font_size",22);w.add_child(l)
+		var done=mis.erledigt.has(str(m.id))
+		var b=Button.new();b.text=("✔ " if done else "")+m.titel+"  ($"+str(int(m.belohnung) if int(m.belohnung)>0 else 500)+")";b.alignment=HORIZONTAL_ALIGNMENT_LEFT;b.add_theme_font_size_override("font_size",20);b.custom_minimum_size=Vector2(0,48);w.add_child(b)
+		var mm=m
+		b.pressed.connect(func():panel_zu();mis.starten(mm))
+	_btn(v,"Zurück",pausenmenue)
 
 func _zum_zuhause():
 	var home=_shop("zuhause");var fw=Vector3(sin(home.yaw),0,cos(home.yaw))
@@ -467,6 +487,7 @@ func einstellungen_menue():
 	var sw=OptionButton.new();for t in ["Sichtweite: niedrig (schnell)","Sichtweite: mittel","Sichtweite: hoch"]:sw.add_item(t)
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
 	var sh=CheckButton.new();sh.text="Schatten";sh.button_pressed=st.e.schatten;w.add_child(sh);sh.toggled.connect(func(b):st.e.schatten=b;einstellungen_anwenden())
+	var fp=CheckButton.new();fp.text="FPS anzeigen";fp.button_pressed=st.e.fps;w.add_child(fp);fp.toggled.connect(func(b):st.e.fps=b)
 	var lc=Label.new();lc.text="Controller: "+("verbunden ✔" if st.controller else "keiner – Xbox-Controller per Bluetooth koppeln");lc.add_theme_font_size_override("font_size",20);lc.autowrap_mode=TextServer.AUTOWRAP_WORD;w.add_child(lc)
 	_btn(v,"Speichern & zurück",func():st.speichern();panel_zu())
 
@@ -552,7 +573,7 @@ func _taxi(dt):
 # ---------------- Speichern / Laden ----------------
 func speichern():
 	var p=spieler.global_position
-	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z]}
+	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z],"missionen":mis.erledigt.keys()}
 	var f=FileAccess.open(SAVE,FileAccess.WRITE);f.store_string(JSON.stringify(d));f.close()
 
 func laden():
@@ -561,11 +582,15 @@ func laden():
 	var d=JSON.parse_string(f.get_as_text())
 	if not d is Dictionary:return
 	geld=int(d.get("geld",500));zeit=float(d.get("zeit",zeit))
+	for k in d.get("missionen",[]):mis.erledigt[str(k)]=true
 	if d.has("outfit"):
 		for k in d.outfit:spieler.outfit[k]=d.outfit[k] if not (d.outfit[k] is float) else int(d.outfit[k])
 		spieler.kleidung()
 
 func _notification(what):
+	if what==NOTIFICATION_WM_GO_BACK_REQUEST and bereit:
+		if panel!=null:panel_zu()
+		else:pausenmenue()
 	if what==NOTIFICATION_APPLICATION_PAUSED or what==NOTIFICATION_WM_CLOSE_REQUEST:
 		if bereit:speichern()
 

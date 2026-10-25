@@ -19,5 +19,7 @@ Downtown, Hafen, Bahnhof, Berg mit Wald, Wüste mit verlassenem Flugplatz und Au
 - Kleiderladen „Stoffwechsel“, Werkstatt „Radeberg Customs“ (Lack, Neon, Motor, NOS, Reparatur)
 - Zuhause: Speichern
 - Taxi-Job (in ein Taxi steigen → TAXI)
+- 56 Fahr-Missionen aus dem Katalog spielbar (Pause → Missionen): Transporte, Lieferungen, Zeitrennen, Autodiebstahl, Abschleppen, Flucht, Eskorte, Bergung
+- Motorsound, Vibration bei Unfällen, Android-Zurück-Taste öffnet das Pausenmenü
 
-Der Missionskatalog (112 Missionen, Jobs, Immobilien, Geschäfte) liegt in `assets/data/missionen.json` und wird in den nächsten Versionen spielbar.
+Der Missionskatalog (112 Missionen, Jobs, Immobilien, Geschäfte) liegt in `assets/data/missionen.json`; Kampf-Missionen, Immobilien, Taxizentrale und Logistikzentrum folgen in den nächsten Versionen.

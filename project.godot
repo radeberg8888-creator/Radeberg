@@ -5,6 +5,7 @@ config_version=5
 config/name="Radeberg"
 config/description="Open-World-Spiel in Radeberg"
 config/version="0.1"
+config/icon="res://icon.png"
 boot_splash/bg_color=Color(0.05,0.05,0.06,1)
 run/main_scene="res://scenes/spiel.tscn"
 config/features=PackedStringArray("4.7", "Mobile")

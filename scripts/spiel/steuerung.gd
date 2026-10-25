@@ -16,6 +16,7 @@ var e:={
 	"schatten":true,
 	"vibration":true,
 	"hud_groesse":1.0,
+	"fps":false,
 }
 const DATEI:="user://einstellungen.json"
 

@@ -18,6 +18,28 @@ var ui_schritt:=0
 func _process(dt):
 	t+=dt
 	var st=spiel.st
+	if spiel.test_modus=="mission":
+		if t<1.0:return
+		t=0
+		var M=spiel.mis
+		match ui_schritt:
+			0:
+				var m=M.spielbare()[0];print("MISSION ",m.titel," typ ",m.typ);M.starten(m)
+			1:
+				print("  ziel ",M.ziel," auto_m ",M.auto_m!=null);spiel.spieler.global_position=M.auto_m.global_position+Vector3(3,0.5,0)
+			2:spiel.einsteigen(M.auto_m);print("  schritt ",M.schritt," text ",spiel.hud.job_text)
+			3:M.auto_m.global_position=M.ziel+Vector3(0,0.8,0);M.auto_m.linear_velocity=Vector3.ZERO
+			4:print("  nach ziel: aktiv=",M.aktiv!=null," geld=",spiel.geld," erledigt=",M.erledigt)
+			5:
+				for m in M.spielbare():
+					if m.typ=="rennen":print("MISSION ",m.titel);M.starten(m);break
+			6:spiel.auto.global_position=M.ziel+Vector3(0,0.8,0);spiel.auto.linear_velocity=Vector3.ZERO
+			7,8,9,10,11,12,13,14,15:
+				print("  cp ",M.aktiv._cpi if M.aktiv else -1," text ",spiel.hud.job_text)
+				if M.aktiv:spiel.auto.global_position=M.ziel+Vector3(0,0.8,0);spiel.auto.linear_velocity=Vector3.ZERO
+			16:print("  rennen fertig: aktiv=",M.aktiv!=null," geld=",spiel.geld);get_tree().quit()
+		ui_schritt+=1
+		return
 	if spiel.test_modus=="ui":
 		if t<1.5:return
 		t=0
