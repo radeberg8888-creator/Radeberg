@@ -1,8 +1,15 @@
 extends RefCounted
 # Gelände der Insel Radeberg: Höhenfunktion, Bezirke, Geländemesh mit Bodenarten.
 # Koordinaten: x = Osten, z = Süden. Insel ca. 3,4 x 2,8 km, rundherum Meer (Wasser y = 0).
-const SX:=1750.0
+# Weltgrenzen: Hauptinsel um (0,0), Ostinsel (Wüste, Städte) um (3450,0), verbunden über die Ostbrücke
+const X0:=-1760.0
+const X1:=4750.0
+const Z0:=-1500.0
+const Z1:=1500.0
+const SX:=1750.0      # Halbachsen der Hauptinsel
 const SZ:=1450.0
+const OST:=Vector2(3450,0)
+const OST_R:=Vector2(1150,1320)
 const STEP:=10.0
 
 var noise:=FastNoiseLite.new()
@@ -16,6 +23,11 @@ var nx:int;var nz:int
 const MOUNTAIN:=Vector2(-1080,-820)
 const HILLS:=Vector2(760,-860)
 const DESERT:=Vector2(-1080,620)
+const DESERT2:=Vector2(3950,300)     # große Wüste auf der Ostinsel
+const ESPEN:=Vector2(3400,-950)      # Espenwald (Hügel, Mischwald)
+const ESPEN2:=Vector2(-350,-1100)    # Wald im Norden der Hauptinsel
+const KOWLOON:=Vector2(2760,-560)
+const LINDSTADT:=Vector2(2760,560)
 
 func _init():
 	noise.seed=7;noise.frequency=0.0016;noise.fractal_octaves=5
@@ -23,8 +35,11 @@ func _init():
 
 # Inselmaske 0..1 (1 = Land), Küste leicht zerklüftet
 func island(x:float,z:float)->float:
-	var e=Vector2(x/SX,z/SZ).length()+noise.get_noise_2d(x*0.6,z*0.6)*0.12
-	return clamp((1.0-e)/0.12,0.0,1.0)
+	var nz=noise.get_noise_2d(x*0.6,z*0.6)*0.12
+	var e=Vector2(x/SX,z/SZ).length()+nz
+	var e2=Vector2((x-OST.x)/OST_R.x,(z-OST.y)/OST_R.y).length()+nz
+	return clamp((1.0-min(e,e2))/0.12,0.0,1.0)
+func auf_ost(x:float,z:float)->bool:return x>2000.0
 
 var plateaus:=[]   # [Vector2 Mitte, Radius, Übergang, Höhe] – ebene Flächen (Bahnhof, Flugplatz, Hafen)
 func base_height(x:float,z:float)->float:
@@ -49,6 +64,14 @@ func _nat(x:float,z:float)->float:
 		var k=1.0-smoothstep(380.0,650.0,dd)
 		h=lerp(h,9.0+abs(noise2.get_noise_2d(x*2.0,z*2.0))*7.0,k)
 		h+=45.0*exp(-pow(Vector2(x,z).distance_to(Vector2(-1420,330))/120.0,2))
+	# Ostinsel: Wüste mit Dünen und Tafelbergen, Waldhügel im Norden
+	var d2=Vector2(x,z).distance_to(DESERT2)
+	if d2<900:
+		var k2=1.0-smoothstep(550.0,900.0,d2)
+		h=lerp(h,8.0+abs(noise2.get_noise_2d(x*1.6,z*1.6))*9.0,k2)
+		h+=70.0*exp(-pow(Vector2(x,z).distance_to(Vector2(4300,700))/140.0,2))+55.0*exp(-pow(Vector2(x,z).distance_to(Vector2(3600,950))/110.0,2))
+	h+=48.0*exp(-pow(Vector2(x,z).distance_to(ESPEN)/380.0,2))*(0.8+0.4*noise2.get_noise_2d(x*0.5,z*0.5))
+	h+=22.0*exp(-pow(Vector2(x,z).distance_to(ESPEN2)/300.0,2))
 	# Stadtgebiet sanft (leichte Hügel und eine Senke im Ghetto)
 	h-=7.0*exp(-pow(Vector2(x,z).distance_to(Vector2(-250,640))/300.0,2))
 	h+=12.0*exp(-pow(Vector2(x,z).distance_to(Vector2(650,520))/300.0,2))
@@ -59,14 +82,14 @@ func _nat(x:float,z:float)->float:
 
 func idx(i:int,k:int)->int:return k*nx+i
 func build_heights():
-	nx=int(2*SX/STEP)+1;nz=int(2*SZ/STEP)+1
+	nx=int((X1-X0)/STEP)+1;nz=int((Z1-Z0)/STEP)+1
 	heights.resize(nx*nz)
 	for k in nz:
 		for i in nx:
-			heights[idx(i,k)]=base_height(-SX+i*STEP,-SZ+k*STEP)
+			heights[idx(i,k)]=base_height(X0+i*STEP,Z0+k*STEP)
 
 func h_at(x:float,z:float)->float:
-	var fx=(x+SX)/STEP;var fz=(z+SZ)/STEP
+	var fx=(x-X0)/STEP;var fz=(z-Z0)/STEP
 	var i=clampi(int(fx),0,nx-2);var k=clampi(int(fz),0,nz-2);var tx=clamp(fx-i,0.0,1.0);var tz=clamp(fz-k,0.0,1.0)
 	var a=heights[idx(i,k)];var b=heights[idx(i+1,k)];var c=heights[idx(i,k+1)];var d=heights[idx(i+1,k+1)]
 	return lerp(lerp(a,b,tx),lerp(c,d,tx),tz)
@@ -74,10 +97,10 @@ func h_at(x:float,z:float)->float:
 # Gelände an Straßen/Plätze anpassen: Gitterpunkte im Radius bekommen die Sollhöhe (weicher Übergang)
 func flatten(p:Vector2,y:float,r_core:float,r_fade:float):
 	var r=r_core+r_fade
-	var i0=int((p.x-r+SX)/STEP);var i1=int((p.x+r+SX)/STEP)+1;var k0=int((p.y-r+SZ)/STEP);var k1=int((p.y+r+SZ)/STEP)+1
+	var i0=int((p.x-r-X0)/STEP);var i1=int((p.x+r-X0)/STEP)+1;var k0=int((p.y-r-Z0)/STEP);var k1=int((p.y+r-Z0)/STEP)+1
 	for k in range(max(k0,0),min(k1,nz-1)+1):
 		for i in range(max(i0,0),min(i1,nx-1)+1):
-			var q=Vector2(-SX+i*STEP,-SZ+k*STEP);var d=q.distance_to(p)
+			var q=Vector2(X0+i*STEP,Z0+k*STEP);var d=q.distance_to(p)
 			if d>r:continue
 			var w=1.0 if d<=r_core else 1.0-smoothstep(r_core,r,d)
 			var key=idx(i,k)
@@ -89,11 +112,15 @@ func apply_cut():
 # Bodenart je Punkt: RGBA = Gras, Wald, Sand, Fels (Rest = Trockengras)
 func soil(x:float,z:float,h:float,slope:float)->Color:
 	var dd=Vector2(x,z).distance_to(DESERT)+noise2.get_noise_2d(x*0.35,z*0.35)*160.0;var dm=Vector2(x,z).distance_to(MOUNTAIN)
+	var dd2=Vector2(x,z).distance_to(DESERT2)+noise2.get_noise_2d(x*0.35,z*0.35)*180.0
+	dd=min(dd,dd2*0.75)
 	var sand=1.0-smoothstep(380.0,560.0,dd)
 	var beach=1.0-smoothstep(0.12,0.4,island(x,z))
 	sand=max(sand,beach)
 	var forest=(1.0-smoothstep(380.0,560.0,dm))*smoothstep(25.0,40.0,h)*(1.0-smoothstep(170.0,200.0,h))
 	forest=max(forest,(1.0-smoothstep(260.0,380.0,Vector2(x,z).distance_to(HILLS)))*0.6)
+	forest=max(forest,(1.0-smoothstep(300.0,480.0,Vector2(x,z).distance_to(ESPEN)))*0.85)
+	forest=max(forest,(1.0-smoothstep(220.0,380.0,Vector2(x,z).distance_to(ESPEN2)))*0.8)
 	var rock=smoothstep(0.55,0.85,slope)+smoothstep(175.0,215.0,h)
 	rock=clamp(rock,0.0,1.0)
 	var grass=clamp(1.0-sand-forest-rock,0.0,1.0)
@@ -102,30 +129,47 @@ func soil(x:float,z:float,h:float,slope:float)->Color:
 	grass*=1.0-clamp(dryp,0.0,0.9)
 	return Color(grass,forest*(1.0-rock),sand*(1.0-rock),rock)
 
+# Geländemesh in Kacheln (640 m): Sichtbarkeit je Kachel, Meeresgrund weglassen
+const TILE:=64
 func build_mesh(parent:Node3D):
-	var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var verts=PackedVector3Array();verts.resize(nx*nz)
-	for k in nz:
-		for i in nx:verts[idx(i,k)]=Vector3(-SX+i*STEP,heights[idx(i,k)],-SZ+k*STEP)
-	for k in nz:
-		for i in nx:
-			var p=verts[idx(i,k)]
-			var hl=heights[idx(max(i-1,0),k)];var hr=heights[idx(min(i+1,nx-1),k)];var hd=heights[idx(i,max(k-1,0))];var hu=heights[idx(i,min(k+1,nz-1))]
-			var n=Vector3(hl-hr,2*STEP,hd-hu).normalized()
-			st.set_normal(n);st.set_color(soil(p.x,p.z,p.y,1.0-n.y));st.set_uv(Vector2(p.x,p.z)/6.0)
-			st.add_vertex(p)
-	for k in nz-1:
-		for i in nx-1:
-			var a=idx(i,k);var b=idx(i+1,k);var c=idx(i,k+1);var d=idx(i+1,k+1)
-			# nur Dreiecke über dem Meeresgrund nahe der Insel
-			if heights[a]<-12 and heights[b]<-12 and heights[c]<-12 and heights[d]<-12:continue
-			if holes.has(Vector2i(i,k)):continue
-			st.add_index(a);st.add_index(b);st.add_index(c);st.add_index(b);st.add_index(d);st.add_index(c)
-	st.generate_tangents()
-	var mi=MeshInstance3D.new();mi.mesh=st.commit();mi.name="Gelaende"
 	var sm=ShaderMaterial.new();sm.shader=load("res://shaders/terrain.gdshader")
 	var T="res://assets/textures/"
 	for t in [["grass","g"],["forest","f"],["sand","s"],["rock","r"],["drygrass","d"]]:
 		sm.set_shader_parameter(t[1]+"_alb",load(T+t[0]+"_albedo.jpg"));sm.set_shader_parameter(t[1]+"_nrm",load(T+t[0]+"_normal.png"))
-	mi.material_override=sm;parent.add_child(mi)
-	return mi
+	# Normalen + Bodenarten einmal für das ganze Gitter
+	var N=PackedVector3Array();N.resize(nx*nz)
+	var C=PackedColorArray();C.resize(nx*nz)
+	for k in nz:
+		for i in nx:
+			var hl=heights[idx(max(i-1,0),k)];var hr=heights[idx(min(i+1,nx-1),k)];var hd=heights[idx(i,max(k-1,0))];var hu=heights[idx(i,min(k+1,nz-1))]
+			var n=Vector3(hl-hr,2*STEP,hd-hu).normalized();N[idx(i,k)]=n
+			var h=heights[idx(i,k)]
+			C[idx(i,k)]=soil(X0+i*STEP,Z0+k*STEP,h,1.0-n.y) if h>-13.0 else Color(0,0,1,0)
+	var first=null
+	for tk in range(0,nz-1,TILE):
+		for ti in range(0,nx-1,TILE):
+			var V=PackedVector3Array();var NN=PackedVector3Array();var CC=PackedColorArray();var UV=PackedVector2Array();var I=PackedInt32Array()
+			var map={}
+			var i1=min(ti+TILE,nx-1);var k1=min(tk+TILE,nz-1)
+			for k in range(tk,k1):
+				for i in range(ti,i1):
+					var a=idx(i,k);var b=idx(i+1,k);var c=idx(i,k+1);var d=idx(i+1,k+1)
+					if heights[a]<-12 and heights[b]<-12 and heights[c]<-12 and heights[d]<-12:continue
+					if holes.has(Vector2i(i,k)):continue
+					var q=[]
+					for g in [a,b,c,d]:
+						if not map.has(g):
+							map[g]=V.size()
+							var gi=g%nx;var gk=g/nx
+							var p=Vector3(X0+gi*STEP,heights[g],Z0+gk*STEP)
+							V.append(p);NN.append(N[g]);CC.append(C[g]);UV.append(Vector2(p.x,p.z)/6.0)
+						q.append(map[g])
+					I.append_array([q[0],q[1],q[2],q[1],q[3],q[2]])
+			if I.is_empty():continue
+			var arr=[];arr.resize(Mesh.ARRAY_MAX)
+			arr[Mesh.ARRAY_VERTEX]=V;arr[Mesh.ARRAY_NORMAL]=NN;arr[Mesh.ARRAY_COLOR]=CC;arr[Mesh.ARRAY_TEX_UV]=UV;arr[Mesh.ARRAY_INDEX]=I
+			var st=SurfaceTool.new();st.create_from_arrays(arr);st.generate_tangents()
+			var mi=MeshInstance3D.new();mi.mesh=st.commit();mi.name="Gelaende_%d_%d"%[ti/TILE,tk/TILE]
+			mi.material_override=sm;parent.add_child(mi)
+			if first==null:first=mi
+	return first

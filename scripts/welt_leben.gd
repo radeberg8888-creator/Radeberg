@@ -100,10 +100,10 @@ func forests(parent:Node3D):
 	if spiel:NEAR=140.0
 	var pines=[];var leafs=[];var shrubs=[]
 	var step=10.0
-	var z=-G.SZ
-	while z<G.SZ:
-		var x=-G.SX
-		while x<G.SX:
+	var z=G.Z0
+	while z<G.Z1:
+		var x=G.X0
+		while x<G.X1:
 			var p=Vector2(x+rng.randf_range(-4,4),z+rng.randf_range(-4,4))
 			x+=step
 			var h=G.h_at(p.x,p.y)
@@ -126,7 +126,7 @@ func forests(parent:Node3D):
 			else:
 				# Baumgruppen statt gleichmäßiger Streuung
 				var grove=G.noise2.get_noise_2d(p.x*0.4+900.0,p.y*0.4)
-				if grove>0.28 and rng.randf()<0.55:leafs.append([p,h])
+				if grove>0.16 and rng.randf()<0.65:leafs.append([p,h])
 				elif rng.randf()<0.006:leafs.append([p,h])
 		z+=step
 	_mm(parent,pine_mesh(),pines,0.75,1.35,"Nadelwald")
@@ -189,8 +189,10 @@ func lamp_mesh()->ArrayMesh:
 	am.surface_set_material(0,m)
 	var hb=BoxMesh.new();hb.size=Vector3(0.36,0.14,0.7)
 	var st2=SurfaceTool.new();st2.begin(Mesh.PRIMITIVE_TRIANGLES);st2.append_from(hb,0,Transform3D(Basis(),Vector3(0,7.25,1.7)));st2.commit(am)
-	am.surface_set_material(1,Mats.emissive(Color(1.0,0.93,0.8),2.5))
+	lampen_mat=Mats.emissive(Color(1.0,0.93,0.8),2.5)
+	am.surface_set_material(1,lampen_mat)
 	return am
+var lampen_mat:StandardMaterial3D
 
 func streets(parent:Node3D):
 	var lamps=[];var ab_lamps=[]

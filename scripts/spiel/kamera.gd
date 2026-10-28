@@ -10,6 +10,12 @@ var _ruhe:=0.0
 var cam:Camera3D
 var arm:SpringArm3D
 var nah:=false
+var zielen:=false
+var scope:=false
+var _kick:=0.0
+var _ziel_t:=0.0
+
+func rueckstoss(st:float):_kick+=st
 
 func _ready():
 	arm=SpringArm3D.new();add_child(arm);arm.spring_length=dist;arm.margin=0.3
@@ -40,9 +46,16 @@ func _process(dt):
 			var v=ziel.linear_velocity.dot(ziel.global_transform.basis.z) if ziel is RigidBody3D else 0.0
 			if v<-2.0:want+=PI   # rückwärts: nach vorn schauen
 			yaw=lerp_angle(yaw,want,clamp(dt*2.5,0.0,1.0));pitch=lerp(pitch,-9.0,dt*1.5)
+	# Zielen: über die rechte Schulter, näher dran, engeres Sichtfeld
+	_ziel_t=move_toward(_ziel_t,1.0 if zielen and not im_auto else 0.0,dt*6.0)
+	var rechts=Vector3(cos(yaw),0,-sin(yaw))
+	p+=rechts*0.55*_ziel_t+Vector3(0,0.05,0)*_ziel_t
 	global_position=global_position.lerp(p,clamp(dt*14.0,0.0,1.0)) if global_position.distance_to(p)<20 else p
+	_kick=move_toward(_kick,0.0,dt*10.0)
+	pitch=clamp(pitch+_kick*dt*6.0,-70.0,35.0)
 	rotation=Vector3(deg_to_rad(pitch),yaw,0)
-	arm.spring_length=lerp(arm.spring_length,dist,dt*4.0)
+	arm.spring_length=lerp(arm.spring_length,lerp(dist,1.9,_ziel_t),dt*8.0)
+	cam.fov=lerp(68.0,16.0 if scope else 52.0,_ziel_t)
 
 # Blickrichtung (für die Laufsteuerung): Vorwärts der Kamera auf dem Boden
 func blick_yaw()->float:return yaw+PI

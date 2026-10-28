@@ -20,8 +20,68 @@ var S
 
 static var _tmpl:={}
 static func vorlage(k:String)->Node3D:
-	if not _tmpl.has(k):_tmpl[k]=VH.make(k)
+	if not _tmpl.has(k):
+		var p="res://assets/cache/autos/"+k+".scn"
+		if ResourceLoader.exists(p):_tmpl[k]=load(p).instantiate()   # vorbereitet: Räder einzeln, Front = +Z
+		else:_tmpl[k]=VH.make(k)
 	return _tmpl[k]
+
+var hp:=1000.0
+var wrack:=false
+var zaeh:=false   # Missionsziel: fährt trotz Treffern weiter
+var _rauch:CPUParticles3D=null
+var _brand:=0.0
+func ist_mensch()->bool:return false
+# Beschuss / Unfallschaden: Rauch, Feuer, Explosion
+func treffer(dmg:float,von,punkt:Vector3):
+	if wrack:return
+	hp-=dmg
+	if modus=="ki" and (not zaeh or hp<350.0):ki_ziel=0.0;ki_speed=max(0.0,ki_speed-4.0)
+	if hp<380.0 and _rauch==null:_rauch_an()
+	if hp<=0.0 and _brand<=0.0:_brand=4.0
+func _rauch_an():
+	_rauch=CPUParticles3D.new();add_child(_rauch);_rauch.position=Vector3(0,ab.end.y*0.7,ab.end.z-0.9)
+	_rauch.amount=24;_rauch.lifetime=1.6;_rauch.direction=Vector3.UP;_rauch.spread=15;_rauch.initial_velocity_min=1.0;_rauch.initial_velocity_max=2.2;_rauch.gravity=Vector3(0,0.6,0)
+	_rauch.scale_amount_min=0.4;_rauch.scale_amount_max=1.0
+	var m=SphereMesh.new();m.radius=0.5;m.height=1.0;m.radial_segments=6;m.rings=3;_rauch.mesh=m
+	var mt=StandardMaterial3D.new();mt.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;mt.vertex_color_use_as_albedo=true;mt.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;m.material=mt
+	var g=Gradient.new();g.set_color(0,Color(0.35,0.35,0.35,0.6));g.set_color(1,Color(0.2,0.2,0.2,0.0));_rauch.color_ramp=g
+func _brand_schritt(dt:float):
+	if _brand<=0.0:return
+	if _rauch:
+		var g=Gradient.new();g.set_color(0,Color(1.0,0.55,0.1,0.9));g.set_color(1,Color(0.15,0.12,0.1,0.0));_rauch.color_ramp=g
+	_brand-=dt
+	if _brand<=0.0:
+		wrack=true;engine_force=0.0;brake=3.0
+		var k=get_tree().get_first_node_in_group("kampf")
+		if k:k.explosion(global_position+Vector3(0,0.8,0),self)
+		var dunkel=StandardMaterial3D.new();dunkel.albedo_color=Color(0.04,0.035,0.03,0.88);dunkel.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;dunkel.roughness=1.0
+		for m in visual.find_children("*","GeometryInstance3D",true,false):m.material_overlay=dunkel
+		apply_central_impulse(Vector3(0,mass*4.0,0));apply_torque_impulse(Vector3(randf_range(-1,1),0,randf_range(-1,1))*mass*1.5)
+
+var _licht:=[]
+func scheinwerfer(an:bool):
+	if _licht.is_empty() and an:
+		for sx in [-1,1]:
+			var l=SpotLight3D.new();add_child(l);l.position=Vector3(ab.get_center().x+sx*ab.size.x*0.32,ab.position.y+ab.size.y*0.4,ab.end.z-0.1)
+			l.rotation_degrees=Vector3(-4,180,0);l.spot_range=45.0;l.spot_angle=32.0;l.light_energy=3.5;l.light_color=Color(1,0.95,0.85);l.shadow_enabled=false
+			_licht.append(l)
+	for l in _licht:l.visible=an
+
+var rad_knoten:=[]   # [Node3D Radoptik, VehicleWheel3D, Ruhelage]
+# im Hintergrund nachladen (kein Ruckeln beim ersten Auftauchen eines Modells)
+static var _laeuft:={}
+static func vorladen(k:String):
+	var p="res://assets/cache/autos/"+k+".scn"
+	if _tmpl.has(k) or _laeuft.has(k) or not ResourceLoader.exists(p):return
+	ResourceLoader.load_threaded_request(p);_laeuft[k]=p
+static func bereit(k:String)->bool:
+	if _tmpl.has(k):return true
+	if not _laeuft.has(k):vorladen(k);return false
+	if ResourceLoader.load_threaded_get_status(_laeuft[k])==ResourceLoader.THREAD_LOAD_LOADED:
+		_tmpl[k]=ResourceLoader.load_threaded_get(_laeuft[k]).instantiate();_laeuft.erase(k);return true
+	return false
+var _spin:=0.0
 
 func setup(k:String):
 	kind=k
@@ -43,15 +103,27 @@ func setup(k:String):
 	cs.position=Vector3(ab.get_center().x,0.38+h*0.5,ab.get_center().z)
 	radius=0.5 if big else 0.34
 	var wx=ab.size.x*0.5-0.24;var wz=ab.size.z*0.5-(1.6 if big else 0.82)
-	for p in [[-1,1,true],[1,1,true],[-1,-1,false],[1,-1,false]]:
+	var rd:Array=t.get_meta("raeder",[])
+	var plan=[]
+	if rd.size()==4:
+		for r in rd:plan.append([r.p,r.r,r.vorne,"Rad_"+("V" if r.vorne else "H")+("L" if r.links else "R")])
+	else:
+		for p in [[-1,1,true],[1,1,true],[-1,-1,false],[1,-1,false]]:
+			plan.append([Vector3(ab.get_center().x+wx*p[0],radius,ab.get_center().z+wz*p[1]),radius,p[2],""])
+	for q in plan:
 		var w=VehicleWheel3D.new()
-		w.position=Vector3(ab.get_center().x+wx*p[0],radius+0.09,ab.get_center().z+wz*p[1])
-		w.use_as_steering=p[2];w.use_as_traction=not p[2] or big==false and k in ["audi_r8","bugatti","audi_rs7"]
-		if not p[2]:w.use_as_traction=true
-		w.wheel_radius=radius;w.suspension_travel=0.22;w.wheel_rest_length=0.16
-		w.suspension_stiffness=55.0 if not big else 70.0;w.damping_compression=0.9;w.damping_relaxation=1.2
+		var stiff=55.0 if not big else 70.0
+		w.wheel_rest_length=0.16;w.suspension_travel=0.22;w.suspension_stiffness=stiff
+		# Aufhängepunkt so, dass das Rad im Stand genau dort steht, wo es im Modell sitzt (Einfederung g/(4*k))
+		w.position=Vector3(q[0].x,q[0].y+w.wheel_rest_length-9.8/(4.0*stiff),q[0].z)
+		w.use_as_steering=q[2]
+		w.use_as_traction=not q[2] or k in ["audi_r8","bugatti","audi_rs7"]
+		w.wheel_radius=q[1];w.damping_compression=0.9;w.damping_relaxation=1.2
 		w.wheel_friction_slip=3.2;w.wheel_roll_influence=0.03;w.suspension_max_force=60000.0 if big else 14000.0
 		add_child(w);wheels.append(w)
+		if q[3]!="":
+			var rn=visual.get_node_or_null(q[3])
+			if rn:rad_knoten.append([rn,w,rn.position])
 	kopf_hoehe=ab.size.y+0.3
 	parken()
 
@@ -73,6 +145,7 @@ func kmh()->float:return linear_velocity.length()*3.6
 
 func fahren(st,dt:float):
 	if modus!="spieler":return
+	if wrack:engine_force=0.0;return
 	var v=linear_velocity.dot(global_transform.basis.z)
 	var speed=abs(v)*3.6
 	# Lenkung: weniger Einschlag bei hoher Geschwindigkeit
@@ -103,6 +176,18 @@ func fahren(st,dt:float):
 		_kopfueber+=dt
 		if _kopfueber>2.5:aufrichten()
 	else:_kopfueber=0.0
+
+# Radoptik: im gefahrenen Auto folgt sie der Physik (Federweg, Lenkeinschlag, Drehung), im Verkehr dreht sie sich mit
+func _process(dt):
+	_brand_schritt(dt)
+	if rad_knoten.is_empty() or not visible:return
+	if modus=="spieler":
+		for e in rad_knoten:
+			e[0].transform=e[1].transform
+	elif modus=="ki":
+		_spin=wrapf(_spin+ki_speed*dt/max(rad_knoten[0][1].wheel_radius,0.2),0.0,TAU)
+		var b=Basis(Vector3.RIGHT,_spin)
+		for e in rad_knoten:e[0].transform=Transform3D(b,e[2])
 
 func aufrichten():
 	var fw=global_transform.basis.z;fw.y=0;fw=fw.normalized()
@@ -167,7 +252,12 @@ func _ki_place(dt:float):
 	var t:Vector2=a[2]*ki_dir;var n=Vector2(-t.y,t.x)
 	var p:Vector2=a[0]-n*ki_lane    # Rechtsverkehr
 	var y=a[1]+0.04
-	var target=Transform3D(Basis.looking_at(Vector3(-t.x,0,-t.y),Vector3.UP),Vector3(p.x,y,p.y))
+	# Steigung der Straße übernehmen (sonst steckt bei Gefälle Bug oder Heck in der Fahrbahn)
+	var L=S.length(ki_road)
+	var hv=S.at(ki_road,clamp(ki_s+2.0*ki_dir,0.0,L))[1];var hh=S.at(ki_road,clamp(ki_s-2.0*ki_dir,0.0,L))[1]
+	var dy=(hv-hh)/4.0
+	var fwd=Vector3(t.x,dy,t.y).normalized()
+	var target=Transform3D(Basis.looking_at(-fwd,Vector3.UP),Vector3(p.x,y,p.y))
 	if dt>0.0:
 		var q=global_transform.basis.get_rotation_quaternion().slerp(target.basis.get_rotation_quaternion(),clamp(dt*5.0,0.0,1.0))
 		global_transform=Transform3D(Basis(q),target.origin)

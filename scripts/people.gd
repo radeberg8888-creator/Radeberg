@@ -15,9 +15,10 @@ const BASES={
 	"daya":[C+"daya/daya.gltf",C+"daya/daya.variants.json",1.78,"m"],
 	"female":[C+"female/female.gltf",C+"female/female.variants.json",1.67,"f"],
 	"aiman":[C+"aiman/aiman_rig.gltf",C+"aiman/aiman_rig.variants.json",1.70,"f"],
+	"hqman":[C+"hqman/hqman.gltf",C+"hqman/hqman.variants.json",1.81,"m"],
 }
 # Straßenpassanten (ohne Polizei-Uniform)
-const CIVIL=["joe","biker","daya","female"]
+const CIVIL=["joe","biker","daya","female","hqman"]
 
 const SKIN=[Color(0.88,0.72,0.61),Color(0.84,0.66,0.54),Color(0.82,0.62,0.48),Color(0.72,0.52,0.37),Color(0.58,0.39,0.26),Color(0.44,0.28,0.18),Color(0.33,0.2,0.13),Color(0.23,0.14,0.09),Color(0.88,0.74,0.58)]
 const HAIR=[Color(0.03,0.025,0.02),Color(0.09,0.06,0.04),Color(0.2,0.12,0.06),Color(0.42,0.27,0.13),Color(0.75,0.6,0.35),Color(0.88,0.78,0.55),Color(0.45,0.14,0.05),Color(0.55,0.55,0.55),Color(0.85,0.85,0.83)]
@@ -135,9 +136,20 @@ static func play(p:Node3D,anim:String,phase:=0.0,speed:=1.0):
 	ap.play(anim,0.25,speed);if phase>0:ap.seek(phase*ap.get_animation(anim).length,true)
 
 static var _medcache:={}
+static var _medfile=null
 static func _median_color(t:Texture2D)->Color:
 	var key=t.get_rid().get_id()
 	if _medcache.has(key):return _medcache[key]
+	# vorab berechnete Werte (auf dem Handy niemals Texturen von der Grafikkarte zurücklesen – das hängt)
+	if _medfile==null:
+		_medfile={}
+		var f=FileAccess.open("res://assets/cache/median_farben.json",FileAccess.READ)
+		if f:_medfile=JSON.parse_string(f.get_as_text())
+	if _medfile.has(t.resource_path):
+		var v=_medfile[t.resource_path];var c0=Color(v[0],v[1],v[2]);_medcache[key]=c0;return c0
+	print("MEDIAN-CACHE FEHLT: ",t.resource_path)
+	if OS.has_feature("mobile") or OS.has_feature("template"):
+		_medcache[key]=Color(0.6,0.5,0.45);return _medcache[key]
 	var img:Image=t.get_image()
 	if img==null:return Color(0.75,0.55,0.45)
 	img=img.duplicate()
@@ -151,4 +163,10 @@ static func _median_color(t:Texture2D)->Color:
 	if rs.is_empty():return Color(0.75,0.55,0.45)
 	rs.sort();gs.sort();bs.sort()
 	var c=Color(rs[rs.size()/2],gs[gs.size()/2],bs[bs.size()/2])
-	_medcache[key]=c;return c
+	_medcache[key]=c
+	# am PC fehlende Werte in den Cache schreiben (wird mit ins Spiel gepackt)
+	if t.resource_path!="" and not OS.has_feature("template"):
+		_medfile[t.resource_path]=[c.r,c.g,c.b]
+		var fw=FileAccess.open("res://assets/cache/median_farben.json",FileAccess.WRITE)
+		if fw:fw.store_string(JSON.stringify(_medfile));fw.close()
+	return c

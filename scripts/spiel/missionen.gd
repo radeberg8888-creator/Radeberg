@@ -13,10 +13,19 @@ var auto_m=null           # Missionsfahrzeug
 var checkpoints:=[]
 var marker:MeshInstance3D
 var erledigt:={}
-const SPIELBAR=["transport","lieferung","rennen","diebstahl","abschleppen","flucht","eskorte","bergung"]
+const SPIELBAR=["transport","lieferung","rennen","diebstahl","abschleppen","flucht","eskorte","bergung",
+	"gang","schiesserei","verteidigen","verfolgung","ueberfall","spionage","sniper"]
+const KAMPF_TYPEN=["gang","schiesserei","verteidigen","verfolgung","ueberfall","spionage","sniper"]
+var feinde:=[]            # Gegner dieser Mission
+var freunde:=[]
+var welle:=0
+var wtimer:=0.0
+var ziel_auto=null        # Verfolgungs-/Beschattungsziel
+var _nah_t:=0.0
 const ORTE={"ghetto":Vector2(-250,620),"altstadt":Vector2(-150,120),"downtown":Vector2(250,-350),"hafen":Vector2(1400,340),"bahnhof":Vector2(600,120),
 	"industrie":Vector2(900,560),"berg":Vector2(-1000,-620),"vorort":Vector2(760,-840),"ost":Vector2(960,-150),"flugplatz":Vector2(-960,520),
-	"gueterbahnhof":Vector2(780,560),"autobahn":Vector2(-250,1185),"bahn":Vector2(450,990),"werkstatt":Vector2.ZERO}
+	"gueterbahnhof":Vector2(780,560),"autobahn":Vector2(-250,1185),"bahn":Vector2(450,990),"werkstatt":Vector2.ZERO,
+	"kowloon":Vector2(2760,-400),"lindstadt":Vector2(2760,560),"staubwinkel":Vector2(3640,500),"canyon":Vector2(3990,-330),"espenwald":Vector2(3420,-860)}
 
 func _ready():
 	var f=FileAccess.open("res://assets/data/missionen.json",FileAccess.READ)
@@ -55,6 +64,14 @@ func ort(key:String,salt:=0)->Vector3:
 func starten(m:Dictionary):
 	abbrechen(false)
 	aktiv=m;schritt=0;zeit=0.0;limit=0.0
+	aktiv["kampf"]=m.typ in KAMPF_TYPEN
+	if aktiv.kampf:
+		var k=spiel.kampf
+		var hat_waffe=false
+		for id in k.waffen:
+			if k.WD.daten(id).typ!="nah":hat_waffe=true
+		if not hat_waffe:k.gib_waffe("pistole",4);spiel.hud.zeige(kontakt_name(m.kontakt)+" gibt dir eine Pistole.",3.0)
+		if m.typ=="sniper" and not (k.waffen.has("jagdgewehr") or k.waffen.has("m14") or k.waffen.has("mauser")):k.gib_waffe("jagdgewehr",2)
 	spiel.hud.zeige(kontakt_name(m.kontakt)+": "+m.titel,4.0)
 	if m.briefing!="":spiel.hud.zeige(m.briefing,6.0)
 	_naechster()
@@ -66,6 +83,12 @@ func abbrechen(meldung:=true):
 	if marker:marker.queue_free();marker=null
 	for c in checkpoints:if is_instance_valid(c):c.queue_free()
 	checkpoints.clear()
+	for g in feinde+freunde:
+		if is_instance_valid(g):g.mission=false
+	feinde.clear();freunde.clear();welle=0
+	if ziel_auto and is_instance_valid(ziel_auto) and ziel_auto!=spiel.auto:
+		spiel.verkehr.erase(ziel_auto);ziel_auto.queue_free()
+	ziel_auto=null
 
 func _setze_ziel(p:Vector3,radius:=4.0,farbe:=Color(1,0.85,0.1)):
 	ziel=p
@@ -97,10 +120,92 @@ func _naechster():
 			if schritt==0:_auto_hier(B,["porsche911","audi_r8","bmw_m8","jdm"][hash(m.titel)%4] if typ=="diebstahl" else "bmw_e30");_setze_ziel(B,3.0);spiel.hud.job_text="Finde den Wagen"
 			elif schritt==1:_setze_ziel(A,5.0);spiel.hud.job_text="Bring ihn zu "+m.start.capitalize()
 			else:_fertig()
+		"gang","schiesserei":
+			if schritt==0:_setze_ziel(B,14.0,Color(1,0.2,0.15));spiel.hud.job_text="Fahr zum Revier der "+_gang_name(m)
+			elif schritt==1:
+				_marker_weg();welle=1
+				_welle(B,4+_stufe(m),m)
+			else:_fertig()
+		"verteidigen":
+			if schritt==0:_setze_ziel(A,10.0,Color(0.2,1,0.3));spiel.hud.job_text="Fahr zu deinen Leuten"
+			elif schritt==1:
+				_marker_weg();limit=75.0+_stufe(m)*5;wtimer=3.0;welle=0
+				for i in 3:freunde.append(spiel.kampf.spawn(_um(A,4.0),"lindenhof",["pistole","mp5","ak47"][i],{"verbuendet":true,"mission":true,"alarm":true}))
+				spiel.hud.job_text="Halte die Stellung!"
+			else:_fertig()
+		"verfolgung":
+			if schritt==0:
+				ziel_auto=_flucht_auto(A,22.0);spiel.mini.ziel=null
+				spiel.hud.job_text="Halte das rote Auto auf – schieß oder ramm es!"
+				limit=150.0
+			elif schritt==1:
+				var fahrer=spiel.kampf.spawn(ziel_auto.global_position+ziel_auto.global_transform.basis.x*2.2+Vector3(0,0.3,0),m.gang if m.gang!="" else "ost","pistole",{"mission":true,"alarm":true})
+				feinde=[fahrer];spiel.hud.job_text="Der Fahrer flieht – schalte ihn aus!";limit=0.0
+			else:_fertig()
+		"ueberfall":
+			if schritt==0:_setze_ziel(B,8.0,Color(1,0.2,0.15));spiel.hud.job_text="Fahr zum Überfallziel"
+			elif schritt==1:
+				_setze_ziel(B,10.0,Color(1,0.2,0.15));zeit=0.0;limit=0.0;wtimer=25.0
+				_welle(B,3+_stufe(m),m,"wache")
+				spiel.hud.job_text="Halte dich 25 s im Bereich auf"
+			elif schritt==2:
+				spiel.kampf.verbrechen(2.0);_setze_ziel(A,6.0);spiel.hud.job_text="Hau ab! Zurück zum Versteck";limit=_zeit(B,A)*1.8
+			else:_fertig()
+		"spionage":
+			if schritt==0:_setze_ziel(A,6.0);spiel.hud.job_text="Fahr zum Treffpunkt"
+			elif schritt==1:
+				_marker_weg();ziel_auto=_flucht_auto(A+Vector3(25,0,0),12.0);wtimer=90.0
+				spiel.hud.job_text="Beschatte das Auto (Abstand 15–110 m)"
+			else:_fertig()
+		"sniper":
+			var V=B+Vector3(70,0,40)
+			V=_strassenpunkt(V)
+			if schritt==0:_setze_ziel(V,4.0,Color(0.3,0.7,1));spiel.hud.job_text="Geh in Schussposition"
+			elif schritt==1:
+				_marker_weg()
+				for i in 3:feinde.append(spiel.kampf.spawn(_um(B,6.0),m.gang if m.gang!="" else "ost",["pistole","mp5","pistole"][i],{"mission":true,"stationaer":true}))
+				spiel.hud.job_text="Schalte die 3 Ziele aus (Scharfschützengewehr: ZIELEN)"
+			else:_fertig()
 		"rennen":
 			if schritt==0:_setze_ziel(A,5.0);spiel.hud.job_text="Fahr zum Start"
 			elif schritt==1:_rennstrecke(A,B)
 			else:_fertig()
+
+func _stufe(m)->int:return clamp(int(m.get("id",1))/12,0,6)
+func _gang_name(m)->String:return daten.get("gangs",{}).get(m.gang,"Gang") if m.gang!="" else "Gang"
+func _marker_weg():
+	if marker:marker.queue_free();marker=null
+	spiel.mini.ziel=null
+func _um(p:Vector3,r:float)->Vector3:
+	var a=randf()*TAU;var q=p+Vector3(cos(a),0,sin(a))*randf_range(r*0.4,r)
+	q.y=spiel.kampf._boden(q);return q
+func _welle(mitte:Vector3,n:int,m,fraktion:=""):
+	var fr=fraktion if fraktion!="" else (m.gang if m.gang!="" and m.gang!="lindenhof" else "kobras")
+	var waffen=["pistole","mp5","pistole","ak47","mossberg","machete"]
+	if _stufe(m)>=3:waffen=["mp5","ak47","ar15","mossberg","pistole"]
+	for i in n:
+		var g=spiel.kampf.spawn(_um(mitte,14.0),fr,waffen[i%waffen.size()],{"mission":true,"alarm":welle>1})
+		feinde.append(g)
+func _flucht_auto(p:Vector3,v:float):
+	var S=spiel.welt.S;var best=null;var bd=1e9
+	for r in S.roads:
+		if not r.typ in ["strasse","allee","land","autobahn"]:continue
+		for i in range(0,r.P.size(),3):
+			var d=r.P[i].distance_to(Vector2(p.x,p.z))
+			if d<bd and not r.tunnel_flags[i]:bd=d;best=[r,i]
+	var c=AUTO.new();spiel.add_child(c);c.setup(["bmw_m8","audi_rs7","mercedes","porsche911"][randi()%4])
+	c.als_ki(best[0],best[1]*S.DS,1,c._lane(best[0]),S)
+	c.ki_ziel=v;c.ki_speed=v*0.5;c.zaeh=true
+	var mt=StandardMaterial3D.new();mt.albedo_color=Color(1,0.1,0.1,0.25);mt.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;mt.emission_enabled=true;mt.emission=Color(1,0,0);mt.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	var mk=MeshInstance3D.new();var cy=CylinderMesh.new();cy.top_radius=0.0;cy.bottom_radius=0.6;cy.height=1.0;mk.mesh=cy;mk.material_override=mt;c.add_child(mk);mk.position=Vector3(0,c.ab.end.y+1.2,0);mk.rotation.x=PI
+	spiel.verkehr.append(c)
+	return c
+
+func gegner_tot(g):
+	if aktiv==null:return
+	if g in feinde:
+		var rest=feinde.filter(func(x):return is_instance_valid(x) and not x.tot).size()
+		if rest>0:spiel.hud.job_text="Gegner übrig: %d"%rest
 
 func _zeit(a:Vector3,b:Vector3)->float:return a.distance_to(b)/13.0+25.0
 
@@ -131,6 +236,7 @@ func _strassenpunkt(p:Vector3)->Vector3:
 
 func _fertig():
 	var m=aktiv
+	if m.get("kampf",false):spiel.kampf.sterne=min(spiel.kampf.sterne,1.0) if m.typ!="ueberfall" else spiel.kampf.sterne
 	spiel.geld+=int(m.belohnung) if int(m.belohnung)>0 else 500
 	erledigt[str(m.id)]=true
 	spiel.hud.zeige("MISSION ERFÜLLT!  +$"+str(int(m.belohnung) if int(m.belohnung)>0 else 500),5.0)
@@ -162,6 +268,64 @@ func _process(dt):
 			if schritt==0 and spiel.auto!=null and p.distance_to(ziel)<7.0 and spiel.auto.kmh()<12.0:
 				schritt=1;spiel.hud.zeige("Ware geladen",2.0);_naechster()
 			elif schritt==1 and spiel.auto!=null and p.distance_to(ziel)<7.0 and spiel.auto.kmh()<15.0:schritt=2;_naechster()
+		"gang","schiesserei":
+			if schritt==0 and p.distance_to(ziel)<40.0:schritt=1;_naechster()
+			elif schritt==1:
+				var rest=feinde.filter(func(x):return is_instance_valid(x) and not x.tot).size()
+				if rest==0:
+					if typ=="schiesserei" and welle==1:
+						welle=2;spiel.hud.zeige("Verstärkung kommt!",2.5)
+						var B=ort(aktiv.ziel,2);_welle(B+Vector3(30,0,-25),5+_stufe(aktiv),aktiv)
+					else:schritt=2;_naechster()
+		"verteidigen":
+			if schritt==0 and p.distance_to(ziel)<14.0:schritt=1;_naechster()
+			elif schritt==1:
+				wtimer-=dt
+				if wtimer<=0.0:
+					wtimer=22.0;welle+=1
+					var A=ort(aktiv.start,1);var a=randf()*TAU
+					_welle(A+Vector3(cos(a),0,sin(a))*40.0,3+welle,aktiv)
+					for g in feinde:
+						if is_instance_valid(g):g.alarm=true
+					spiel.hud.zeige("Angriff! Welle %d"%welle,2.0)
+				if limit>0.0 and zeit>=limit-0.5:schritt=2;limit=0.0;_naechster()
+		"verfolgung":
+			if not is_instance_valid(ziel_auto):_gescheitert("Ziel verloren");return
+			spiel.mini.ziel=Vector2(ziel_auto.global_position.x,ziel_auto.global_position.z)
+			if schritt==0:
+				if ziel_auto.hp<=350.0 or ziel_auto.wrack:
+					ziel_auto.ki_ziel=0.0;ziel_auto.ki_speed=0.0;schritt=1;_naechster()
+				elif p.distance_to(ziel_auto.global_position)>400.0:_gescheitert("Ziel entkommen")
+			elif schritt==1:
+				if feinde.filter(func(x):return is_instance_valid(x) and not x.tot).is_empty():schritt=2;_naechster()
+		"ueberfall":
+			if schritt==0 and p.distance_to(ziel)<12.0:schritt=1;_naechster()
+			elif schritt==1:
+				if p.distance_to(ziel)<16.0:
+					wtimer-=dt;spiel.hud.job_text="Beute einsammeln: %d s"%int(wtimer)
+					if wtimer<=0.0:schritt=2;_naechster()
+				else:spiel.hud.job_text="Zurück in den Bereich!"
+			elif schritt==2 and p.distance_to(ziel)<8.0:schritt=3;_naechster()
+		"spionage":
+			if schritt==0 and p.distance_to(ziel)<10.0:schritt=1;_naechster()
+			elif schritt==1:
+				if not is_instance_valid(ziel_auto):_gescheitert("Ziel verloren");return
+				var d=p.distance_to(ziel_auto.global_position)
+				spiel.mini.ziel=Vector2(ziel_auto.global_position.x,ziel_auto.global_position.z)
+				wtimer-=dt
+				spiel.hud.job_text="Beschatten: %d s   Abstand %d m"%[int(wtimer),int(d)]
+				if d<15.0:
+					_nah_t+=dt
+					if _nah_t>3.0:_gescheitert("Du wurdest entdeckt");return
+				else:_nah_t=0.0
+				if d>130.0:_gescheitert("Ziel aus den Augen verloren");return
+				if wtimer<=0.0:schritt=2;_naechster()
+		"sniper":
+			if schritt==0 and p.distance_to(ziel)<5.0:schritt=1;_naechster()
+			elif schritt==1:
+				var rest=feinde.filter(func(x):return is_instance_valid(x) and not x.tot).size()
+				if rest==0:schritt=2;_naechster()
+				else:spiel.hud.job_text="Ziele übrig: %d"%rest
 		"rennen":
 			if schritt==0 and spiel.auto!=null and p.distance_to(ziel)<8.0:schritt=1;spiel.hud.zeige("3 … 2 … 1 … LOS!",2.5);_naechster()
 			elif schritt==1 and spiel.auto!=null and p.distance_to(ziel)<10.0:

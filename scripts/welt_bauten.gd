@@ -28,16 +28,30 @@ var DIST=[
 			["cityscene2_29",1],["cityscene2_34",2],["cityscene2_35",1],["nyc_00",2],["nyc_01",2],["chicago_00",2],["city3_02",2],["city_00",1],["city_13",1],["city_18",1],["house",2]]},
 	{"n":"vorort","c":Vector2(760,-840),"r":340.0,"gap":[8.0,22.0],"dirt":0.25,
 		"list":[["stash",6],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1]]},
+	{"n":"lindstadt","c":Vector2(2760,560),"r":260.0,"gap":[1.0,5.0],"dirt":0.2,
+		"list":[["realcity_18",2],["realcity_13",2],["realcity_00",2],["realcity_01",2],["realcity_04",2],["realcity_10",1],["london_00",2],["citybuilding",3],["realbuilding",3],["nycity_10",1],["beautiful_01",1],["city_09",1]]},
+	{"n":"kowloonrand","c":Vector2(2760,-560),"r":250.0,"gap":[0.0,3.0],"dirt":0.6,
+		"list":[["cityscene2_04",2],["cityscene2_13",2],["cityscene2_20",2],["nyc_00",2],["nyc_01",2],["chicago_00",2],["city3_02",2],["seoul_00",1],["seoul_01",1]]},
+	{"n":"staubwinkel","c":Vector2(3640,520),"r":200.0,"gap":[4.0,14.0],"dirt":1.0,
+		"list":[["house",4],["ghetto",4],["stash",3],["marino",1]]},
+	{"n":"moewenbach","c":Vector2(1110,-560),"r":130.0,"gap":[5.0,14.0],"dirt":0.35,
+		"list":[["stash",4],["house",2],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1],["cityscene2_05",1]]},
+	{"n":"suedfeld","c":Vector2(330,830),"r":130.0,"gap":[5.0,14.0],"dirt":0.35,
+		"list":[["stash",4],["house",2],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1],["cityscene2_05",1]]},
+	{"n":"westerholz","c":Vector2(-1060,-90),"r":130.0,"gap":[5.0,14.0],"dirt":0.35,
+		"list":[["stash",4],["house",2],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1],["cityscene2_05",1]]},
+	{"n":"nordrode","c":Vector2(120,-1000),"r":130.0,"gap":[5.0,14.0],"dirt":0.35,
+		"list":[["stash",4],["house",2],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1],["cityscene2_05",1]]},
 	{"n":"industrie","c":Vector2(920,560),"r":300.0,"gap":[4.0,12.0],"dirt":0.6,
 		"list":[["proc3_00",2],["proc3_01",2],["proc3_02",2],["proc3_03",2],["proc3_07",2],["proc3_08",2],["city3_00",1],["city3_01",1],["cityscene_00",1]]},
 ]
 
 func _init(g,s):
 	G=g;S=s;rng.seed=99
-	ox=int(2*G.SX/CELL)+1;oz=int(2*G.SZ/CELL)+1
+	ox=int((G.X1-G.X0)/CELL)+1;oz=int((G.Z1-G.Z0)/CELL)+1
 	occ.resize(ox*oz)
 
-func _c(p:Vector2)->Vector2i:return Vector2i(int((p.x+G.SX)/CELL),int((p.y+G.SZ)/CELL))
+func _c(p:Vector2)->Vector2i:return Vector2i(int((p.x-G.X0)/CELL),int((p.y-G.Z0)/CELL))
 func is_free(p:Vector2)->bool:
 	var c=_c(p)
 	if c.x<0 or c.y<0 or c.x>=ox or c.y>=oz:return false
@@ -46,7 +60,7 @@ func stamp(p:Vector2,r:float,v:=1):
 	var c0=_c(p-Vector2(r,r));var c1=_c(p+Vector2(r,r))
 	for k in range(max(c0.y,0),min(c1.y,oz-1)+1):
 		for i in range(max(c0.x,0),min(c1.x,ox-1)+1):
-			var q=Vector2(-G.SX+(i+0.5)*CELL,-G.SZ+(k+0.5)*CELL)
+			var q=Vector2(G.X0+(i+0.5)*CELL,G.Z0+(k+0.5)*CELL)
 			if q.distance_to(p)<=r:occ[k*ox+i]=v
 # gedrehtes Rechteck (Mitte, Achse a = Längsrichtung, halbe Maße)
 func _rect_cells(c:Vector2,a:Vector2,hx:float,hz:float)->Array:
@@ -54,7 +68,7 @@ func _rect_cells(c:Vector2,a:Vector2,hx:float,hz:float)->Array:
 	var c0=_c(c-Vector2(r,r));var c1=_c(c+Vector2(r,r));var out=[]
 	for k in range(max(c0.y,0),min(c1.y,oz-1)+1):
 		for i in range(max(c0.x,0),min(c1.x,ox-1)+1):
-			var q=Vector2(-G.SX+(i+0.5)*CELL,-G.SZ+(k+0.5)*CELL)-c
+			var q=Vector2(G.X0+(i+0.5)*CELL,G.Z0+(k+0.5)*CELL)-c
 			if abs(q.dot(a))<=hx and abs(q.dot(n))<=hz:out.append(k*ox+i)
 	return out
 func rect_free(c:Vector2,a:Vector2,hx:float,hz:float)->bool:
@@ -78,6 +92,9 @@ func _path(name:String)->Array:
 	if name=="house":return [B+"house/house.gltf",0.03,true]
 	if name=="ghetto":return [B+"ghetto/ghetto.gltf",1.0,true]
 	if name=="stash":return [B+"stash/stash.gltf",1.0,true]
+	if name=="citybuilding":return ["res://assets/staedte/citybuilding/citybuilding.gltf",0.1,true]
+	if name=="realbuilding":return ["res://assets/staedte/realbuilding/realbuilding.gltf",0.06,true]
+	if name=="marino":return ["res://assets/staedte/marino/marino.gltf",1.0,true]
 	var d=name.substr(0,name.rfind("_"))
 	return [E+d+"/"+name+".gltf",1.0,false]
 

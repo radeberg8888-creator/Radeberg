@@ -249,7 +249,7 @@ class Strip:
 		st.set_color(col);st.set_uv(ua);st.add_vertex(a);st.set_color(col2);st.set_uv(ud);st.add_vertex(d);st.set_color(col2);st.set_uv(uc);st.add_vertex(c)
 	func commit(parent:Node3D,m:Material,name:="",shadow:=true)->MeshInstance3D:
 		st.generate_tangents()
-		var mi=MeshInstance3D.new();mi.mesh=st.commit();mi.material_override=m;mi.name=name;parent.add_child(mi)
+		var mi=MeshInstance3D.new();mi.mesh=st.commit();mi.material_override=m;mi.name=name;parent.add_child(mi,true)
 		if not shadow:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		return mi
 
@@ -421,11 +421,11 @@ func _local(r:Dictionary,k:int,dir:int,q:Vector2)->Array:
 func _fix_one(r:Dictionary,k:int,dir:int):
 	var w=r.w;var cw=w+9.0;var roof=7.0
 	var p=r.P[k];var R=cw+80.0
-	var i0=int((p.x-R+G.SX)/G.STEP);var i1=int((p.x+R+G.SX)/G.STEP)+1;var k0=int((p.y-R+G.SZ)/G.STEP);var k1=int((p.y+R+G.SZ)/G.STEP)+1
+	var i0=int((p.x-R-G.X0)/G.STEP);var i1=int((p.x+R-G.X0)/G.STEP)+1;var k0=int((p.y-R-G.Z0)/G.STEP);var k1=int((p.y+R-G.Z0)/G.STEP)+1
 	var inside={}
 	for kk in range(max(k0,0),min(k1,G.nz-1)+1):
 		for ii in range(max(i0,0),min(i1,G.nx-1)+1):
-			var q=Vector2(-G.SX+ii*G.STEP,-G.SZ+kk*G.STEP);var L=_local(r,k,dir,q)
+			var q=Vector2(G.X0+ii*G.STEP,G.Z0+kk*G.STEP);var L=_local(r,k,dir,q)
 			if L[1]<cw and L[0]>=0.0 and L[0]<70.0:
 				var key=G.idx(ii,kk);var lim=r.h[L[2]]+roof+1.2
 				if G.heights[key]<lim:G.heights[key]=lim;inside[Vector2i(ii,kk)]=true
@@ -437,11 +437,11 @@ func _fix_one(r:Dictionary,k:int,dir:int):
 			var nin=0
 			for v in c:if inside.has(v):nin+=1
 			if nin==0 or nin==4:continue
-			var cc=Vector2(-G.SX+(ii+0.5)*G.STEP,-G.SZ+(kk+0.5)*G.STEP);var L=_local(r,k,dir,cc)
+			var cc=Vector2(G.X0+(ii+0.5)*G.STEP,G.Z0+(kk+0.5)*G.STEP);var L=_local(r,k,dir,cc)
 			if L[1]>cw+8.0 or L[0]>14.0 or L[0]<-14.0:continue
 			G.holes[Vector2i(ii,kk)]=true;cells.append(Vector2i(ii,kk))
 			for v in c:
-				var q=Vector2(-G.SX+v.x*G.STEP,-G.SZ+v.y*G.STEP);var L2=_local(r,k,dir,q)
+				var q=Vector2(G.X0+v.x*G.STEP,G.Z0+v.y*G.STEP);var L2=_local(r,k,dir,q)
 				if L2[1]<cw+8:smin=min(smin,L2[0])
 	# Röhre bis vor die entfernten Zellen verlängern
 	var ext=int(ceil(-smin/DS))+1
@@ -475,7 +475,7 @@ func _portals(s:Strip,floor_s:Strip,r:Dictionary):
 		s.quad(_v(p+nn*(w+1)-t*0.6,y+7.9),_v(p-nn*(w+1)-t*0.6,y+7.9),_v(p-nn*(w+1),y+7.9),_v(p+nn*(w+1),y+7.9),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
 		# entfernte Zellen: Boden (Straßenniveau) und Deckel (über der Röhre)
 		for c in po.cells:
-			var a=Vector2(-G.SX+c.x*G.STEP,-G.SZ+c.y*G.STEP);var bb=a+Vector2(G.STEP,G.STEP)
+			var a=Vector2(G.X0+c.x*G.STEP,G.Z0+c.y*G.STEP);var bb=a+Vector2(G.STEP,G.STEP)
 			var L=_local(r,po.k,dir,(a+bb)*0.5);var yy=r.h[L[2]]
 			if L[0]<-1.0:
 				floor_s.quad(_v(a,yy-0.06),_v(Vector2(bb.x,a.y),yy-0.06),_v(bb,yy-0.06),_v(Vector2(a.x,bb.y),yy-0.06),a/2.0,Vector2(bb.x,a.y)/2.0,bb/2.0,Vector2(a.x,bb.y)/2.0)
@@ -519,7 +519,7 @@ func clamp_terrain():
 	for k in G.nz:
 		for i in G.nx:
 			var key=G.idx(i,k)
-			if G.heights[key]<1.2 and G.island(-G.SX+i*G.STEP,-G.SZ+k*G.STEP)>=1.0:G.heights[key]=1.2
+			if G.heights[key]<1.2 and G.island(G.X0+i*G.STEP,G.Z0+k*G.STEP)>=1.0:G.heights[key]=1.2
 	for r in roads:
 		if r.typ=="schiene":continue
 		var edge=r.w+r.sw
@@ -527,10 +527,10 @@ func clamp_terrain():
 		for i in r.P.size():
 			if r.tunnel_flags[i] or r.elev[i]:continue
 			var p=r.P[i];var h=r.h[i]
-			var i0=int((p.x-rr+G.SX)/G.STEP);var i1=int((p.x+rr+G.SX)/G.STEP)+1;var k0=int((p.y-rr+G.SZ)/G.STEP);var k1=int((p.y+rr+G.SZ)/G.STEP)+1
+			var i0=int((p.x-rr-G.X0)/G.STEP);var i1=int((p.x+rr-G.X0)/G.STEP)+1;var k0=int((p.y-rr-G.Z0)/G.STEP);var k1=int((p.y+rr-G.Z0)/G.STEP)+1
 			for k in range(max(k0,0),min(k1,G.nz-1)+1):
 				for ii in range(max(i0,0),min(i1,G.nx-1)+1):
-					var q=Vector2(-G.SX+ii*G.STEP,-G.SZ+k*G.STEP);var d=q.distance_to(p)
+					var q=Vector2(G.X0+ii*G.STEP,G.Z0+k*G.STEP);var d=q.distance_to(p)
 					if d>rr:continue
 					var lim=h-0.12+max(0.0,d-edge)*0.6
 					var key=G.idx(ii,k)

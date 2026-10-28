@@ -17,6 +17,7 @@ var e:={
 	"vibration":true,
 	"hud_groesse":1.0,
 	"fps":false,
+	"gras":true,
 }
 const DATEI:="user://einstellungen.json"
 
@@ -28,6 +29,8 @@ var t_brake:=0.0
 var t_hand:=false
 var t_nos:=false
 var t_sprint:=false
+var t_feuer:=false
+var t_zielen:=false     # Umschalter (Touch)
 
 # --- Ergebnis ---
 var move:=Vector2.ZERO     # x rechts, y vorwärts
@@ -38,6 +41,8 @@ var brake:=0.0
 var handbrake:=false
 var nos:=false
 var sprint:=false
+var feuer:=false
+var zielen:=false
 var controller:=false      # ein Controller ist verbunden
 var neigung_null:=Vector3(0,-9.8,0)   # kalibrierte Ruhelage
 var _pressed:={}
@@ -72,7 +77,8 @@ func _actions():
 		"springen":[KEY_SPACE,JOY_BUTTON_A],"einsteigen":[KEY_F,KEY_E,JOY_BUTTON_Y],"karte":[KEY_M,JOY_BUTTON_BACK],
 		"pause":[KEY_ESCAPE,KEY_P,JOY_BUTTON_START],"hupe":[KEY_H,JOY_BUTTON_LEFT_STICK],"kamera":[KEY_C,JOY_BUTTON_RIGHT_STICK],
 		"handbremse":[KEY_SPACE,JOY_BUTTON_RIGHT_SHOULDER],"nos":[KEY_SHIFT,JOY_BUTTON_X],"sprinten":[KEY_SHIFT,JOY_BUTTON_B],
-		"job":[KEY_J,JOY_BUTTON_DPAD_UP],"interagieren":[KEY_E,JOY_BUTTON_DPAD_RIGHT],
+		"job":[KEY_J,JOY_BUTTON_DPAD_UP],"interagieren":[KEY_E,JOY_BUTTON_DPAD_DOWN],
+		"nachladen":[KEY_R,JOY_BUTTON_X],"waffe":[KEY_Q,KEY_TAB,JOY_BUTTON_DPAD_RIGHT],"waffe_zurueck":[KEY_Z,JOY_BUTTON_DPAD_LEFT],
 	}
 	for a in A:
 		if InputMap.has_action(a):InputMap.erase_action(a)
@@ -117,6 +123,9 @@ func _process(dt):
 	handbrake=t_hand or Input.is_action_pressed("handbremse")
 	nos=t_nos or Input.is_action_pressed("nos")
 	sprint=t_sprint or Input.is_action_pressed("sprinten") or move.length()>0.92
+	var maus=Input.mouse_mode==Input.MOUSE_MODE_CAPTURED
+	feuer=t_feuer or rt>0.5 or (maus and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	zielen=t_zielen or lt>0.5 or (maus and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 
 func _physics_process(_d):
 	pass

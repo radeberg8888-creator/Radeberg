@@ -1823,6 +1823,126 @@
     "Gebiet halten bis Verstärkung"
    ],
    "id": 112
+  },
+  {
+   "kontakt": "petro",
+   "titel": "Über die Brücke",
+   "typ": "transport",
+   "start": "hafen",
+   "ziel": "staubwinkel",
+   "gang": "fuechse",
+   "belohnung": 900,
+   "briefing": "Ein Kombi voller Ersatzteile muss nach Staubwinkel. Fahr über die Ostbrücke.",
+   "schritte": [],
+   "id": 113
+  },
+  {
+   "kontakt": "petro",
+   "titel": "Sand im Getriebe",
+   "typ": "gang",
+   "start": "staubwinkel",
+   "ziel": "canyon",
+   "gang": "fuechse",
+   "belohnung": 1800,
+   "briefing": "Die Wüstenfüchse lagern Waffen am Roten Canyon. Räum das Lager.",
+   "schritte": [],
+   "id": 114
+  },
+  {
+   "kontakt": "viktor",
+   "titel": "Kowloon-Nacht",
+   "typ": "schiesserei",
+   "start": "lindstadt",
+   "ziel": "kowloon",
+   "gang": "ost",
+   "belohnung": 2200,
+   "briefing": "Die Ostblock-Brüder haben sich in Neu-Kowloon verschanzt.",
+   "schritte": [],
+   "id": 115
+  },
+  {
+   "kontakt": "ines",
+   "titel": "Lindstadt-Express",
+   "typ": "rennen",
+   "start": "lindstadt",
+   "ziel": "staubwinkel",
+   "gang": "",
+   "belohnung": 1500,
+   "briefing": "Straßenrennen von Lindstadt quer durch die Wüste.",
+   "schritte": [],
+   "id": 116
+  },
+  {
+   "kontakt": "baron",
+   "titel": "Die Wüstenbank",
+   "typ": "ueberfall",
+   "start": "staubwinkel",
+   "ziel": "lindstadt",
+   "gang": "",
+   "belohnung": 3500,
+   "briefing": "Der Händler in Staubwinkel bunkert Bargeld. Hol es dir – und dann ab nach Lindstadt.",
+   "schritte": [],
+   "id": 117
+  },
+  {
+   "kontakt": "mara",
+   "titel": "Schatten im Espenwald",
+   "typ": "spionage",
+   "start": "espenwald",
+   "ziel": "kowloon",
+   "gang": "",
+   "belohnung": 1400,
+   "briefing": "Folge dem Wagen des Bürgermeisters unauffällig.",
+   "schritte": [],
+   "id": 118
+  },
+  {
+   "kontakt": "viktor",
+   "titel": "Canyon-Kontrolle",
+   "typ": "sniper",
+   "start": "canyon",
+   "ziel": "canyon",
+   "gang": "fuechse",
+   "belohnung": 2500,
+   "briefing": "Drei Späher am Canyonrand. Erledige sie aus der Ferne.",
+   "schritte": [],
+   "id": 119
+  },
+  {
+   "kontakt": "petro",
+   "titel": "Stellung halten",
+   "typ": "verteidigen",
+   "start": "staubwinkel",
+   "ziel": "staubwinkel",
+   "gang": "fuechse",
+   "belohnung": 2600,
+   "briefing": "Die Füchse greifen Petros Werkstatt an. Halte durch!",
+   "schritte": [],
+   "id": 120
+  },
+  {
+   "kontakt": "jojo",
+   "titel": "Fluchtwagen Kowloon",
+   "typ": "flucht",
+   "start": "kowloon",
+   "ziel": "ghetto",
+   "gang": "",
+   "belohnung": 1600,
+   "briefing": "Bring den heißen Wagen aus Kowloon zurück ins Ghetto, bevor die Polizei dich hat.",
+   "schritte": [],
+   "id": 121
+  },
+  {
+   "kontakt": "brandt",
+   "titel": "Hehlerware",
+   "typ": "verfolgung",
+   "start": "lindstadt",
+   "ziel": "kowloon",
+   "gang": "ost",
+   "belohnung": 2000,
+   "briefing": "Ein Hehler flieht mit gestohlener Ware. Stopp ihn!",
+   "schritte": [],
+   "id": 122
   }
  ],
  "jobs": {

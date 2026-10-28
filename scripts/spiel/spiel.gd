@@ -17,7 +17,13 @@ const TOR=preload("res://scripts/rolltor.gd")
 const SAVE:="user://spielstand.json"
 const MOTOR=preload("res://scripts/spiel/motor_sound.gd")
 const MIS=preload("res://scripts/spiel/missionen.gd")
-var motor;var mis
+const KAMPF=preload("res://scripts/spiel/kampf.gd")
+const WD=preload("res://scripts/spiel/waffen_daten.gd")
+const PK=preload("res://scripts/spiel/passant_koerper.gd")
+const WIRT=preload("res://scripts/spiel/wirtschaft.gd")
+const GRAS=preload("res://scripts/spiel/gras.gd")
+var gras
+var motor;var mis;var kampf;var wirt
 
 var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
@@ -54,14 +60,24 @@ func _ready():
 	await get_tree().process_frame
 	welt=WELT.new();welt.spiel=true;add_child(welt)
 	await welt.generate(func(t,p):_lade(t,p*0.8))
-	_lade("Kollision …",0.82);await get_tree().process_frame
+	await _schritt("Kollision …",0.82)
 	_kollision()
-	_lade("Autos werden vorbereitet …",0.88);await get_tree().process_frame
-	for k in ["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","polizei","porsche911"]:AUTO.vorlage(k)
-	_lade("Spieler …",0.94);await get_tree().process_frame
+	await _schritt("Autos werden vorbereitet …",0.86)
+	var alle=[]
+	for k in ["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","polizei","porsche911"]:
+		if not k in alle:alle.append(k)
+	for i in alle.size():
+		AUTO.vorlage(alle[i]);_log("  vorlage "+alle[i])
+		_lade("Autos werden vorbereitet … %d/%d"%[i+1,alle.size()],0.86+0.04*i/alle.size());await get_tree().process_frame
+	await _schritt("Spieler …",0.9)
 	_spieler()
+	await _schritt("Orte und Passanten …",0.95)
 	_zonen()
+	wirt.setup()
 	_passanten_pool(22)
+	_log("passanten ok")
+	if test_modus=="":
+		for k in FARB+["lkw","lkw_blau","bus","feuerwehr","rtw"]:AUTO.vorladen(k)
 	laden()
 	if test_modus!="":st.e.sichtweite=0;st.e.schatten=false
 	einstellungen_anwenden()
@@ -101,12 +117,32 @@ func _ladebildschirm():
 
 func _lade(t:String,p:float):
 	if lade_text:lade_text.text=t;lade_bar.value=p
+	_log(t+"   RAM %d MB"%int(OS.get_static_memory_usage()/1048576))
+
+# Ladeschritt anzeigen und sicher warten, bis er wirklich auf dem Bildschirm ist (Vulkan zeigt ein Bild verzögert)
+func _schritt(t:String,p:float):
+	_lade(t,p)
+	await get_tree().process_frame;await get_tree().process_frame;await get_tree().process_frame
+
+var _t_start:=Time.get_ticks_msec()
+# Startprotokoll (user://start_log.txt) – hilft, falls das Spiel auf dem Handy beim Laden stehen bleibt
+func _log(t:String):
+	var f=FileAccess.open("user://start_log.txt",FileAccess.READ_WRITE if FileAccess.file_exists("user://start_log.txt") and _t_start>0 and Time.get_ticks_msec()-_t_start>0 and _log_n>0 else FileAccess.WRITE)
+	if f==null:return
+	f.seek_end();f.store_line("%7.2f s  %s"%[(Time.get_ticks_msec()-_t_start)/1000.0,t]);f.close();_log_n+=1
+	print("[start] ",t)
+var _log_n:=0
 
 # ---------------- Kollision ----------------
+# Namen können von Godot mit @…@Nummer eindeutig gemacht werden -> enthält statt beginnt
+func _kollisions_teil(n:String)->bool:
+	for k in ["Gelaende","Strasse","Beton","Gehweg","Bordstein","Mittelstreifen","Schotter","Leitplanke","Kreuzung","Platz"]:
+		if n.contains(k):return true
+	return false
 func _kollision():
 	var sb=StaticBody3D.new();sb.name="Kollision";add_child(sb)
 	for c in welt.get_children():
-		if c is MeshInstance3D and (c.name=="Gelaende" or c.name.begins_with("Strasse") or c.name in ["Beton","Gehweg","Bordstein","Mittelstreifen","Schotter","Leitplanke"]):
+		if c is MeshInstance3D and _kollisions_teil(str(c.name)):
 			var cs=CollisionShape3D.new();cs.shape=c.mesh.create_trimesh_shape();sb.add_child(cs)
 	# Gebäude als Kästen
 	for pl in welt.B.placed:
@@ -143,6 +179,10 @@ func _spieler():
 	mini=MINI.new();ui.add_child(mini);mini.position=Vector2(22,22)
 	motor=MOTOR.new();add_child(motor)
 	mis=MIS.new();mis.spiel=self;add_child(mis)
+	kampf=KAMPF.new();kampf.spiel=self;add_child(kampf);kampf.setup_spieler()
+	hud.kampf=kampf
+	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
+	gras=GRAS.new();gras.welt=welt;add_child(gras)
 
 func _shop(typ:String)->Dictionary:
 	for s in welt.A.shops:
@@ -153,7 +193,7 @@ func _zonen():
 	for s in welt.A.shops:
 		var fw=Vector3(sin(s.yaw),0,cos(s.yaw))
 		var p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5+1.8)
-		var txt={"werkstatt":"Werkstatt (mit Auto hineinfahren)","waffen":"Waffen Krause","kleider":"Kleiderladen Stoffwechsel","zuhause":"Zuhause – speichern"}[s.typ]
+		var txt={"werkstatt":"Werkstatt (mit Auto hineinfahren)","waffen":"Waffen Krause","kleider":"Kleiderladen Stoffwechsel","zuhause":"Zuhause – speichern","wueste":"Sands Waffenhandel (Wüste)"}[s.typ]
 		if s.typ=="werkstatt":p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5-6.0)
 		zonen.append({"typ":s.typ,"p":p,"r":3.5 if s.typ=="werkstatt" else 1.6,"text":txt})
 		_marker(p,1.2 if s.typ!="werkstatt" else 2.6)
@@ -178,6 +218,7 @@ func _process(dt):
 	if not bereit:st.end_frame();return
 	zeit+=dt*1.0   # 1 Spielminute je Sekunde
 	if zeit>=1440.0:zeit-=1440.0
+	if Engine.get_process_frames()%3==0:_tageszeit()
 	if panel==null:kam.drehen(st.look)
 	var ziel=auto if auto!=null else spieler
 	var p:Vector3=ziel.global_position
@@ -187,6 +228,7 @@ func _process(dt):
 	if auto!=null:hud.tacho=auto.kmh();hud.nos=auto.nos_vorrat
 	motor.setze(auto.kmh() if auto else 0.0,st.gas if auto else 0.0,auto!=null and panel==null)
 	_verkehr_pflege(p)
+	if Engine.get_process_frames()%8==0:gras.aktualisieren(p,st.e.get("gras",true) and (auto==null or auto.kmh()<70.0))
 	_passanten_pflege(p,dt)
 	_interaktion()
 	_taxi(dt)
@@ -195,7 +237,35 @@ func _process(dt):
 		if panel==null:karte_oeffnen()
 	if st.pressed("kamera"):kam.nah=not kam.nah;kam.setze_ziel(ziel,auto!=null,[ziel])
 	if st.pressed("hupe") and auto!=null:motor.hupe=0.5
+	if auto==null and panel==null:kampf.spieler_schritt(dt)
+	kampf.welt_schritt(dt)
+	wirt.schritt(dt)
 	st.end_frame()
+
+# Tag und Nacht: Sonnenstand, Licht, Himmel, Straßenlaternen, Scheinwerfer
+var _sky_mat:ShaderMaterial
+func _tageszeit():
+	var t=zeit/1440.0
+	var e=sin((t-0.25)*TAU)          # >0 Tag, <0 Nacht
+	var tag=clamp(e*3.0+0.15,0.0,1.0)
+	var abend=clamp(1.0-abs(e)*4.0,0.0,1.0)
+	if e>-0.05:
+		sun.rotation_degrees=Vector3(-max(e,0.03)*68.0-4.0,-125.0+(t-0.5)*160.0,0)
+		sun.light_color=Color(1.0,0.93,0.82).lerp(Color(1.0,0.62,0.38),abend)
+		sun.light_energy=lerp(0.35,2.6,tag)
+	else:
+		# Mondlicht
+		sun.rotation_degrees=Vector3(-45,-60,0);sun.light_color=Color(0.55,0.62,0.85);sun.light_energy=0.35
+	env.ambient_light_energy=lerp(0.32,1.0,tag)
+	env.fog_light_color=Color(0.7,0.76,0.84).lerp(Color(0.95,0.7,0.5),abend).lerp(Color(0.08,0.09,0.13),1.0-tag)
+	if _sky_mat==null and env.sky and env.sky.sky_material is ShaderMaterial:_sky_mat=env.sky.sky_material
+	if _sky_mat:
+		_sky_mat.set_shader_parameter("zenith",Color(0.22,0.42,0.75).lerp(Color(0.18,0.26,0.5),abend).lerp(Color(0.01,0.015,0.04),1.0-tag))
+		_sky_mat.set_shader_parameter("horizon",Color(0.7,0.8,0.9).lerp(Color(1.0,0.62,0.4),abend).lerp(Color(0.05,0.06,0.1),1.0-tag))
+		_sky_mat.set_shader_parameter("cloud_light",Color(1,0.98,0.95).lerp(Color(1.0,0.75,0.55),abend).lerp(Color(0.12,0.13,0.17),1.0-tag))
+		_sky_mat.set_shader_parameter("cloud_shadow",Color(0.52,0.56,0.64).lerp(Color(0.05,0.05,0.08),1.0-tag))
+	if welt.LV and welt.LV.lampen_mat:welt.LV.lampen_mat.emission_energy_multiplier=lerp(7.0,0.4,tag)
+	if auto!=null:auto.scheinwerfer(tag<0.45)
 
 func uhrzeit_text()->String:
 	return "%02d:%02d"%[int(zeit/60.0)%24,int(zeit)%60]
@@ -228,7 +298,9 @@ func _interaktion():
 				return
 	else:
 		if st.pressed("einsteigen"):aussteigen();return
-		if st.pressed("job") and ist_taxi():taxi_umschalten()
+		if st.pressed("job"):
+			if ist_taxi():taxi_umschalten()
+			elif wirt.job_typ()!="" or wirt.job!="":wirt.job_umschalten()
 		for z in zonen:
 			if z.typ=="werkstatt" and auto.global_position.distance_to(z.p)<z.r+2.0:
 				if auto.kmh()<6.0:
@@ -242,15 +314,23 @@ func einsteigen(c):
 	auto=c;c.uebernehmen();c.contact_monitor=true;c.max_contacts_reported=4
 	if not c.body_entered.is_connected(_rempler):c.body_entered.connect(_rempler)
 	spieler.visible=false;spieler.process_mode=Node.PROCESS_MODE_DISABLED;spieler.collision_layer=0
+	kampf.halter.entfernen();kam.zielen=false;kam.scope=false
 	kam.setze_ziel(c,true,[c]);hud.modus="auto";hud.reset_touch()
 	if c.kind=="taxi":hud.zeige("Taxi: Tippe TAXI für den Taxi-Job",3.5)
+
+func aussteigen_sofort():
+	if auto==null:return
+	var v=auto.kmh();auto.linear_velocity=Vector3.ZERO
+	aussteigen()
 
 func aussteigen():
 	if auto.kmh()>25.0:hud.zeige("Zu schnell zum Aussteigen!",1.5);return
 	var p=auto.aussteig_punkt()
+	kampf.halter.modell=null;kampf.halter.waffe_id="";kampf.halter.setze_waffe(kampf.aktuell)
 	auto.modus="geparkt";auto.engine_force=0;auto.brake=8.0;auto.steering=0
 	spieler.global_position=p;spieler.velocity=Vector3.ZERO;spieler.visible=true;spieler.process_mode=Node.PROCESS_MODE_INHERIT;spieler.collision_layer=1
 	kam.setze_ziel(spieler,false,[spieler]);hud.modus="fuss";hud.reset_touch()
+	auto.scheinwerfer(false)
 	if taxi_aktiv:taxi_umschalten()
 	auto=null
 
@@ -260,7 +340,8 @@ func _rempler(b):
 		verkehr.erase(b);b.parken();b.freeze=false;geparkt.append(b)
 
 # ---------------- Verkehr ----------------
-const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","small_car","mercedes","taxi","porsche911","polizei","bmw_e30"]
+const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
+	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","trabant","rtw","hudson","mercedes","hoonicorn","bugatti","armored"]
 func _ziel_anzahl()->int:return [12,22,32][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
 	var p2=Vector2(p.x,p.z)
@@ -285,7 +366,11 @@ func _spawn_auto(p2:Vector2):
 		if not frei:continue
 		var c=AUTO.new();add_child(c)
 		var k=FARB[rng.randi()%FARB.size()]
-		if r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","bus"][rng.randi()%2]
+		if r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","bus","lkw_blau"][rng.randi()%3]
+		elif rng.randf()<0.03:k=["feuerwehr","bus"][rng.randi()%2]
+		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="taxi"
+		if wirt and r.typ=="autobahn" and rng.randf()<int(wirt.personal.get("logistik",{}).get("lkw",0))*0.04:k="lkw_blau"
+		if not AUTO.bereit(k):k=FARB[rng.randi()%8]   # Modell lädt noch im Hintergrund
 		c.setup(k)
 		var dir=1 if rng.randf()<0.5 else -1
 		c.als_ki(r,s,dir,c._lane(r),welt.S)
@@ -297,12 +382,23 @@ func _passanten_pool(n:int):
 	var r2=RandomNumberGenerator.new();r2.seed=11
 	for i in n:
 		var ps=PE.make(PE.CIVIL[i%PE.CIVIL.size()],r2);add_child(ps);ps.visible=false
-		passanten.append({"n":ps,"r":null,"s":0.0,"dir":1,"seite":1,"v":r2.randf_range(1.1,1.6)})
+		var e={"n":ps,"r":null,"s":0.0,"dir":1,"seite":1,"v":r2.randf_range(1.1,1.6),"tot":0.0,"flucht":0.0}
+		var kb=PK.new();kb.spiel=self;kb.eintrag=e;kb.collision_layer=4;kb.collision_mask=0;kb.sync_to_physics=false
+		var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.28;cap.height=1.7;cs.shape=cap;cs.position.y=0.86;kb.add_child(cs)
+		add_child(kb);e["k"]=kb
+		passanten.append(e)
 
 func _passanten_pflege(p:Vector3,dt:float):
 	var p2=Vector2(p.x,p.z)
 	for e in passanten:
 		var n=e.n
+		if e.tot>0.0:
+			e.tot-=dt
+			if e.tot<=0.0 or Vector2(n.global_position.x,n.global_position.z).distance_to(p2)>170.0:
+				e.tot=0.0;e.r=null;n.visible=false;n.rotation.x=0.0;n.position.y=0.0
+				var ap:AnimationPlayer=n.get_meta("anim",null)
+				if ap:ap.play()
+			continue
 		if e.r==null or Vector2(n.global_position.x,n.global_position.z).distance_to(p2)>170.0:
 			# neu setzen: Gehweg in einem Stadtviertel 40–150 m entfernt
 			if Engine.get_process_frames()%3!=0:continue
@@ -314,21 +410,41 @@ func _passanten_pflege(p:Vector3,dt:float):
 			e.r=r;e.s=s;e.dir=1 if rng.randf()<0.5 else -1;e.seite=1 if rng.randf()<0.5 else -1
 			n.visible=true;PE.play(n,"walk",rng.randf())
 		var r=e.r;var L=welt.S.length(r)
-		e.s+=e.v*dt*e.dir
+		if e.flucht>0.0:
+			e.flucht-=dt
+			if e.flucht<=0.0:PE.play(n,"walk")
+		e.s+=e.v*dt*e.dir*(3.2 if e.flucht>0.0 else 1.0)
 		if e.s<3.0 or e.s>L-3.0:e.dir=-e.dir;e.s=clamp(e.s,3.0,L-3.0)
 		var a=welt.S.at(r,e.s);var t:Vector2=a[2];var nn=Vector2(-t.y,t.x)
 		var q:Vector2=a[0]+nn*e.seite*(r.w+r.sw*0.55)
 		n.global_position=Vector3(q.x,a[1]+0.14,q.y);n.rotation.y=atan2(t.x*e.dir,t.y*e.dir)
+		e.k.global_position=n.global_position
 		# vor dem Spieler-Auto zur Seite springen
 		if auto!=null and auto.global_position.distance_to(n.global_position)<3.0 and auto.kmh()>15:
 			e.r=null;n.visible=false
 
+# Passant getroffen: fällt um, die anderen in der Nähe rennen weg
+func passant_treffer(e,von):
+	if e.tot>0.0 or not e.n.visible:return
+	var n=e.n;e.tot=25.0
+	var ap:AnimationPlayer=n.get_meta("anim",null)
+	if ap:ap.pause()
+	var tw=create_tween();tw.tween_property(n,"rotation:x",PI*0.5*(1 if randf()<0.5 else -1),0.4);tw.parallel().tween_property(n,"position:y",n.position.y+0.12,0.4)
+	e.k.global_position=Vector3(0,-500,0)
+	if von==spieler or (auto!=null and von==auto):kampf.verbrechen(0.7)
+	for o in passanten:
+		if o!=e and o.tot<=0.0 and o.n.visible and o.n.global_position.distance_to(n.global_position)<40.0:
+			o.flucht=12.0;o.dir=-o.dir;PE.play(o.n,"run")
+
 # ---------------- Läden / Zonen ----------------
 func zone_betreten(z:Dictionary):
 	match z.typ:
-		"zuhause":speichern();hud.zeige("Spiel gespeichert. Gesundheit aufgefüllt.",3.0)
+		"zuhause":kampf.hp=100.0;speichern();hud.zeige("Spiel gespeichert. Gesundheit aufgefüllt.",3.0)
 		"kleider":kleider_menue()
-		"waffen":hud.zeige("Waffen Krause: Der Laden öffnet im nächsten Update.",3.0)
+		"waffen":waffen_menue(false)
+		"wueste":waffen_menue(true)
+		"immobilie":wirt.immobilie_menue(z.d)
+		"geschaeft":wirt.geschaeft_menue(z.d)
 
 func _panel(titel:String)->VBoxContainer:
 	if panel:panel.queue_free()
@@ -347,6 +463,44 @@ func panel_zu():
 	if panel:panel.queue_free();panel=null
 	hud.modus="auto" if auto!=null else "fuss"
 	kam.setze_ziel(auto if auto else spieler,auto!=null,[auto if auto else spieler])
+
+# Waffenladen (Stadt) bzw. Wüsten-Händler: Waffen, Munition, Schutzweste
+func waffen_menue(wueste:bool):
+	var v=_panel("WAFFEN KRAUSE" if not wueste else "SANDS WAFFENHANDEL")
+	var info=Label.new();v.add_child(info)
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(0,430);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var liste=VBoxContainer.new();liste.size_flags_horizontal=Control.SIZE_EXPAND_FILL;liste.add_theme_constant_override("separation",6);sc.add_child(liste)
+	var rabatt=0.8 if wueste else 1.0
+	var ids=WD.REIHE.filter(func(i):return i!="faust" and (not wueste or i in WD.WUESTE or WD.daten(i).typ=="pistole"))
+	if not wueste:ids=ids.filter(func(i):return not i in ["m248","mauser"])   # schwere Waffen nur in der Wüste
+	var neu=func():pass
+	var aufbauen=func(self_ref):
+		for c in liste.get_children():c.queue_free()
+		info.text="Geld: $%s    Leben %d   Weste %d"%[str(geld),int(kampf.hp),int(kampf.ruestung)]
+		var w=Button.new();w.text="Schutzweste  –  $%d"%int(500*rabatt);w.custom_minimum_size=Vector2(0,54);liste.add_child(w)
+		w.pressed.connect(func():
+			if kampf.ruestung>=100:hud.zeige("Weste ist schon voll",1.5);return
+			if _zahlen(int(500*rabatt)):kampf.ruestung=100.0;hud.zeige("Schutzweste angelegt",1.5)
+			self_ref.call(self_ref))
+		for id in ids:
+			var d=WD.daten(id)
+			var h=HBoxContainer.new();liste.add_child(h)
+			var l=Label.new();l.size_flags_horizontal=Control.SIZE_EXPAND_FILL;l.add_theme_font_size_override("font_size",22)
+			var hat=kampf.waffen.has(id)
+			l.text=d.name+("  ✔" if hat else "")+"\n"+({"nah":"Nahkampf","pistole":"Pistole","mp":"Maschinenpistole","schrot":"Schrotflinte","gewehr":"Sturmgewehr","mg":"Maschinengewehr","sniper":"Präzisionsgewehr"}[d.typ])+("   Mun. %d"%(kampf.waffen[id]+kampf.magazin.get(id,0)) if hat and d.typ!="nah" else "")
+			h.add_child(l)
+			if not hat:
+				var b=Button.new();b.text="$%d"%int(d.preis*rabatt);b.custom_minimum_size=Vector2(130,54);h.add_child(b)
+				b.pressed.connect(func():
+					if _zahlen(int(d.preis*rabatt)):kampf.gib_waffe(id,3);hud.zeige(d.name+" gekauft",1.5)
+					self_ref.call(self_ref))
+			elif d.typ!="nah":
+				var b2=Button.new();b2.text="Mun. $%d"%int(d.munpreis*rabatt);b2.custom_minimum_size=Vector2(130,54);h.add_child(b2)
+				b2.pressed.connect(func():
+					if _zahlen(int(d.munpreis*rabatt)):kampf.waffen[id]+=int(d.magazin);hud.zeige("+%d Schuss"%int(d.magazin),1.2)
+					self_ref.call(self_ref))
+	aufbauen.call(aufbauen)
+	_btn(v,"VERLASSEN",panel_zu)
 
 # Kleiderladen: Teile durchschalten (sofort sichtbar), Preis bezahlen
 var _kl_alt:={}
@@ -455,7 +609,7 @@ func pausenmenue():
 
 func missionen_menue():
 	var v=_panel("MISSIONEN")
-	var info=Label.new();info.text="Fahr-Missionen sind spielbar. Kampf-Missionen kommen mit dem Waffensystem.";info.autowrap_mode=TextServer.AUTOWRAP_WORD;info.add_theme_font_size_override("font_size",18);info.custom_minimum_size=Vector2(460,0);v.add_child(info)
+	var info=Label.new();info.text="Alle %d Missionen: Fahren, Rennen, Verfolgungen, Schießereien, Bandenkriege, Überfälle, Scharfschützen. Kampf-Missionen: ⚔"%mis.spielbare().size();info.autowrap_mode=TextServer.AUTOWRAP_WORD;info.add_theme_font_size_override("font_size",18);info.custom_minimum_size=Vector2(460,0);v.add_child(info)
 	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(470,420);v.add_child(sc)
 	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sc.add_child(w)
 	var last=""
@@ -463,7 +617,7 @@ func missionen_menue():
 		if m.kontakt!=last:
 			last=m.kontakt;var l=Label.new();l.text=mis.kontakt_name(m.kontakt);l.add_theme_color_override("font_color",Color(0.98,0.82,0.3));l.add_theme_font_size_override("font_size",22);w.add_child(l)
 		var done=mis.erledigt.has(str(m.id))
-		var b=Button.new();b.text=("✔ " if done else "")+m.titel+"  ($"+str(int(m.belohnung) if int(m.belohnung)>0 else 500)+")";b.alignment=HORIZONTAL_ALIGNMENT_LEFT;b.add_theme_font_size_override("font_size",20);b.custom_minimum_size=Vector2(0,48);w.add_child(b)
+		var b=Button.new();b.text=("✔ " if done else "")+("⚔ " if m.typ in mis.KAMPF_TYPEN else "")+m.titel+"  ($"+str(int(m.belohnung) if int(m.belohnung)>0 else 500)+")";b.alignment=HORIZONTAL_ALIGNMENT_LEFT;b.add_theme_font_size_override("font_size",20);b.custom_minimum_size=Vector2(0,48);w.add_child(b)
 		var mm=m
 		b.pressed.connect(func():panel_zu();mis.starten(mm))
 	_btn(v,"Zurück",pausenmenue)
@@ -487,6 +641,7 @@ func einstellungen_menue():
 	var sw=OptionButton.new();for t in ["Sichtweite: niedrig (schnell)","Sichtweite: mittel","Sichtweite: hoch"]:sw.add_item(t)
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
 	var sh=CheckButton.new();sh.text="Schatten";sh.button_pressed=st.e.schatten;w.add_child(sh);sh.toggled.connect(func(b):st.e.schatten=b;einstellungen_anwenden())
+	var gr=CheckButton.new();gr.text="Dichtes Gras";gr.button_pressed=st.e.get("gras",true);w.add_child(gr);gr.toggled.connect(func(b):st.e.gras=b)
 	var fp=CheckButton.new();fp.text="FPS anzeigen";fp.button_pressed=st.e.fps;w.add_child(fp);fp.toggled.connect(func(b):st.e.fps=b)
 	var lc=Label.new();lc.text="Controller: "+("verbunden ✔" if st.controller else "keiner – Xbox-Controller per Bluetooth koppeln");lc.add_theme_font_size_override("font_size",20);lc.autowrap_mode=TextServer.AUTOWRAP_WORD;w.add_child(lc)
 	_btn(v,"Speichern & zurück",func():st.speichern();panel_zu())
@@ -511,7 +666,7 @@ func einstellungen_anwenden():
 func hilfe():
 	var v=_panel("STEUERUNG")
 	var l=Label.new();l.autowrap_mode=TextServer.AUTOWRAP_WORD;l.custom_minimum_size=Vector2(460,0);l.add_theme_font_size_override("font_size",20)
-	l.text="TOUCH\n• Links: Stick zum Laufen/Lenken (erscheint, wo du tippst)\n• Rechts wischen: Kamera drehen\n• Auto: GAS, BREMSE (Rückwärts), HAND, NOS, RAUS\n• Neigen-Lenkung in den Einstellungen\n\nXBOX-CONTROLLER\n• Linker Stick: laufen/lenken, rechter Stick: Kamera\n• RT Gas, LT Bremse/Rückwärts, RB Handbremse, X NOS\n• Y Ein-/Aussteigen, A Springen, B Rennen\n• D-Pad rechts: Laden betreten, D-Pad hoch: Taxi-Job\n• Start: Pause, Back: Karte\n\nTASTATUR\n• WASD, Maus, F/E Einsteigen, Leertaste, Shift, M Karte, Esc Pause"
+	l.text="TOUCH\n• Links: Stick zum Laufen/Lenken (erscheint, wo du tippst)\n• Rechts wischen: Kamera drehen (auch während FEUER gehalten wird)\n• Zu Fuß: FEUER/SCHLAG, ZIELEN (umschalten), WAFFE wechseln, LADEN\n• Auto: GAS, BREMSE (Rückwärts), HAND, NOS, RAUS, Job-Knopf (Taxi, Polizei, Feuerwehr, Rettung, LKW, Bus)\n• Neigen-Lenkung in den Einstellungen\n\nXBOX-CONTROLLER\n• Linker Stick: laufen/lenken, rechter Stick: Kamera\n• Zu Fuß: RT Schießen, LT Zielen, X Nachladen, D-Pad links/rechts Waffe wechseln\n• Auto: RT Gas, LT Bremse/Rückwärts, RB Handbremse, X NOS\n• Y Ein-/Aussteigen, A Springen, B Rennen\n• D-Pad runter: Laden/Haus betreten, D-Pad hoch: Job\n• Start: Pause, Back: Karte\n\nTASTATUR\n• WASD, Maus (links schießen, rechts zielen), R Nachladen, Q/Tab Waffe, F/E Einsteigen, Leertaste, Shift, M Karte, Esc Pause\n\nWELT\n• Ostbrücke zur Ostinsel: Neu-Kowloon, Lindstadt, Wüstendorf Staubwinkel (Waffenhändler + Tuning), Roter Canyon, Espenwald\n• Grüne Kreise: Häuser/Garagen kaufen, blaue Kreise: Geschäfte (Taxizentrale, Logistikzentrum …) mit Personal\n• Fahndungssterne: Polizei verfolgt dich, verschwinde aus ihrem Blickfeld"
 	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(470,440);v.add_child(sc);sc.add_child(l)
 	_btn(v,"Zurück",pausenmenue)
 
@@ -573,7 +728,7 @@ func _taxi(dt):
 # ---------------- Speichern / Laden ----------------
 func speichern():
 	var p=spieler.global_position
-	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z],"missionen":mis.erledigt.keys()}
+	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z],"missionen":mis.erledigt.keys(),"kampf":kampf.daten(),"wirt":wirt.daten()}
 	var f=FileAccess.open(SAVE,FileAccess.WRITE);f.store_string(JSON.stringify(d));f.close()
 
 func laden():
@@ -583,6 +738,8 @@ func laden():
 	if not d is Dictionary:return
 	geld=int(d.get("geld",500));zeit=float(d.get("zeit",zeit))
 	for k in d.get("missionen",[]):mis.erledigt[str(k)]=true
+	if d.has("kampf"):kampf.lade_daten(d.kampf)
+	if d.has("wirt"):wirt.lade_daten(d.wirt)
 	if d.has("outfit"):
 		for k in d.outfit:spieler.outfit[k]=d.outfit[k] if not (d.outfit[k] is float) else int(d.outfit[k])
 		spieler.kleidung()

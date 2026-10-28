@@ -103,6 +103,57 @@ func layout():
 	S.add("taxi",[Vector3(-1112,0,415),Vector3(-1040,0,430),Vector3(-960,0,470)],{"wear":1.0})
 	S.add("taxi",[Vector3(-1060,0,640),Vector3(-990,0,610),Vector3(-930,0,560),Vector3(-960,0,470)],{"wear":1.0})
 	S.add("piste",[Vector3(-980,0,600),Vector3(-930,0,560)],{"wear":1.0})
+	ost_layout()
+	doerfer()
+
+# Dörfer auf der Hauptinsel (vorher leere Wiesen): kleine Straßenschleife + Häuser
+const DOERFER=[["Möwenbach",Vector2(1110,-560)],["Südfeld",Vector2(330,830)],["Westerholz",Vector2(-1060,-90)],["Nordrode",Vector2(120,-1000)]]
+func doerfer():
+	for d in DOERFER:
+		var c:Vector2=d[1]
+		G.plateaus.append([c,70.0,90.0,G._nat(c.x,c.y)])
+		var pts=[]
+		for k in 6:
+			var a=TAU*k/6.0+0.3
+			pts.append(Vector3(c.x+cos(a)*95.0,0,c.y+sin(a)*70.0))
+		S.add("strasse",pts,{"closed":true,"name":d[0],"wear":0.45})
+		S.add("gasse",[Vector3(c.x-95,0,c.y),Vector3(c.x,0,c.y+5),Vector3(c.x+95,0,c.y)],{"wear":0.5})
+	# Anbindung an vorhandene Straßen
+	S.add("land",[Vector3(1180,0,-230),Vector3(1150,0,-400),Vector3(1140,0,-490)],{"wear":0.4})
+	S.add("land",[Vector3(222,0,812),Vector3(170,0,860),Vector3(120,0,900)],{"wear":0.4})
+	S.add("land",[Vector3(-1000,0,-150),Vector3(-860,0,-220),Vector3(-820,0,-250)],{"wear":0.4})
+	S.add("land",[Vector3(120,0,-930),Vector3(250,0,-880),Vector3(370,0,-780)],{"wear":0.4})
+
+# ---- Ostinsel: über die Ostbrücke erreichbar. Neu-Kowloon (dichtes Hochhausviertel), Lindstadt (Innenstadt),
+#      Staubwinkel (heruntergekommenes Wüstendorf mit Waffenhändler und Tuning), Roter Canyon, Espenwald
+const KOW:=Vector2(2760,-560)
+const LIND:=Vector2(2760,560)
+const DORF:=Vector2(3640,520)
+const CANYON:=Vector2(4180,-470)
+func ost_layout():
+	G.plateaus.append([KOW,150.0,70.0,G._nat(KOW.x,KOW.y)])
+	G.plateaus.append([LIND,200.0,80.0,G._nat(LIND.x,LIND.y)])
+	G.plateaus.append([DORF,140.0,70.0,G._nat(DORF.x,DORF.y)])
+	G.plateaus.append([CANYON,270.0,90.0,G._nat(CANYON.x,CANYON.y)])
+	S.add("rampe",[Vector3(1600,0,-170),Vector3(1450,0,-150),Vector3(1339,0,-110)],{"ab_join":true})
+	named.bruecke=S.add("land",[Vector3(1600,0,-170),Vector3(1800,6,-160),Vector3(2050,10,-150),Vector3(2300,5,-140),Vector3(2500,0,-120)],{"name":"Ostbrücke","wear":0.2})
+	S.add("land",[Vector3(2500,0,-120),Vector3(2800,0,-200),Vector3(3150,0,-150),Vector3(3550,0,-50),Vector3(3850,0,150),Vector3(3900,0,500),Vector3(3700,0,750),
+		Vector3(3300,0,850),Vector3(2900,0,780),Vector3(2600,0,500),Vector3(2450,0,200)],{"closed":true,"name":"Wüstenstraße","wear":0.55})
+	# Neu-Kowloon: Ringstraße um den Häuserblock
+	S.add("strasse",[Vector3(2610,0,-405),Vector3(2760,0,-400),Vector3(2910,0,-405),Vector3(2915,0,-560),Vector3(2910,0,-715),Vector3(2760,0,-720),Vector3(2610,0,-715),Vector3(2605,0,-560)],{"closed":true,"name":"Kowloon-Ring","wear":0.6})
+	S.add("strasse",[Vector3(2800,0,-200),Vector3(2770,0,-300),Vector3(2760,0,-400)],{"wear":0.6})
+	# Lindstadt: Raster
+	for x in [2600.0,2700.0,2800.0,2920.0]:
+		S.add("strasse",[Vector3(x,0,400),Vector3(x,0,560),Vector3(x,0,720)],{"wear":0.2})
+	for z in [400.0,560.0,720.0]:
+		S.add("strasse",[Vector3(2600,0,z),Vector3(2700,0,z),Vector3(2800,0,z),Vector3(2920,0,z)],{"wear":0.2})
+	S.add("strasse",[Vector3(2920,0,560),Vector3(3050,0,560),Vector3(3200,0,620),Vector3(3300,0,850)],{"wear":0.3})
+	# Staubwinkel (Wüstendorf)
+	named.dorf=S.add("gasse",[Vector3(3500,0,470),Vector3(3640,0,500),Vector3(3800,0,470),Vector3(3880,0,480)],{"name":"Staubweg","wear":1.0})
+	S.add("gasse",[Vector3(3640,0,380),Vector3(3640,0,500),Vector3(3660,0,640),Vector3(3700,0,750)],{"wear":1.0})
+	# zum Roten Canyon und in den Espenwald
+	S.add("piste",[Vector3(3550,0,-50),Vector3(3800,0,-250),Vector3(3990,0,-330)],{"wear":1.0})
+	S.add("land",[Vector3(3150,0,-150),Vector3(3230,0,-520),Vector3(3420,0,-860),Vector3(3700,0,-1020)],{"name":"Waldweg","wear":0.5})
 
 var spiel:=false          # true: vom Spiel erzeugt (keine Testbilder, keine statischen Autos/Passanten)
 func _ready():
@@ -178,9 +229,9 @@ func _after(t0):
 		print("HOLES ",G.holes.size())
 		for k in G.nz:
 			for i in G.nx:
-				var x=-G.SX+i*G.STEP;var z=-G.SZ+k*G.STEP
+				var x=G.X0+i*G.STEP;var z=G.Z0+k*G.STEP
 				if G.heights[G.idx(i,k)]<0.5 and G.island(x,z)>=1.0:print("TIEF ",x," ",z," ",G.heights[G.idx(i,k)])
-		for h in G.holes:print("LOCH ",h," ",-G.SX+h.x*G.STEP," ",-G.SZ+h.y*G.STEP)
+		for h in G.holes:print("LOCH ",h," ",G.X0+h.x*G.STEP," ",G.Z0+h.y*G.STEP)
 		get_tree().quit();return
 	_env()
 	_shots()
@@ -255,11 +306,11 @@ func _shots():
 		list=[street_cam(named.ghetto,260,-3.0,1.8,40),street_cam(named.ghetto,520,2.0,2.5,60),street_cam(named.allee,700,-8.0,2.0,60),
 			street_cam(named.allee,1150,-6.0,2.0,80),street_cam(named.allee,350,4.0,12.0,90),street_cam(named.hafen,300,3.0,3.0,70)]
 	if mode=="karte":
-		cam.projection=Camera3D.PROJECTION_ORTHOGONAL;cam.size=3000.0;cam.keep_aspect=Camera3D.KEEP_HEIGHT
+		cam.projection=Camera3D.PROJECTION_ORTHOGONAL;cam.size=6650.0;cam.keep_aspect=Camera3D.KEEP_WIDTH
 		for c in get_children():
 			if c is WorldEnvironment:c.environment.fog_enabled=false
 		sun.rotation_degrees=Vector3(-62,-150,0);sun.directional_shadow_max_distance=3000.0
-		cam.position=Vector3(0,1500,0);cam.rotation_degrees=Vector3(-90,0,0);cam.far=4000
+		cam.position=Vector3((G.X0+G.X1)*0.5,1500,0);cam.rotation_degrees=Vector3(-90,0,0);cam.far=4000
 		var t=Timer.new();add_child(t);t.wait_time=0.5;t.one_shot=true;t.start()
 		t.timeout.connect(func():
 			var img=get_viewport().get_texture().get_image();img.save_png(ProjectSettings.globalize_path("res://assets/ui/karte_basis.png"))

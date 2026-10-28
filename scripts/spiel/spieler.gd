@@ -12,6 +12,7 @@ var gehen:=1.9
 var rennen:=5.6
 var _gelaende_ok:=Vector3.ZERO
 var im_wasser:=0.0
+var blick_fest:=false   # beim Zielen schaut die Figur in Kamerarichtung (seitwärts gehen)
 
 func _ready():
 	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.32;cap.height=1.75;cs.shape=cap;cs.position.y=0.88;add_child(cs)
@@ -35,14 +36,14 @@ func steuern(st,dt:float):
 	var mv:Vector2=st.move
 	var fw=Vector3(sin(cam_yaw),0,cos(cam_yaw));var rt=Vector3(-fw.z,0,fw.x)
 	var dir=(fw*mv.y+rt*mv.x)
-	var sp=rennen if st.sprint else gehen
+	var sp=rennen if st.sprint and not blick_fest else gehen*(1.1 if blick_fest else 1.0)
 	if mv.length()<0.6 and not st.sprint:sp=gehen*clamp(mv.length()/0.6,0.3,1.0)
 	var want=dir*sp
 	velocity.x=move_toward(velocity.x,want.x,dt*22.0);velocity.z=move_toward(velocity.z,want.z,dt*22.0)
 	if not is_on_floor():velocity.y-=19.6*dt
 	elif st.pressed("springen"):velocity.y=5.2
 	move_and_slide()
-	if dir.length()>0.05:
+	if dir.length()>0.05 and not blick_fest:
 		var target=atan2(dir.x,dir.z)
 		figur.rotation.y=lerp_angle(figur.rotation.y,target,clamp(dt*12.0,0.0,1.0))
 	var hs=Vector2(velocity.x,velocity.z).length()

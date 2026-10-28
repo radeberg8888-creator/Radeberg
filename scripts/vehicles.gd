@@ -38,6 +38,8 @@ static var _front:={}   # Modell -> Vorzeichen der Längsachse (falls Modell rü
 const FLIP={"trabant":false}
 # Fahrzeugfront nach dem Einpassen: +1 = +Z, -1 = -Z (per Testbild ermittelt)
 const FRONT={"armored":-1.0,"bmw_m8":-1.0,"hoonicorn":-1.0,"mercedes":-1.0,"container_truck":-1.0}
+# Räder von Hand, wo das Modell keine benannten Reifen hat (r=Radius, b=Breite, z=[Vorderachse,Hinterachse])
+const RAD={"hudson":{"z":[1.66,-1.61],"r":0.33},"trabant":{"r":0.28},"firetruck":{"methode":"geo"}}
 
 static func _flat(c:Color,rough:=0.5,metal:=0.0)->StandardMaterial3D:
 	var m=StandardMaterial3D.new();m.albedo_color=c;m.roughness=rough;m.metallic=metal;return m

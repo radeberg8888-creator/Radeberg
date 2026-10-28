@@ -98,8 +98,8 @@ static func _mat(c:Color,rough:float,metal:float)->StandardMaterial3D:
 # ---------------- Optik anwenden ----------------
 static func apply(car:Node3D,c:Dictionary):
 	var model:String=car.get_meta("model","")
-	for ch in car.get_children():
-		if ch.has_meta("tuning_part"):car.remove_child(ch);ch.queue_free()
+	for ch in car.find_children("*","",true,false):
+		if ch.has_meta("tuning_part") and is_instance_valid(ch) and ch.get_parent():ch.get_parent().remove_child(ch);ch.queue_free()
 	var paints:Array=PAINT.get(model,[])
 	var body_paint:StandardMaterial3D=null
 	for m in car.find_children("*","MeshInstance3D",true,false):
@@ -145,6 +145,11 @@ static func apply(car:Node3D,c:Dictionary):
 			var ctr:Vector3=w[0];var r:float=w[1];var s=sign(ctr.x);var depth:float=w[3]
 			var holder=Node3D.new();wheels_node.add_child(holder)
 			holder.transform=Transform3D(Basis() if s>0 else Basis(Vector3.UP,PI),Vector3(w[2]-s*0.004,ctr.y,ctr.z))
+			# vorbereitete Autos: Felge an das drehbare Rad hängen
+			var rn=_rad_node(car,ctr)
+			if rn:
+				var x0=holder.transform;wheels_node.remove_child(holder);rn.add_child(holder);holder.set_meta("tuning_part",true)
+				holder.transform=Transform3D(rn.transform.basis,rn.transform.origin).affine_inverse()*(wheels_node.transform*x0)
 			var a=MeshInstance3D.new();a.mesh=rm[0];a.material_override=rmat;holder.add_child(a);a.scale=Vector3(depth/0.48,r/1.02,r/1.02)
 			var b=MeshInstance3D.new();b.mesh=rm[1];b.material_override=dark;holder.add_child(b);b.scale=a.scale
 			# Bremssattel hinter den Speichen
@@ -165,6 +170,14 @@ static func apply(car:Node3D,c:Dictionary):
 			var ins=MeshInstance3D.new();ins.mesh=CylinderMesh.new();ins.mesh.top_radius=t.mesh.top_radius*0.8;ins.mesh.bottom_radius=ins.mesh.top_radius;ins.mesh.height=0.181
 			kit.add_child(ins);ins.rotation.x=PI*0.5;ins.position=t.position;ins.material_override=dark
 	car.set_meta("tuning",c.duplicate())
+
+static func _rad_node(car:Node3D,p:Vector3)->Node3D:
+	var best=null;var bd=0.6
+	for c in car.get_children():
+		if str(c.name).begins_with("Rad_"):
+			var d=c.position.distance_to(p)
+			if d<bd:bd=d;best=c
+	return best
 
 static func _is_rim(low:String,model:String)->bool:
 	if model=="small_car":return low.contains("disk")
@@ -205,7 +218,7 @@ static func _guess_body_color(car:Node3D,paints:Array)->Color:
 			var mt=m.mesh.surface_get_material(i)
 			if mt is BaseMaterial3D and mt.resource_name in paints:
 				var c:Color=mt.albedo_color
-				if mt.albedo_texture:
+				if mt.albedo_texture and not (OS.has_feature("mobile") or OS.has_feature("template")):
 					var img:Image=mt.albedo_texture.get_image()
 					if img:
 						if img.is_compressed():img=img.duplicate();img.decompress()

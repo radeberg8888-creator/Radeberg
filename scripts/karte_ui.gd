@@ -8,22 +8,16 @@ var player:=Vector2(-180,600)
 var player_dir:=0.6
 var font:Font
 const COL={"werkstatt":Color(0.95,0.6,0.1),"waffen":Color(0.85,0.12,0.1),"kleider":Color(0.65,0.3,0.85),"zuhause":Color(0.15,0.7,0.3),
-	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6)}
-const NAMES={"werkstatt":"Tuning-Werkstatt","waffen":"Waffenladen","kleider":"Kleiderladen","zuhause":"Zuhause / Speichern","bahnhof":"Hauptbahnhof","hafen":"Hafen","flugplatz":"Flugplatz"}
+	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
+const NAMES={"werkstatt":"Tuning-Werkstatt","waffen":"Waffenladen","kleider":"Kleiderladen","zuhause":"Zuhause / Speichern","bahnhof":"Hauptbahnhof","hafen":"Hafen","flugplatz":"Flugplatz","canyon":"Roter Canyon","stadt":"Stadt / Dorf"}
 
 func _ready():
-	var img=load("res://assets/ui/karte_basis.png").get_image()
-	tex=ImageTexture.create_from_image(img)
+	tex=load("res://assets/ui/karte_basis.png")
 	var f=FileAccess.open("res://assets/ui/karte_icons.json",FileAccess.READ);icons=JSON.parse_string(f.get_as_text())
 	font=ThemeDB.fallback_font
 	var fb=FileAccess.open("res://assets/ui/karte_bereich.json",FileAccess.READ)
 	if fb:
 		var b=JSON.parse_string(fb.get_as_text());X0=b.x0;Z0=b.z0;WX=b.x1-b.x0;WZ=b.z1-b.z0
-		# auf die Insel zuschneiden (x -1850..1850)
-		var px0=int((-1850.0-X0)/WX*img.get_width());var px1=int((1850.0-X0)/WX*img.get_width())
-		if px0>0:
-			img=img.get_region(Rect2i(px0,0,px1-px0,img.get_height()));tex=ImageTexture.create_from_image(img)
-			X0=-1850.0;WX=3700.0
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	if "--shot" in OS.get_cmdline_user_args():
 		await get_tree().process_frame;await get_tree().process_frame;await get_tree().process_frame

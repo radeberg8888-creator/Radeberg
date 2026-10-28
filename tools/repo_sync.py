@@ -11,11 +11,14 @@ for n in ['project.godot','CREDITS.md','icon.png','icon.png.import']:
 for d in ['scripts','scenes','shaders','tools']:
     shutil.copytree(os.path.join(SRC,d),os.path.join(DST,d),ignore=shutil.ignore_patterns('__pycache__'))
 A=['buildings/einzeln','buildings/ghetto','buildings/house','buildings/stash','props/tree','props/polyhaven','textures','ui','data','cache','animations',
-   'characters/joe','characters/biker','characters/daya','characters/female',
-   'vehicles/small_car','vehicles/police_ford','vehicles/mercedes','vehicles/bmw_e30','vehicles/audi_rs7','vehicles/trabant','vehicles/porsche911',
-   'vehicles/container_truck','vehicles/bus','vehicles/jdm','vehicles/audi_r8','vehicles/bmw_m8']
+   'characters/joe','characters/biker','characters/daya','characters/female','characters/police','characters/woman','characters/aiman','characters/hqman',
+   'weapons','staedte/kowloon','staedte/canyon','staedte/citybuilding','staedte/realbuilding','staedte/marino']
 for d in A:
     shutil.copytree(os.path.join(SRC,'assets',d),os.path.join(DST,'assets',d))
+# Fahrzeuge: nur Texturen (Meshes stecken fertig vorbereitet in assets/cache/autos/*.scn)
+V='trabant bmw_e30 small_car hudson dodge audi_rs7 bmw_m8 audi_r8 porsche911 bugatti hoonicorn police_ford armored ambulance firetruck mercedes supra f100 jdm bus cartrailer container_truck'.split()
+for v in V:
+    shutil.copytree(os.path.join(SRC,'assets/vehicles',v),os.path.join(DST,'assets/vehicles',v),ignore=shutil.ignore_patterns('*.gltf','*.bin','*.gltf.import','*.glb','*.glb.import'))
 for f in glob.glob(SRC+'/assets/characters/michelle*'):shutil.copy2(f,DST+'/assets/characters/')
 tot=0
 for r,_,fs in os.walk(DST):

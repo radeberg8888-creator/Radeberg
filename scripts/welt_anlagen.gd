@@ -4,6 +4,7 @@ extends RefCounted
 const Mats=preload("res://scripts/mats.gd")
 const Batch=preload("res://scripts/batch.gd")
 const TOR=preload("res://scripts/rolltor.gd")
+const F=preload("res://scripts/fit.gd")
 var G;var S;var B
 var root:Node3D
 var icons:=[]      # [typ, Vector2, name]
@@ -33,9 +34,16 @@ func reserve():
 	B.rect_mark(Vector2(1545,350),Vector2(0,1),215.0,110.0)
 	# Flugplatz-Vorfeld
 	B.rect_mark(Vector2(-900,520),Vector2(0,1),160.0,70.0)
+	# Großmodelle der Ostinsel freihalten
+	B.rect_mark(Vector2(2760,-560),Vector2(0,1),146.0,146.0)
+	B.rect_mark(Vector2(4180,-470),Vector2(0,1),270.0,270.0)
+	G.flatten(Vector2(2760,-560),G.base_height(2760,-560),118.0,40.0)
+	G.flatten(Vector2(4180,-470),G.base_height(4180,-470),230.0,60.0)
 	# Läden an festen Straßenstellen: [Straße, s, Seite, Breite, Tiefe, Typ]
 	var plan=[[S.roads_by_name("Grove"),300.0,1,26.0,21.0,"werkstatt"],[S.roads_by_name("Grove"),150.0,-1,15.0,13.0,"waffen"],
 		[S.roads_by_name("Radeberger Allee"),560.0,1,18.0,14.0,"kleider"],[S.roads_by_name("Grove"),470.0,-1,13.5,11.5,"zuhause"]]
+	plan.append([S.roads_by_name("Staubweg"),95.0,1,15.0,13.0,"wueste"])
+	plan.append([S.roads_by_name("Staubweg"),230.0,-1,26.0,21.0,"werkstatt"])
 	for e in plan:
 		var r=e[0];var at=S.at(r,e[1]);var p:Vector2=at[0];var t:Vector2=at[2];var side:int=e[2]
 		var nn=Vector2(-t.y,t.x)*side
@@ -48,15 +56,53 @@ func reserve():
 func build(parent:Node3D):
 	root=Node3D.new();root.name="Anlagen";parent.add_child(root)
 	bahnhof();gueterbahnhof();hafen();flugplatz()
+	grossmodell("res://assets/staedte/kowloon/kowloon.gltf",1.0,Vector2(2760,-560),"res://assets/cache/kowloon_hoehe.json",0.0)
+	grossmodell("res://assets/staedte/canyon/canyon.gltf",26.0,Vector2(4180,-470),"res://assets/cache/canyon_hoehe.json",0.6)
+	icons.append(["canyon",Vector2(4180,-470),"Roter Canyon"])
+	icons.append(["stadt",Vector2(2760,-560),"Neu-Kowloon"]);icons.append(["stadt",Vector2(2760,560),"Lindstadt"]);icons.append(["stadt",Vector2(3640,600),"Staubwinkel"])
 	for s in shops:
 		var n=Node3D.new();root.add_child(n);n.position=Vector3(s.c.x,s.y,s.c.y);n.rotation.y=s.yaw
 		match s.typ:
-			"werkstatt":werkstatt(n,s.w,s.d);icons.append(["werkstatt",s.c,"Radeberg Customs (Tuning)"])
+			"werkstatt":werkstatt(n,s.w,s.d);icons.append(["werkstatt",s.c,"Radeberg Customs (Tuning)" if s.c.x<2000 else "Wüsten-Tuning Staubwinkel"])
 			"waffen":waffenladen(n,s.w,s.d);icons.append(["waffen",s.c,"Waffen Krause"])
+			"wueste":waffenladen(n,s.w,s.d);icons.append(["waffen",s.c,"Sands Waffenhandel (Wüste)"])
 			"kleider":kleiderladen(n,s.w,s.d);icons.append(["kleider",s.c,"Stoffwechsel (Kleidung)"])
 			"zuhause":
 				var t=B.get_tpl("stash");var w=B.instance(t,0,0.6);n.add_child(w);icons.append(["zuhause",s.c,"Zuhause (Speichern)"])
 	icons.append(["bahnhof",Vector2(690,90),"Hauptbahnhof"]);icons.append(["hafen",Vector2(1545,350),"Containerhafen"]);icons.append(["flugplatz",Vector2(-1080,540),"Alter Flugplatz"])
+
+# Großes Fertigmodell (Stadtkachel, Canyon) auf seine Hochebene setzen; Kollision über ein vorab berechnetes Höhenraster
+func grossmodell(pfad:String,skala:float,mitte:Vector2,hoehe_json:String,yaw:float):
+	if not ResourceLoader.exists(pfad):return
+	var f=FileAccess.open(hoehe_json,FileAccess.READ)
+	if f==null:return
+	var d=JSON.parse_string(f.get_as_text())
+	var n:Node3D=load(pfad).instantiate()
+	var holder=Node3D.new();root.add_child(holder)
+	holder.add_child(n);n.scale=Vector3.ONE*skala
+	# Modellmitte (Bounding Box) auf den Ursprung
+	var ab=F.aabb(holder)
+	n.position-=Vector3(ab.get_center().x,ab.position.y,ab.get_center().z)
+	# Randhöhe des Modells = Geländehöhe der Hochebene
+	var H:Array=d.h;var nx=int(d.nx);var nz=int(d.nz)
+	var rand=[]
+	for i in nx:rand.append(H[i]);rand.append(H[(nz-1)*nx+i])
+	for k in nz:rand.append(H[k*nx]);rand.append(H[k*nx+nx-1])
+	rand.sort()
+	var boden=G.base_height(mitte.x,mitte.y)
+	var y=boden-float(rand[rand.size()/2])
+	holder.position=Vector3(mitte.x,y,mitte.y);holder.rotation.y=yaw
+	for m in n.find_children("*","GeometryInstance3D",true,false):m.visibility_range_end=2600.0
+	# Kollision
+	var sb=StaticBody3D.new();holder.add_child(sb)
+	var hs=HeightMapShape3D.new();hs.map_width=nx;hs.map_depth=nz
+	var data=PackedFloat32Array()
+	for v in H:data.append(float(v))
+	hs.map_data=data
+	var cs=CollisionShape3D.new();cs.shape=hs;sb.add_child(cs)
+	var cell=float(d.zelle)
+	cs.scale=Vector3(cell,1.0,cell)
+	cs.position=Vector3(float(d.x0)+(nx-1)*cell*0.5,0.0,float(d.z0)+(nz-1)*cell*0.5)
 
 # ---------------- Hauptbahnhof ----------------
 func bahnhof():
