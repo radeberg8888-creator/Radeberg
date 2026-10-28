@@ -7,9 +7,10 @@ var tex:Texture2D
 var player:=Vector2(-180,600)
 var player_dir:=0.6
 var font:Font
+var tippen=null   # Callable(Vector2 Welt) – Admin: Teleport per Antippen
 const COL={"werkstatt":Color(0.95,0.6,0.1),"waffen":Color(0.85,0.12,0.1),"kleider":Color(0.65,0.3,0.85),"zuhause":Color(0.15,0.7,0.3),
-	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
-const NAMES={"werkstatt":"Tuning-Werkstatt","waffen":"Waffenladen","kleider":"Kleiderladen","zuhause":"Zuhause / Speichern","bahnhof":"Hauptbahnhof","hafen":"Hafen","flugplatz":"Flugplatz","canyon":"Roter Canyon","stadt":"Stadt / Dorf"}
+	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"militaer":Color(0.4,0.45,0.25),"lack":Color(0.85,0.25,0.65),"auto":Color(0.2,0.45,0.9),"premium":Color(0.85,0.7,0.15),"lager":Color(0.55,0.4,0.25),"park":Color(0.3,0.7,0.3),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
+const NAMES={"werkstatt":"Tuning-Werkstatt","waffen":"Waffenladen","kleider":"Kleiderladen","zuhause":"Zuhause / Speichern","bahnhof":"Hauptbahnhof","hafen":"Hafen","flugplatz":"Flughafen","militaer":"Militärbasis / Gefängnis","lack":"Lackiererei","auto":"Autohaus","premium":"Premium-Autohaus","canyon":"Roter Canyon","stadt":"Stadt / Dorf"}
 
 func _ready():
 	tex=load("res://assets/ui/karte_basis.png")
@@ -55,7 +56,7 @@ func _draw():
 	draw_string(font,Vector2(lx,ly+28),"RADEBERG",HORIZONTAL_ALIGNMENT_LEFT,-1,40,Color(0.98,0.85,0.35))
 	draw_string(font,Vector2(lx,ly+56),"Karte",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color(0.8,0.8,0.8))
 	var y=ly+100
-	for k in ["zuhause","werkstatt","waffen","kleider","bahnhof","hafen","flugplatz"]:
+	for k in ["zuhause","werkstatt","lack","waffen","kleider","auto","premium","hafen","flugplatz","militaer"]:
 		icon(Vector2(lx+16,y),k,15.0)
 		draw_string(font,Vector2(lx+42,y+7),NAMES[k],HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color(0.95,0.95,0.92))
 		y+=44
@@ -88,3 +89,12 @@ func icon(p:Vector2,typ:String,r:float):
 			draw_arc(p+Vector2(0,1),7.0,0.3,PI-0.3,10,w,2.5);draw_circle(p+Vector2(0,-9),2.0,w)
 		"flugplatz":   # Flugzeug
 			draw_colored_polygon(PackedVector2Array([p+Vector2(0,-10),p+Vector2(1.5,-3),p+Vector2(10,2),p+Vector2(1.5,1),p+Vector2(1.5,6),p+Vector2(4,9),p+Vector2(-4,9),p+Vector2(-1.5,6),p+Vector2(-1.5,1),p+Vector2(-10,2),p+Vector2(-1.5,-3)]),w)
+
+func m2w(p:Vector2)->Vector2:
+	var r=map_rect();return Vector2(X0+(p.x-r.position.x)/r.size.x*WX,Z0+(p.y-r.position.y)/r.size.y*WZ)
+
+func _input(ev):
+	if tippen==null:return
+	if (ev is InputEventScreenTouch and ev.pressed) or (ev is InputEventMouseButton and ev.pressed and ev.button_index==MOUSE_BUTTON_LEFT):
+		if map_rect().has_point(ev.position):
+			tippen.call(m2w(ev.position));get_viewport().set_input_as_handled()

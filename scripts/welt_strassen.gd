@@ -7,8 +7,8 @@ const DS:=4.0
 const TYP={
 	"autobahn":{"w":12.0,"sw":0.0,"g":0.05,"sm":160.0,"lanes":2,"med":0.9,"center":0,"tunnel":true},
 	"allee":{"w":10.5,"sw":5.0,"g":0.08,"sm":50.0,"lanes":2,"med":2.0,"center":0,"tunnel":false},
-	"strasse":{"w":5.5,"sw":3.5,"g":0.10,"sm":30.0,"lanes":1,"med":0.0,"center":1,"tunnel":false},
-	"gasse":{"w":4.0,"sw":2.0,"g":0.12,"sm":20.0,"lanes":1,"med":0.0,"center":0,"tunnel":false},
+	"strasse":{"w":5.5,"sw":3.5,"g":0.17,"sm":30.0,"lanes":1,"med":0.0,"center":1,"tunnel":false},
+	"gasse":{"w":4.0,"sw":2.0,"g":0.20,"sm":20.0,"lanes":1,"med":0.0,"center":0,"tunnel":false},
 	"rampe":{"w":4.5,"sw":0.0,"g":0.07,"sm":20.0,"lanes":1,"med":0.0,"center":0,"tunnel":false},
 	"land":{"w":3.8,"sw":0.0,"g":0.11,"sm":30.0,"lanes":1,"med":0.0,"center":1,"tunnel":true},
 	"piste":{"w":3.2,"sw":0.0,"g":0.14,"sm":20.0,"lanes":1,"med":0.0,"center":0,"tunnel":false},
@@ -126,7 +126,9 @@ func profiles():
 		for r in roads:if r.typ==t:sorted_.append(r)
 	roads=sorted_
 	for ri in roads.size():
-		var r=roads[ri];_sample(r)
+		var r=roads[ri]
+		if r.typ!="autobahn" and ri>0:_snap_enden(r,ri)
+		_sample(r)
 		var n=r.P.size();var raw=PackedFloat32Array();raw.resize(n)
 		for i in n:raw[i]=G.base_height(r.P[i].x,r.P[i].y)
 		r.raw=raw
@@ -187,6 +189,36 @@ func profiles():
 		r.tunnel_flags=tf;r.elev=ef
 		_index(ri)
 
+# Endpunkte an schon berechnete Straßen heranziehen (Rampen: an die Autobahn, sonst an nahe Straßen)
+func _snap_enden(r:Dictionary,ri:int):
+	var c:Array=r.ctrl
+	if r.closed:return
+	for e in [0,c.size()-1]:
+		var p=Vector2(c[e].x,c[e].z)
+		var maxd=160.0 if r.ab_join else 30.0
+		var best=null;var bd=maxd
+		if r.ab_join:
+			# Ende liegt an einer normalen Straße (Ausfahrt) -> nicht zur Autobahn ziehen
+			var nah_str=false
+			for j in ri:
+				var o=roads[j]
+				if not o.has("P") or o.typ in ["autobahn","schiene","runway"]:continue
+				for i in range(0,o.P.size(),2):
+					if o.P[i].distance_to(p)<25.0:nah_str=true;break
+				if nah_str:break
+			if nah_str:continue
+		for j in ri:
+			var o=roads[j]
+			if not o.has("P"):continue
+			if r.ab_join and o.typ!="autobahn":continue
+			if not r.ab_join and o.typ in ["autobahn","schiene","runway"]:continue
+			for i in range(0,o.P.size(),2):
+				var d=o.P[i].distance_to(p)
+				if d<bd:bd=d;best=o.P[i]
+		if best!=null and bd>0.5:
+			# Rampen: nur heranziehen, wenn das Ende wirklich auf eine Autobahn zeigen soll (nächster Punkt einer Autobahn)
+			c[e]=Vector3(best.x,c[e].y,best.y)
+
 func _clean_runs(f:Array,minlen:int):
 	var i=0
 	while i<f.size():
@@ -224,6 +256,7 @@ func _road_mat(r:Dictionary)->ShaderMaterial:
 	var T="res://assets/textures/"
 	var base="asphalt"
 	if r.typ=="piste":base="gravel"
+	if r.typ=="gasse":base="pflaster"
 	m.set_shader_parameter("alb",load(T+base+"_albedo.jpg"));m.set_shader_parameter("nrm",load(T+base+"_normal.png"))
 	var nt=NoiseTexture2D.new();nt.seamless=true;var fn=FastNoiseLite.new();fn.frequency=0.05;fn.fractal_octaves=4;nt.noise=fn;nt.width=256;nt.height=256
 	m.set_shader_parameter("crack",nt)
@@ -260,7 +293,7 @@ func _v(p:Vector2,y:float)->Vector3:return Vector3(p.x,y,p.y)
 
 func build(parent:Node3D):
 	var conc=_two(Mats.pbr("concrete",0.25,Color(0.72,0.71,0.69)))
-	var paver=Mats.pbr("pavers",0.45,Color(0.86,0.84,0.8))
+	var paver=Mats.pbr("gehweg",0.35,Color(1.45,1.42,1.36))
 	var curbm=_two(Mats.pbr("concrete",0.6,Color(0.78,0.78,0.77)))
 	var steel=_two(Mats.flat(Color(0.62,0.64,0.66),0.35,0.85))
 	var lamp_m=Mats.emissive(Color(1,0.93,0.78),3.0);lamp_m.cull_mode=BaseMaterial3D.CULL_DISABLED

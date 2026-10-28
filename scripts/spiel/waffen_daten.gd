@@ -5,6 +5,7 @@ extends RefCounted
 const W="res://assets/weapons/"
 const LISTE={
 	"faust":{"name":"Fäuste","typ":"nah","schaden":12,"rate":2.2,"reichweite":1.6,"preis":0},
+	"spraydose":{"name":"Spraydose","typ":"spray","schaden":0,"rate":1.0,"reichweite":5.0,"preis":60},
 	"machete":{"name":"Machete","modell":W+"machete.glb","laenge":0.62,"griff":0.1,"typ":"nah","schaden":38,"rate":1.6,"reichweite":2.0,"preis":150},
 	"katana":{"name":"Katana","modell":W+"katana/katana.glb","laenge":1.0,"griff":0.1,"typ":"nah","schaden":60,"rate":1.3,"reichweite":2.4,"preis":900},
 	"pistole":{"name":"Pistole 9 mm","modell":W+"pistol.glb","laenge":0.2,"griff":0.2,"typ":"pistole","schaden":22,"rate":4.0,"magazin":15,"nachladen":1.3,"reichweite":60,"streuung":1.2,"preis":400,"munpreis":30},
@@ -25,7 +26,7 @@ const LISTE={
 	"jagdgewehr":{"name":"Jagdgewehr","modell":W+"rifle.glb","laenge":1.1,"griff":0.3,"vorn":0.58,"typ":"sniper","schaden":110,"rate":0.9,"magazin":5,"nachladen":2.8,"reichweite":350,"streuung":0.2,"preis":3000,"munpreis":60},
 }
 # Reihenfolge im Laden / beim Durchschalten
-const REIHE=["faust","machete","katana","pistole","m1911","tp9","pistol_tac","mp5","mp7","ks7","mossberg","ak47","ar15","m4a1","aug","m248","jagdgewehr","m14","mauser"]
+const REIHE=["faust","spraydose","machete","katana","pistole","m1911","tp9","pistol_tac","mp5","mp7","ks7","mossberg","ak47","ar15","m4a1","aug","m248","jagdgewehr","m14","mauser"]
 # Was der Wüsten-Händler zusätzlich (günstiger, aber nur dort) anbietet
 const WUESTE=["ak47","mossberg","m248","mauser","machete","m1911"]
 const ZWEIHAND=["mp","schrot","gewehr","mg","sniper"]

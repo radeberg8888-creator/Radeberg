@@ -59,6 +59,39 @@ func _brand_schritt(dt:float):
 		for m in visual.find_children("*","GeometryInstance3D",true,false):m.material_overlay=dunkel
 		apply_central_impulse(Vector3(0,mass*4.0,0));apply_torque_impulse(Vector3(randf_range(-1,1),0,randf_range(-1,1))*mass*1.5)
 
+# ---------------- Verfolger (Polizei) ----------------
+var _stau:=0.0;var _rueck:=0.0
+func verfolge(ziel:Node3D,dt:float):
+	if modus!="verfolger":
+		modus="verfolger";freeze=false;sleeping=false;brake=0.0
+	var me=global_transform
+	var d=ziel.global_position-me.origin;var dist=d.length()
+	var lok=me.basis.inverse()*d
+	var winkel=atan2(lok.x,lok.z)
+	var v=linear_velocity.dot(me.basis.z)
+	if _rueck>0.0:
+		_rueck-=dt;engine_force=-kraft*0.6;steering=clamp(winkel,-0.5,0.5);brake=0.0;return
+	if abs(v)<1.0:_stau+=dt
+	else:_stau=0.0
+	if _stau>2.0:_stau=0.0;_rueck=1.5
+	steering=move_toward(steering,clamp(-winkel*1.2,-0.6,0.6),dt*3.0)
+	var soll=34.0 if dist>60.0 else max(10.0,dist*0.6)
+	if abs(winkel)>1.2:soll=8.0
+	engine_force=kraft*0.9 if v<soll else 0.0
+	brake=8.0 if v>soll+4.0 else 0.0
+	# Stabilisierung wie beim Spieler
+	var bx=me.basis
+	apply_torque(bx.z*(-bx.x.y)*mass*9.0+bx.x*(bx.z.y)*mass*4.0)
+	if me.basis.y.y<0.3 and linear_velocity.length()<2.0:aufrichten()
+
+var _blau:=[];var _blau_t:=0.0
+func blaulicht(an:bool):
+	if _blau.is_empty() and an:
+		for sx in [-1,1]:
+			var l=OmniLight3D.new();add_child(l);l.position=Vector3(sx*0.4,ab.end.y+0.3,ab.get_center().z+0.3);l.light_color=Color(0.15,0.3,1.0) if sx<0 else Color(1,0.1,0.1);l.omni_range=9.0;l.light_energy=3.0
+			_blau.append(l)
+	for l in _blau:l.visible=an
+
 var _licht:=[]
 func scheinwerfer(an:bool):
 	if _licht.is_empty() and an:
@@ -180,8 +213,11 @@ func fahren(st,dt:float):
 # Radoptik: im gefahrenen Auto folgt sie der Physik (Federweg, Lenkeinschlag, Drehung), im Verkehr dreht sie sich mit
 func _process(dt):
 	_brand_schritt(dt)
+	if not _blau.is_empty():
+		_blau_t+=dt
+		_blau[0].light_energy=4.0 if int(_blau_t*6.0)%2==0 else 0.2;_blau[1].light_energy=4.0 if int(_blau_t*6.0)%2==1 else 0.2
 	if rad_knoten.is_empty() or not visible:return
-	if modus=="spieler":
+	if modus=="spieler" or modus=="verfolger":
 		for e in rad_knoten:
 			e[0].transform=e[1].transform
 	elif modus=="ki":

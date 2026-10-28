@@ -22,10 +22,11 @@ var welle:=0
 var wtimer:=0.0
 var ziel_auto=null        # Verfolgungs-/Beschattungsziel
 var _nah_t:=0.0
-const ORTE={"ghetto":Vector2(-250,620),"altstadt":Vector2(-150,120),"downtown":Vector2(250,-350),"hafen":Vector2(1400,340),"bahnhof":Vector2(600,120),
-	"industrie":Vector2(900,560),"berg":Vector2(-1000,-620),"vorort":Vector2(760,-840),"ost":Vector2(960,-150),"flugplatz":Vector2(-960,520),
+const ORTE={"ghetto":Vector2(-250,620),"altstadt":Vector2(-150,120),"downtown":Vector2(250,-350),"hafen":Vector2(1560,700),"bahnhof":Vector2(600,120),
+	"industrie":Vector2(900,560),"berg":Vector2(-800,-8250),"vorort":Vector2(760,-840),"ost":Vector2(960,-150),"flugplatz":Vector2(-1900,1640),
 	"gueterbahnhof":Vector2(780,560),"autobahn":Vector2(-250,1185),"bahn":Vector2(450,990),"werkstatt":Vector2.ZERO,
-	"kowloon":Vector2(2760,-400),"lindstadt":Vector2(2760,560),"staubwinkel":Vector2(3640,500),"canyon":Vector2(3990,-330),"espenwald":Vector2(3420,-860)}
+	"kowloon":Vector2(-2050,-1000),"lindstadt":Vector2(1080,-520),"staubwinkel":Vector2(1750,-5900),"canyon":Vector2(-250,-5420),"espenwald":Vector2(-1300,-6350),
+	"nordbucht":Vector2(-2200,-8700),"sonnenhuegel":Vector2(-150,-1500),"strand":Vector2(-2150,-100),"farm":Vector2(1950,-7800),"see":Vector2(550,-5850),"stern":Vector2(1080,-520),"oststadt":Vector2(2700,600),"suedstadt":Vector2(250,1580),"docks":Vector2(500,2050),"militaer":Vector2(-1750,-5250),"stausee":Vector2(-1000,-2550),"wueste":Vector2(600,-5500),"weststadt":Vector2(-850,-450),"nordstadt":Vector2(-400,-1000),"sandufer":Vector2(900,-5850),"kornfeld":Vector2(1700,-7550),"fischerdorf":Vector2(-830,-6680),"flughafen":Vector2(-1900,1640),"kleinseoul":Vector2(-1250,850),"hafenviertel":Vector2(1600,1300),"gefaengnis":Vector2(1650,-5050)}
 
 func _ready():
 	var f=FileAccess.open("res://assets/data/missionen.json",FileAccess.READ)
@@ -200,6 +201,12 @@ func _flucht_auto(p:Vector3,v:float):
 	var mk=MeshInstance3D.new();var cy=CylinderMesh.new();cy.top_radius=0.0;cy.bottom_radius=0.6;cy.height=1.0;mk.mesh=cy;mk.material_override=mt;c.add_child(mk);mk.position=Vector3(0,c.ab.end.y+1.2,0);mk.rotation.x=PI
 	spiel.verkehr.append(c)
 	return c
+
+func tag_gesprueht():
+	if aktiv==null or aktiv.typ!="graffiti":return
+	aktiv["_tags"]=aktiv.get("_tags",0)+1
+	spiel.hud.job_text="Graffiti: %d / %d"%[aktiv._tags,aktiv.get("anzahl",5)]
+	if aktiv._tags>=aktiv.get("anzahl",5):schritt=1;_fertig()
 
 func gegner_tot(g):
 	if aktiv==null:return

@@ -21,9 +21,17 @@ const KAMPF=preload("res://scripts/spiel/kampf.gd")
 const WD=preload("res://scripts/spiel/waffen_daten.gd")
 const PK=preload("res://scripts/spiel/passant_koerper.gd")
 const WIRT=preload("res://scripts/spiel/wirtschaft.gd")
+const STROM=preload("res://scripts/spiel/gebaeude_strom.gd")
+var strom
 const GRAS=preload("res://scripts/spiel/gras.gd")
 var gras
 var motor;var mis;var kampf;var wirt
+var admin:=false          # Admin-/Testmodus (Hauptmenü)
+var admin_mod
+var story=null
+var admin_geld:=true
+var admin_gott:=false
+var admin_keine_polizei:=false
 
 var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
@@ -52,16 +60,31 @@ func _ready():
 	ui=CanvasLayer.new();ui.layer=10;add_child(ui)
 	_theme()
 	_ladebildschirm()
+	if test_modus=="":await _hauptmenue()
+	elif _arg("--admin")!="":admin=true
+	if admin:geld=99999999
 	sun=load("res://scripts/env.gd").make(self,"day")
 	for c in get_children():
 		if c is WorldEnvironment:env=c.environment
-	env.fog_density=0.0009;env.ssao_enabled=false;env.glow_enabled=false
-	sun.directional_shadow_max_distance=90.0;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	env.fog_density=0.0009
 	await get_tree().process_frame
-	welt=WELT.new();welt.spiel=true;add_child(welt)
-	await welt.generate(func(t,p):_lade(t,p*0.8))
-	await _schritt("Kollision …",0.82)
-	_kollision()
+	if WELT.cache_da() and _arg("--neu")=="":
+		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
+		await _schritt("Welt wird geladen …",0.05)
+		var pfad=WELT.CACHE_DIR+"welt.scn"
+		ResourceLoader.load_threaded_request(pfad)
+		var pr=[0.0]
+		while ResourceLoader.load_threaded_get_status(pfad,pr)==ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			_lade("Welt wird geladen … %d %%"%int(pr[0]*100),0.05+pr[0]*0.7);await get_tree().process_frame
+		var ps=ResourceLoader.load_threaded_get(pfad)
+		await _schritt("Welt wird aufgebaut …",0.76)
+		welt=ps.instantiate();welt.spiel=true;add_child(welt);welt.aus_cache()
+	else:
+		welt=WELT.new();welt.spiel=true;add_child(welt)
+		await welt.generate(func(t,p):_lade(t,p*0.8))
+		await _schritt("Kollision …",0.82)
+		welt.kollision_bauen()
+	strom=STROM.new();add_child(strom);strom.setup(welt)
 	await _schritt("Autos werden vorbereitet …",0.86)
 	var alle=[]
 	for k in ["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","polizei","porsche911"]:
@@ -71,9 +94,12 @@ func _ready():
 		_lade("Autos werden vorbereitet … %d/%d"%[i+1,alle.size()],0.86+0.04*i/alle.size());await get_tree().process_frame
 	await _schritt("Spieler …",0.9)
 	_spieler()
+	await _schritt("Häuser in der Nähe …",0.92)
+	strom.sofort(spieler.global_position,320.0)
 	await _schritt("Orte und Passanten …",0.95)
 	_zonen()
 	wirt.setup()
+	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup()
 	_passanten_pool(22)
 	_log("passanten ok")
 	if test_modus=="":
@@ -114,6 +140,21 @@ func _ladebildschirm():
 	lade_bar=ProgressBar.new();lade_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);lade_bar.position=Vector2(-400,-160);lade_bar.size=Vector2(800,26);lade_bar.max_value=1.0;lade_bar.show_percentage=false;lade.add_child(lade_bar)
 	lade_text=Label.new();lade_text.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);lade_text.position=Vector2(-400,-120);lade_text.size=Vector2(800,40);lade_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lade_text.add_theme_font_size_override("font_size",26);lade.add_child(lade_text)
 	var tip=Label.new();tip.text="Tipp: In den Einstellungen kannst du mit Handy-Neigung lenken. Xbox-Controller werden automatisch erkannt.";tip.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);tip.position=Vector2(-600,-70);tip.size=Vector2(1200,40);tip.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tip.add_theme_font_size_override("font_size",20);tip.add_theme_color_override("font_color",Color(0.8,0.8,0.8));lade.add_child(tip)
+
+# Hauptmenü: normales Spiel oder Admin-/Testmodus
+signal _gewaehlt
+func _hauptmenue():
+	var box=VBoxContainer.new();box.theme=theme_ui;lade.add_child(box)
+	box.set_anchors_preset(Control.PRESET_CENTER);box.position=Vector2(-230,-120);box.custom_minimum_size=Vector2(460,0)
+	box.add_theme_constant_override("separation",16)
+	lade_bar.visible=false;lade_text.visible=false
+	var b1=Button.new();b1.text="SPIELEN";b1.custom_minimum_size=Vector2(460,86);b1.add_theme_font_size_override("font_size",38);box.add_child(b1)
+	var b2=Button.new();b2.text="ADMIN-MODUS (alles testen)";b2.custom_minimum_size=Vector2(460,70);box.add_child(b2)
+	var hinweis=Label.new();hinweis.text="Admin: unendlich Geld, Gott-Modus, alle Autos & Waffen, Teleport, Uhrzeit, Fahndung, alle Missionen";hinweis.autowrap_mode=TextServer.AUTOWRAP_WORD;hinweis.add_theme_font_size_override("font_size",18);hinweis.custom_minimum_size=Vector2(460,0);box.add_child(hinweis)
+	b1.pressed.connect(func():admin=false;_gewaehlt.emit())
+	b2.pressed.connect(func():admin=true;_gewaehlt.emit())
+	await _gewaehlt
+	box.queue_free();lade_bar.visible=true;lade_text.visible=true
 
 func _lade(t:String,p:float):
 	if lade_text:lade_text.text=t;lade_bar.value=p
@@ -180,8 +221,9 @@ func _spieler():
 	motor=MOTOR.new();add_child(motor)
 	mis=MIS.new();mis.spiel=self;add_child(mis)
 	kampf=KAMPF.new();kampf.spiel=self;add_child(kampf);kampf.setup_spieler()
-	hud.kampf=kampf
+	hud.kampf=kampf;mini.kampf=kampf
 	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
+	admin_mod=load("res://scripts/spiel/admin.gd").new();admin_mod.spiel=self;add_child(admin_mod)
 	gras=GRAS.new();gras.welt=welt;add_child(gras)
 
 func _shop(typ:String)->Dictionary:
@@ -193,10 +235,15 @@ func _zonen():
 	for s in welt.A.shops:
 		var fw=Vector3(sin(s.yaw),0,cos(s.yaw))
 		var p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5+1.8)
-		var txt={"werkstatt":"Werkstatt (mit Auto hineinfahren)","waffen":"Waffen Krause","kleider":"Kleiderladen Stoffwechsel","zuhause":"Zuhause – speichern","wueste":"Sands Waffenhandel (Wüste)"}[s.typ]
-		if s.typ=="werkstatt":p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5-6.0)
-		zonen.append({"typ":s.typ,"p":p,"r":3.5 if s.typ=="werkstatt" else 1.6,"text":txt})
-		_marker(p,1.2 if s.typ!="werkstatt" else 2.6)
+		var txt={"werkstatt":"Werkstatt (mit Auto hineinfahren)","waffen":"Waffen Krause","kleider":"Kleiderladen Stoffwechsel","zuhause":"Zuhause – speichern",
+			"wueste":"Sands Waffenhandel (Wüste)","lack":"Lackiererei (mit Auto hineinfahren)","autohaus":"Radeberg Autohaus","premium":"Premium Motors","lager":"Logistikzentrum"}.get(s.typ,s.typ)
+		if s.has("ort"):txt+=" – "+s.ort
+		var reinfahren=s.typ in ["werkstatt","lack"]
+		if reinfahren:p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5-6.0)
+		if s.typ in ["autohaus","premium"]:p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5+3.0)
+		if s.typ=="lager":continue
+		zonen.append({"typ":s.typ,"p":p,"r":3.5 if reinfahren else 1.6,"text":txt})
+		_marker(p,1.2 if not reinfahren else 2.6)
 
 func _marker(p:Vector3,r:float):
 	var m=MeshInstance3D.new();var cy=CylinderMesh.new();cy.top_radius=r;cy.bottom_radius=r;cy.height=1.2;cy.cap_top=false;cy.cap_bottom=false;m.mesh=cy
@@ -228,6 +275,7 @@ func _process(dt):
 	if auto!=null:hud.tacho=auto.kmh();hud.nos=auto.nos_vorrat
 	motor.setze(auto.kmh() if auto else 0.0,st.gas if auto else 0.0,auto!=null and panel==null)
 	_verkehr_pflege(p)
+	strom.schritt(p)
 	if Engine.get_process_frames()%8==0:gras.aktualisieren(p,st.e.get("gras",true) and (auto==null or auto.kmh()<70.0))
 	_passanten_pflege(p,dt)
 	_interaktion()
@@ -264,7 +312,8 @@ func _tageszeit():
 		_sky_mat.set_shader_parameter("horizon",Color(0.7,0.8,0.9).lerp(Color(1.0,0.62,0.4),abend).lerp(Color(0.05,0.06,0.1),1.0-tag))
 		_sky_mat.set_shader_parameter("cloud_light",Color(1,0.98,0.95).lerp(Color(1.0,0.75,0.55),abend).lerp(Color(0.12,0.13,0.17),1.0-tag))
 		_sky_mat.set_shader_parameter("cloud_shadow",Color(0.52,0.56,0.64).lerp(Color(0.05,0.05,0.08),1.0-tag))
-	if welt.LV and welt.LV.lampen_mat:welt.LV.lampen_mat.emission_energy_multiplier=lerp(7.0,0.4,tag)
+	var lm=welt.get_meta("lampen_mat",null) if welt.has_meta("lampen_mat") else (welt.LV.lampen_mat if welt.LV else null)
+	if lm:lm.emission_energy_multiplier=lerp(7.0,0.4,tag)
 	if auto!=null:auto.scheinwerfer(tag<0.45)
 
 func uhrzeit_text()->String:
@@ -291,7 +340,7 @@ func _interaktion():
 			if st.pressed("einsteigen"):einsteigen(c)
 			return
 		for z in zonen:
-			if z.typ=="werkstatt":continue
+			if z.typ=="werkstatt" or (z.typ=="story" and z.text==""):continue
 			if spieler.global_position.distance_to(z.p)<z.r:
 				hud.prompt=z.text;hud.prompt_knopf="interagieren"
 				if st.pressed("interagieren") or st.pressed("einsteigen"):zone_betreten(z)
@@ -302,12 +351,18 @@ func _interaktion():
 			if ist_taxi():taxi_umschalten()
 			elif wirt.job_typ()!="" or wirt.job!="":wirt.job_umschalten()
 		for z in zonen:
-			if z.typ=="werkstatt" and auto.global_position.distance_to(z.p)<z.r+2.0:
+			if z.typ=="story" and z.text!="" and auto.global_position.distance_to(z.p)<z.r+3.0 and auto.kmh()<8.0:
+				hud.prompt=z.text;hud.prompt_knopf="interagieren"
+				if st.pressed("interagieren"):zone_betreten(z)
+				return
+			if z.typ in ["werkstatt","lack"] and auto.global_position.distance_to(z.p)<z.r+2.0:
 				if auto.kmh()<6.0:
+					if z.typ=="lack" and kampf.sterne>0.0 and not z.get("offen",false):
+						z.offen=true;_lackieren(true);return
 					hud.prompt="Werkstatt öffnen";hud.prompt_knopf=""
 					if not z.get("offen",false):z.offen=true;werkstatt_menue()
 				return
-			if z.typ=="werkstatt":z.offen=false
+			if z.typ in ["werkstatt","lack"]:z.offen=false
 
 func einsteigen(c):
 	verkehr.erase(c);if not geparkt.has(c):geparkt.append(c)
@@ -444,7 +499,10 @@ func zone_betreten(z:Dictionary):
 		"waffen":waffen_menue(false)
 		"wueste":waffen_menue(true)
 		"immobilie":wirt.immobilie_menue(z.d)
+		"autohaus":wirt.autohaus_menue(false)
+		"premium":wirt.autohaus_menue(true)
 		"geschaeft":wirt.geschaeft_menue(z.d)
+		"story":story.betreten(z.d)
 
 func _panel(titel:String)->VBoxContainer:
 	if panel:panel.queue_free()
@@ -561,7 +619,10 @@ func werkstatt_menue():
 		var b=Button.new();b.custom_minimum_size=Vector2(66,54);g.add_child(b)
 		var sb=StyleBoxFlat.new();sb.bg_color=TU.COLORS[f];sb.corner_radius_top_left=8;sb.corner_radius_top_right=8;sb.corner_radius_bottom_left=8;sb.corner_radius_bottom_right=8
 		b.add_theme_stylebox_override("normal",sb);b.add_theme_stylebox_override("hover",sb)
-		b.pressed.connect(func():if _zahlen(250):_tu.paint=f;_tu_anwenden())
+		b.pressed.connect(func():
+			if _zahlen(250):
+				_tu.paint=f;_tu_anwenden()
+				if kampf.sterne>0.0 and not kampf.polizei_sieht_dich():kampf.sterne=0.0;hud.zeige("Neue Farbe – Fahndung abgeschüttelt!",2.5))
 	var hn=HBoxContainer.new();v.add_child(hn)
 	var ln=Label.new();ln.text="Neon ($400): ";hn.add_child(ln)
 	for nn in ["Aus","Blau","Rot","Grün","Lila","Türkis"]:
@@ -572,10 +633,28 @@ func werkstatt_menue():
 		if lv>=3:hud.zeige("Motor ist voll getunt");return
 		if _zahlen(1500):auto.set_meta("motor",lv+1);auto.kraft*=1.12;auto.max_kmh+=12;hud.zeige("Motor Stufe "+str(lv+1)))
 	_btn(v,"NOS-Tank füllen ($200)",func():if _zahlen(200):auto.nos_vorrat=1.0;hud.zeige("NOS voll"))
-	_btn(v,"Reparieren ($100)",func():if _zahlen(100):auto.aufrichten();hud.zeige("Repariert"))
+	_btn(v,"Reparieren ($100)",func():
+		if _zahlen(100):
+			auto.aufrichten();auto.hp=1000.0
+			if auto._rauch:auto._rauch.queue_free();auto._rauch=null
+			hud.zeige("Repariert"))
 	_btn(v,"Fertig",panel_zu)
 
+# Umlackieren: neue Farbe, Polizei verliert die Spur (wie im Original)
+func _lackieren(zufall:bool,farbe:=""):
+	if auto==null:return
+	if kampf.polizei_sieht_dich():hud.zeige("Die Polizei sieht dich – erst abhängen!",2.5);return
+	if not admin and not _zahlen(200):return
+	_tu=auto.get_meta("tuning",TU.default_cfg())
+	var farben=["Signalrot","Racing-Gelb","Rallye-Blau","Tiefschwarz","Weiß","Limette","Orange","Lila","Silber","Gold","Petrol"]
+	_tu.paint=farbe if farbe!="" else farben[randi()%farben.size()]
+	_tu_anwenden();auto.hp=1000.0
+	var hatte=kampf.sterne>0.0
+	kampf.sterne=0.0
+	hud.zeige(("Neu lackiert – die Polizei sucht jetzt ein anderes Auto! " if hatte else "Neu lackiert! ")+"(200 $)",3.5)
+
 func _zahlen(b:int)->bool:
+	if admin and admin_geld:return true
 	if b>geld:hud.zeige("Nicht genug Geld!",2.0);return false
 	geld-=b;return true
 func _tu_anwenden():
@@ -584,8 +663,9 @@ func _tu_anwenden():
 	TU.apply(auto.visual,_tu)
 
 # ---------------- Karte ----------------
-func karte_oeffnen():
+func karte_oeffnen(teleport:=false):
 	var k=load("res://scripts/karte_ui.gd").new()
+	if teleport:k.tippen=func(w:Vector2):admin_mod.teleport(Vector3(w.x,0,w.y))
 	hud.modus="menue";hud.reset_touch()
 	var p=(auto if auto else spieler).global_position
 	k.player=Vector2(p.x,p.z);k.player_dir=kam.blick_yaw()
@@ -599,6 +679,7 @@ func pausenmenue():
 	get_tree().paused=false
 	var v=_panel("PAUSE")
 	_btn(v,"Weiter",panel_zu)
+	if admin:_btn(v,"★ ADMIN-MENÜ ★",admin_mod.menue)
 	_btn(v,"Karte",func():panel_zu();karte_oeffnen())
 	_btn(v,"Missionen ("+str(mis.erledigt.size())+"/"+str(mis.spielbare().size())+")",missionen_menue)
 	if mis.aktiv!=null:_btn(v,"Mission abbrechen",func():mis.abbrechen();panel_zu())
@@ -640,6 +721,8 @@ func einstellungen_menue():
 	_slider(w,"Größe der Touch-Knöpfe","hud_groesse",0.7,1.4)
 	var sw=OptionButton.new();for t in ["Sichtweite: niedrig (schnell)","Sichtweite: mittel","Sichtweite: hoch"]:sw.add_item(t)
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
+	var gq=OptionButton.new();for t in ["Grafik: Mittel (schnell)","Grafik: Hoch","Grafik: Ultra (realistisch, braucht starkes Handy)"]:gq.add_item(t)
+	gq.selected=int(st.e.get("grafik",1));w.add_child(gq);gq.item_selected.connect(func(i):st.e.grafik=i;einstellungen_anwenden())
 	var sh=CheckButton.new();sh.text="Schatten";sh.button_pressed=st.e.schatten;w.add_child(sh);sh.toggled.connect(func(b):st.e.schatten=b;einstellungen_anwenden())
 	var gr=CheckButton.new();gr.text="Dichtes Gras";gr.button_pressed=st.e.get("gras",true);w.add_child(gr);gr.toggled.connect(func(b):st.e.gras=b)
 	var fp=CheckButton.new();fp.text="FPS anzeigen";fp.button_pressed=st.e.fps;w.add_child(fp);fp.toggled.connect(func(b):st.e.fps=b)
@@ -653,6 +736,21 @@ func _slider(v:Control,t:String,key:String,a:float,b:float):
 
 func einstellungen_anwenden():
 	sun.shadow_enabled=st.e.schatten
+	# Grafikstufe: Umgebungsverdeckung, indirektes Licht, Spiegelungen, Lichtnebel, Schattenreichweite, Auflösungs-Skalierung (FSR 2)
+	var q=int(st.e.get("grafik",1))
+	env.ssao_enabled=q>=1;env.ssao_radius=1.2;env.ssao_intensity=1.8;env.ssao_detail=0.6
+	env.ssil_enabled=q>=2;env.ssil_radius=4.0;env.ssil_intensity=0.8
+	env.ssr_enabled=q>=2;env.ssr_max_steps=48;env.ssr_fade_in=0.15;env.ssr_fade_out=2.0
+	env.volumetric_fog_enabled=q>=2;env.volumetric_fog_density=0.0035;env.volumetric_fog_length=180.0;env.volumetric_fog_anisotropy=0.6
+	env.glow_enabled=true;env.glow_intensity=0.45;env.glow_bloom=0.05
+	sun.directional_shadow_max_distance=[120.0,200.0,320.0][q]
+	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if q==0 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.shadow_blur=1.0;sun.light_angular_distance=0.6 if q>=1 else 0.0
+	var vp=get_viewport()
+	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR2
+	vp.scaling_3d_scale=[0.6,0.77,1.0][q]
+	vp.use_taa=false
+	vp.mesh_lod_threshold=[2.0,1.0,0.5][q]
 	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
 	var g=welt.get_node_or_null("Gebaeude")
 	if g:
@@ -666,7 +764,7 @@ func einstellungen_anwenden():
 func hilfe():
 	var v=_panel("STEUERUNG")
 	var l=Label.new();l.autowrap_mode=TextServer.AUTOWRAP_WORD;l.custom_minimum_size=Vector2(460,0);l.add_theme_font_size_override("font_size",20)
-	l.text="TOUCH\n• Links: Stick zum Laufen/Lenken (erscheint, wo du tippst)\n• Rechts wischen: Kamera drehen (auch während FEUER gehalten wird)\n• Zu Fuß: FEUER/SCHLAG, ZIELEN (umschalten), WAFFE wechseln, LADEN\n• Auto: GAS, BREMSE (Rückwärts), HAND, NOS, RAUS, Job-Knopf (Taxi, Polizei, Feuerwehr, Rettung, LKW, Bus)\n• Neigen-Lenkung in den Einstellungen\n\nXBOX-CONTROLLER\n• Linker Stick: laufen/lenken, rechter Stick: Kamera\n• Zu Fuß: RT Schießen, LT Zielen, X Nachladen, D-Pad links/rechts Waffe wechseln\n• Auto: RT Gas, LT Bremse/Rückwärts, RB Handbremse, X NOS\n• Y Ein-/Aussteigen, A Springen, B Rennen\n• D-Pad runter: Laden/Haus betreten, D-Pad hoch: Job\n• Start: Pause, Back: Karte\n\nTASTATUR\n• WASD, Maus (links schießen, rechts zielen), R Nachladen, Q/Tab Waffe, F/E Einsteigen, Leertaste, Shift, M Karte, Esc Pause\n\nWELT\n• Ostbrücke zur Ostinsel: Neu-Kowloon, Lindstadt, Wüstendorf Staubwinkel (Waffenhändler + Tuning), Roter Canyon, Espenwald\n• Grüne Kreise: Häuser/Garagen kaufen, blaue Kreise: Geschäfte (Taxizentrale, Logistikzentrum …) mit Personal\n• Fahndungssterne: Polizei verfolgt dich, verschwinde aus ihrem Blickfeld"
+	l.text="TOUCH\n• Links: Stick zum Laufen/Lenken (erscheint, wo du tippst)\n• Rechts wischen: Kamera drehen (auch während FEUER gehalten wird)\n• Zu Fuß: FEUER/SCHLAG, ZIELEN (umschalten), WAFFE wechseln, LADEN\n• Auto: GAS, BREMSE (Rückwärts), HAND, NOS, RAUS, Job-Knopf (Taxi, Polizei, Feuerwehr, Rettung, LKW, Bus)\n• Neigen-Lenkung in den Einstellungen\n\nXBOX-CONTROLLER\n• Linker Stick: laufen/lenken, rechter Stick: Kamera\n• Zu Fuß: RT Schießen, LT Zielen, X Nachladen, D-Pad links/rechts Waffe wechseln\n• Auto: RT Gas, LT Bremse/Rückwärts, RB Handbremse, X NOS\n• Y Ein-/Aussteigen, A Springen, B Rennen\n• D-Pad runter: Laden/Haus betreten, D-Pad hoch: Job\n• Start: Pause, Back: Karte\n\nTASTATUR\n• WASD, Maus (links schießen, rechts zielen), R Nachladen, Q/Tab Waffe, F/E Einsteigen, Leertaste, Shift, M Karte, Esc Pause\n\nWELT\n• Hauptstadt im Süden (Downtown, Grove, Südstadt, Oststadt, Strand, Docks, Flughafen), Sonnenhügel mit Villen\n• Wüste mit Sandufer und Staubwinkel, Staubsee mit Fischerdorf, Kornfeld am Farmland, Nordbucht an der Küste, Radeberg-Gipfel\n• Militärbasis und Gefängnis sind Sperrgebiet (sofort Fahndungssterne)\n• Tuning, Lackierereien, Waffen, Kleidung, Autohäuser und kaufbare Häuser gibt es in jeder Stadt – siehe Karte\n• Buchstaben auf der Karte: Story-Figuren – hinfahren und Mission starten\n• Grüne Kreise: Häuser/Garagen kaufen, blaue Kreise: Geschäfte (Taxizentrale, Logistikzentrum …) mit Personal\n• Fahndungssterne: Polizei verfolgt dich, verschwinde aus ihrem Blickfeld"
 	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(470,440);v.add_child(sc);sc.add_child(l)
 	_btn(v,"Zurück",pausenmenue)
 

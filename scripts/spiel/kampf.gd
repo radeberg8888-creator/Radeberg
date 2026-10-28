@@ -115,7 +115,7 @@ func spieler_schritt(dt:float):
 		if _laden<=0.0:_laden=0.0;_laden_fertig()
 	_cool=max(0.0,_cool-dt)
 	var d=WD.daten(aktuell)
-	zielt=(st.zielen or st.feuer) and d.typ!="nah"
+	zielt=(st.zielen or st.feuer) and d.typ!="nah" and d.typ!="spray"
 	if zielt!=_zielen_alt:
 		_zielen_alt=zielt;spiel.kam.zielen=zielt
 	spiel.kam.scope=zielt and d.typ=="sniper" and st.zielen
@@ -135,6 +135,10 @@ func spieler_schritt(dt:float):
 		sp.blick_fest=true
 	else:sp.blick_fest=false
 	halter.aktualisieren(dt)
+	# Sprühen (Graffiti)
+	if d.typ=="spray":
+		_spray_schritt(dt,st.feuer,von,fw)
+		return
 	# Schießen / Schlagen
 	if d.typ=="nah":
 		if _schlag>0.0:
@@ -161,6 +165,47 @@ func spieler_schritt(dt:float):
 		# Schüsse in der Stadt: Fahndung, wenn Zeugen in der Nähe
 		if spiel.mis==null or spiel.mis.aktiv==null or not spiel.mis.aktiv.get("kampf",false):
 			if _zeugen(sp.global_position)>0:verbrechen(0.15)
+
+# ---------------- Graffiti ----------------
+var _tags:=[]
+var _spray_dc:Decal=null
+var _spray_t:=0.0
+var _spray_pos:=Vector3.ZERO
+var tags_gesprueht:=0
+var tag_daten:=[]   # gespeicherte eigene Tags [x,y,z,nx,ny,nz,nr]
+func _tag_tex(i:int)->Texture2D:
+	return load("res://assets/textures/graffiti/tag_%02d.png"%(i%16))
+static func tag_basis(n:Vector3)->Basis:
+	n=n.normalized()
+	var x=Vector3.UP.cross(n) if abs(n.y)<0.9 else Vector3.RIGHT
+	x=x.normalized();var z=x.cross(n).normalized()
+	return Basis(x,n,z)
+func _spray_schritt(dt:float,an:bool,von:Vector3,fw:Vector3):
+	if not an:
+		if _spray_dc and _spray_t<1.0:_spray_dc.queue_free();_spray_dc=null
+		_spray_t=0.0;return
+	var h=_ray(von+fw*1.0,von+fw*7.0,[spiel.spieler])
+	if h==null or h.collider.has_method("ist_mensch"):return
+	if _spray_dc==null or h.position.distance_to(_spray_pos)>1.2:
+		if _spray_dc:_spray_dc.queue_free()
+		_spray_dc=Decal.new();add_child(_spray_dc);_spray_t=0.0;_spray_pos=h.position
+		var nr=randi()%16;_spray_dc.set_meta("nr",nr)
+		_spray_dc.texture_albedo=_tag_tex(nr);_spray_dc.size=Vector3(3.2,0.8,1.6)
+		_spray_dc.global_transform=Transform3D(tag_basis(h.normal),h.position)
+	_spray_t+=dt/1.6
+	_spray_dc.modulate=Color(1,1,1,clamp(_spray_t,0.05,1.0))
+	if int(_spray_t*10)%3==0:_ton("schlag",h.position,0.15)
+	if _spray_t>=1.0 and not _spray_dc.has_meta("fertig"):
+		_spray_dc.set_meta("fertig",true);tags_gesprueht+=1
+		var p=_spray_dc.global_position;var n=h.normal
+		tag_daten.append([p.x,p.y,p.z,n.x,n.y,n.z,_spray_dc.get_meta("nr")])
+		_tags.append(_spray_dc);_spray_dc=null;_spray_t=0.0
+		spiel.hud.zeige("Graffiti gesprüht! (%d)"%tags_gesprueht,1.5)
+		if spiel.mis:spiel.mis.tag_gesprueht()
+func tags_wiederherstellen():
+	for t in tag_daten:
+		var dc=Decal.new();add_child(dc);dc.texture_albedo=_tag_tex(int(t[6]));dc.size=Vector3(3.2,0.8,1.6)
+		dc.global_transform=Transform3D(tag_basis(Vector3(t[3],t[4],t[5])),Vector3(t[0],t[1],t[2]));_tags.append(dc)
 
 func _zielhilfe(von:Vector3,fw:Vector3,reich:float):
 	var best=null;var bw=deg_to_rad(7.0 if not spiel.st.controller else 5.0)
@@ -239,6 +284,7 @@ func _nahkampf_treffer(sp,d):
 # Spieler wird getroffen
 func spieler_treffer(dmg:float,von=null):
 	if tot:return
+	if spiel.admin and spiel.admin_gott:return
 	if ruestung>0.0:
 		var a=min(ruestung,dmg*0.7);ruestung-=a;dmg-=a
 	hp-=dmg;schaden_blitz=0.45
@@ -284,22 +330,84 @@ func welt_schritt(dt:float):
 		if g.tot and g.tot_zeit>25.0:gegner.erase(g);g.queue_free()
 		elif g.global_position.distance_to(me.global_position)>260.0 and not g.mission:gegner.erase(g);g.queue_free()
 	if tot:return
-	# Polizei
+	# Polizei wie im Original: Suchgebiet um den zuletzt gesehenen Ort, Streifenwagen jagen dich,
+	# wer das Gebiet verlässt und nicht gesehen wird, ist die Sterne los
+	_streifen_pflege(dt,me)
+	# Militärbasis: Sperrgebiet -> sofort 4 Sterne
+	var mp=me.global_position
+	if mp.distance_to(Vector3(2000,mp.y,-5050))<215.0 and sterne<3.0 and not (spiel.admin and spiel.admin_keine_polizei):
+		sterne=3.0;such_mitte=mp;_ohne_sicht=0.0;spiel.hud.zeige("GEFÄNGNISGELÄNDE! Fahndungsstufe 3",2.5)
+	if mp.x>-3360.0 and mp.x<-1840.0 and mp.z>-5600.0 and mp.z<-5020.0 and sterne<4.0:
+		if not (spiel.admin and spiel.admin_keine_polizei):
+			sterne=4.0;such_mitte=mp;_ohne_sicht=0.0;spiel.hud.zeige("SPERRGEBIET! Fahndungsstufe 4",2.5)
+	if spiel.admin and spiel.admin_keine_polizei:sterne=0.0
 	if sterne>=1.0:
-		var sieht=false
-		for g in gegner:
-			if is_instance_valid(g) and g.fraktion=="polizei" and not g.tot and g.global_position.distance_to(me.global_position)<60.0:sieht=true;break
-		_ohne_sicht=0.0 if sieht else _ohne_sicht+dt
-		if _ohne_sicht>18.0+int(sterne)*4.0:
-			sterne=floor(sterne)-1.0;_ohne_sicht=0.0
-			if sterne<1.0:sterne=0.0;spiel.hud.zeige("Die Polizei hat dich verloren",2.5)
+		var sieht=polizei_sieht_dich()
+		if sieht:_ohne_sicht=0.0;such_mitte=me.global_position
+		else:_ohne_sicht+=dt
+		such_r=110.0+65.0*int(sterne)
+		var draussen=me.global_position.distance_to(such_mitte)>such_r
+		var grenze=(5.0+int(sterne)*2.0) if draussen else (28.0+int(sterne)*7.0)
+		if _ohne_sicht>grenze:
+			sterne=0.0;_ohne_sicht=0.0
+			spiel.hud.zeige("Die Polizei hat dich verloren",2.5)
+			for c in streifen:
+				if is_instance_valid(c):c.modus="geparkt";c.parken()
+			streifen.clear()
 		_pol_spawn-=dt
 		var n=gegner.filter(func(g):return is_instance_valid(g) and g.fraktion=="polizei" and not g.tot).size()
-		if _pol_spawn<=0.0 and n<int(sterne)*2+1:
-			_pol_spawn=6.0
+		if _pol_spawn<=0.0 and n<int(sterne)*2+1 and spiel.auto==null:
+			_pol_spawn=8.0
 			_polizei_spawn(me.global_position)
 	elif sterne>0.0:
 		sterne=max(0.0,sterne-dt*0.02)
+
+var such_mitte:=Vector3.ZERO
+var such_r:=0.0
+var streifen:=[]          # verfolgende Streifenwagen
+var _streifen_t:=0.0
+func polizei_sieht_dich()->bool:
+	var me=spiel.auto if spiel.auto!=null else spiel.spieler
+	var p=me.global_position
+	for g in gegner:
+		if is_instance_valid(g) and g.fraktion=="polizei" and not g.tot and g.global_position.distance_to(p)<70.0:
+			var h=_ray(g.global_position+Vector3(0,1.6,0),p+Vector3(0,1.0,0),[g,me])
+			if h==null:return true
+	for c in streifen:
+		if is_instance_valid(c) and c.global_position.distance_to(p)<90.0:
+			var h2=_ray(c.global_position+Vector3(0,1.5,0),p+Vector3(0,1.0,0),[c,me])
+			if h2==null:return true
+	return false
+
+func _streifen_pflege(dt:float,me):
+	for c in streifen.duplicate():
+		if not is_instance_valid(c) or c.wrack:streifen.erase(c);continue
+		if c.global_position.distance_to(me.global_position)>500.0:streifen.erase(c);spiel.geparkt.erase(c);c.queue_free();continue
+		if sterne<1.0:continue
+		c.verfolge(me,dt)
+		# zu Fuß: Polizisten steigen aus
+		if spiel.auto==null and c.global_position.distance_to(me.global_position)<16.0 and not c.has_meta("ausgestiegen"):
+			c.set_meta("ausgestiegen",true);c.modus="geparkt";c.parken()
+			var w="pistole" if sterne<3 else "mp5"
+			for i in 2:spawn(c.global_position+c.global_transform.basis.x*(2.4 if i==0 else -2.4)+Vector3(0,0.3,0),"polizei",w,{"basis":"police","alarm":true})
+	if sterne<1.0:return
+	_streifen_t-=dt
+	var soll=min(int(sterne),4)+(1 if sterne>=4 else 0)
+	if _streifen_t<=0.0 and streifen.filter(func(c):return is_instance_valid(c) and not c.has_meta("ausgestiegen")).size()<soll:
+		_streifen_t=7.0
+		var S=spiel.welt.S;var p2=Vector2(me.global_position.x,me.global_position.z);var kand=[]
+		for r in S.roads:
+			if not r.typ in ["strasse","allee","land","autobahn","gasse"]:continue
+			for i in range(0,r.P.size(),4):
+				var d=r.P[i].distance_to(p2)
+				if d>90.0 and d<160.0 and not r.tunnel_flags[i]:kand.append([r,i])
+		if kand.is_empty():return
+		var e=kand[randi()%kand.size()];var r2=e[0];var i2=e[1]
+		var c2=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(c2);c2.setup("polizei" if sterne<4 or randf()<0.6 else "armored")
+		var t:Vector2=r2.T[i2]
+		c2.global_transform=Transform3D(Basis.looking_at(-Vector3(t.x,0,t.y),Vector3.UP),Vector3(r2.P[i2].x,r2.h[i2]+0.8,r2.P[i2].y))
+		c2.blaulicht(true)
+		streifen.append(c2);spiel.geparkt.append(c2)
 
 func _polizei_spawn(p:Vector3):
 	var S=spiel.welt.S;var kand=[]
@@ -460,9 +568,10 @@ static func _klick()->AudioStreamWAV:
 
 # ---------------- Speichern ----------------
 func daten()->Dictionary:
-	return {"waffen":waffen,"magazin":magazin,"aktuell":aktuell,"ruestung":ruestung}
+	return {"waffen":waffen,"magazin":magazin,"aktuell":aktuell,"ruestung":ruestung,"tags":tag_daten}
 func lade_daten(d:Dictionary):
 	if d.has("waffen"):waffen=d.waffen;magazin=d.get("magazin",{});ruestung=float(d.get("ruestung",0.0))
+	tag_daten=d.get("tags",[]);tags_gesprueht=tag_daten.size();tags_wiederherstellen()
 	for k in waffen:waffen[k]=int(waffen[k])
 	for k in magazin:magazin[k]=int(magazin[k])
 	if not waffen.has("faust"):waffen["faust"]=0

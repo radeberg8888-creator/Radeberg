@@ -85,6 +85,16 @@ jobs:
           (timeout 3000 $GODOT --headless --path . --import || true) >> build/import.log 2>&1
           tail -5 build/import.log
 
+      - name: Welt vorab bauen (kurze Ladezeit im Spiel)
+        run: |
+          sudo apt-get install -y xvfb > /dev/null 2>&1 || true
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          mkdir -p build
+          timeout 3600 xvfb-run -a -s "-screen 0 640x480x24" $GODOT --rendering-method gl_compatibility --rendering-driver opengl3 --path . -s tools/welt_bake.gd > build/bake.log 2>&1 || true
+          grep -E "ERZEUGT|GESPEICHERT|SCRIPT ERROR" build/bake.log | head -20
+          ls -la assets/cache/welt/
+          test -f assets/cache/welt/welt.scn
+
       - name: APK exportieren
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/debug.keystore

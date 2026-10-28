@@ -332,3 +332,47 @@ func ghetto_props(parent:Node3D):
 			cnt+=1
 	b.commit(parent)
 	print("WELT Ghetto-Kram ",cnt)
+
+# ---------------- Stadtmöbel aus echten Modellen (Bank, Betonmülleimer, Müllcontainer) als MultiMesh ----------------
+const MOEBEL:={"bank":["res://assets/props/neu/bank/bank.gltf",0.0],"eimer":["res://assets/props/neu/muelleimer/muelleimer.gltf",0.95],"container":["res://assets/props/neu/container/container.gltf",1.45]}
+func moebel(parent:Node3D):
+	var sets={"bank":[],"eimer":[],"container":[]}
+	for r in S.roads:
+		if not r.typ in ["strasse","allee"]:continue
+		var L=S.length(r);var s=rng.randf_range(15,40)
+		while s<L-8:
+			var at=S.at(r,s);var p:Vector2=at[0];var t:Vector2=at[2];var i=at[3];s+=rng.randf_range(45,85)
+			if r.tunnel_flags[i] or r.elev[i] or S.near_junction(p,8.0)<0:continue
+			var d=B.district(p)
+			if d==null or d.n in ["staubwinkel","docks"]:continue
+			var sd=1 if rng.randf()<0.5 else -1;var nn=Vector2(-t.y,t.x)*sd
+			var art="bank" if rng.randf()<0.6 else "container"
+			var q=p+nn*(r.w+r.sw-(0.6 if art=="bank" else 0.9))
+			var yaw=atan2(-nn.x,-nn.y) if art=="bank" else atan2(t.x,t.y)
+			sets[art].append(Transform3D(Basis(Vector3.UP,yaw),Vector3(q.x,at[1]+0.14,q.y)))
+	for k in sets:
+		if sets[k].is_empty() or not ResourceLoader.exists(MOEBEL[k][0]):continue
+		_mm_modell(parent,MOEBEL[k][0],sets[k],MOEBEL[k][1],"Moebel_"+k)
+	print("WELT Moebel ",sets.bank.size()," ",sets.eimer.size()," ",sets.container.size())
+
+# Modell -> je Teil-Mesh ein MultiMesh; ziel_h>0 skaliert auf diese Höhe, Fuß auf y=0, mittig
+func _mm_modell(parent:Node3D,pfad:String,xfs:Array,ziel_h:float,name:String):
+	var m:Node3D=load(F.leicht(pfad)).instantiate()
+	var ab=F.aabb(m);var sk=1.0
+	if ziel_h>0.0:sk=ziel_h/max(ab.size.y,0.001)
+	var basis=Transform3D(Basis().scaled(Vector3.ONE*sk),-Vector3(ab.get_center().x,ab.position.y,ab.get_center().z)*sk)
+	# in 250-m-Zellen aufteilen, damit die Sichtweite pro Zelle greift
+	var zellen={}
+	for x in xfs:
+		var k=Vector2i(floor(x.origin.x/250.0),floor(x.origin.z/250.0))
+		if not zellen.has(k):zellen[k]=[]
+		zellen[k].append(x)
+	for mi in m.find_children("*","MeshInstance3D",true,false):
+		var lx=basis*F.rel_xf(mi,m)
+		for k in zellen:
+			var l=zellen[k];var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=mi.mesh;mm.instance_count=l.size()
+			for j in l.size():mm.set_instance_transform(j,l[j]*lx)
+			var inst=MultiMeshInstance3D.new();inst.multimesh=mm;inst.name=name;inst.visibility_range_end=220.0
+			if mi.material_override:inst.material_override=mi.material_override
+			parent.add_child(inst,true)
+	m.free()

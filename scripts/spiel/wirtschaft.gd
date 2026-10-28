@@ -1,4 +1,5 @@
 extends Node
+const F=preload("res://scripts/fit.gd")
 # Immobilien (Wohnungen = Speicherpunkte, Garagen), Geschäfte mit Angestellten (Taxizentrale, Logistikzentrum, Club …)
 # und Fahrzeug-Jobs (Polizei, Feuerwehr, Rettungsdienst, LKW, Bus). Daten: assets/data/missionen.json
 const AUTO=preload("res://scripts/spiel/fahrzeug.gd")
@@ -167,6 +168,13 @@ func _betrieb_bauen():
 		_stapler.append({"n":st,"a":a,"b":b,"t":randf()})
 
 func _stapler_bauen()->Node3D:
+	# echte Modelle: Gabelstapler und Schnellläufer (Elektro-Hubwagen) im Wechsel
+	var mod=[["res://assets/props/neu/stapler/stapler.gltf",2.2],["res://assets/props/neu/hubwagen/hubwagen.gltf",1.3]][_stapler.size()%2]
+	if ResourceLoader.exists(mod[0]):
+		var w=Node3D.new();var m:Node3D=load(F.leicht(mod[0])).instantiate();w.add_child(m)
+		var ab=F.aabb(m);var sk=mod[1]/max(ab.size.y,0.01);m.scale=Vector3.ONE*sk
+		m.position=-Vector3(ab.get_center().x,ab.position.y,ab.get_center().z)*sk
+		return w
 	var root=Node3D.new()
 	var gelb=StandardMaterial3D.new();gelb.albedo_color=Color(0.95,0.7,0.05);gelb.roughness=0.5
 	var dunkel=StandardMaterial3D.new();dunkel.albedo_color=Color(0.08,0.08,0.09)
@@ -186,6 +194,39 @@ func _stapler_bewegen(s,dt):
 	var h=spiel.kampf._boden(p) if Engine.get_process_frames()%30==0 else s.n.global_position.y
 	s.n.global_position=Vector3(p.x,h,p.z)
 	s.n.rotation.y=0.0 if sin(s.t*TAU)>0 else PI
+
+# ---------------- Autohändler ----------------
+# [kind, Name, Preis, Tuning (optional)]
+const AUTOHAUS:=[["trabant","Trabant 601",4500],["small_car","Kleinwagen",9000],["bmw_e30","BMW E30",14000],["f100","Ford F100",18000],
+	["mercedes","Mercedes Kombi",22000],["dodge","Dodge Pickup '53",26000],["hudson","Hudson Hornet",31000],["taxi","Taxi (eigenes)",35000],["audi_rs7","Audi RS7 Sportback",120000],["rtw","Rettungswagen",80000]]
+const PREMIUM:=[["supra","Supra Breitbau",180000],["jdm","JDM Drift-Coupé",210000],["porsche911","Porsche 911 Carrera 4S",290000],["bmw_m8","BMW M8 Competition",380000],
+	["audi_r8","Audi R8 V10",420000],["armored","Panzer-Limousine (Geldtransporter)",650000],["hoonicorn","Mustang Hoonicorn 1400 PS",950000],["bugatti","Bugatti EB110 Super Sport",2400000],
+	["bugatti","Bugatti EB110 „Goldrausch“",3500000,{"paint":"Gold","finish":"Chrom"}],["audi_r8","Audi R8 „Phantom“ Carbon",1200000,{"paint":"Tiefschwarz","finish":"Matt","neon":"Lila"}]]
+var autos:=[]   # eigene Autos: {kind, tuning}
+func autohaus_menue(premium:bool):
+	var v=spiel._panel("PREMIUM MOTORS" if premium else "RADEBERG AUTOHAUS")
+	var info=Label.new();info.text="Dein Geld: $%s   Eigene Autos: %d"%[_f(spiel.geld),autos.size()];v.add_child(info)
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(0,440);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;sc.add_child(w)
+	for e in (PREMIUM if premium else AUTOHAUS):
+		var h=HBoxContainer.new();w.add_child(h)
+		var l=Label.new();l.text=e[1];l.size_flags_horizontal=Control.SIZE_EXPAND_FILL;l.add_theme_font_size_override("font_size",21);h.add_child(l)
+		var b=Button.new();b.text="$"+_f(int(e[2]));b.custom_minimum_size=Vector2(170,52);h.add_child(b)
+		var ee=e
+		b.pressed.connect(func():
+			if spiel._zahlen(int(ee[2])):
+				var tun={}
+				if ee.size()>3:
+					tun=spiel.TU.default_cfg()
+					for k in ee[3]:tun[k]=ee[3][k]
+				autos.append({"kind":ee[0],"tuning":tun})
+				var c=AUTO.new();spiel.add_child(c);c.setup(ee[0])
+				if tun.size()>0:spiel.TU.apply(c.visual,tun);c.set_meta("tuning",tun)
+				var me=spiel.spieler.global_position
+				c.global_position=me+spiel.spieler.figur.global_transform.basis.z*7.0+Vector3(0,0.8,0)
+				c.set_meta("eigen",true);spiel.geparkt.append(c)
+				spiel.hud.zeige(ee[1]+" gehört dir! Steht vor dem Laden.",3.0);spiel.speichern();spiel.panel_zu())
+	spiel._btn(v,"SCHLIESSEN",spiel.panel_zu)
 
 # ---------------- Fahrzeug-Jobs ----------------
 func job_typ()->String:
@@ -294,10 +335,10 @@ func _job_lohn(b:int,txt:String):
 
 # ---------------- Speichern ----------------
 func daten()->Dictionary:
-	return {"besitz":besitz.keys(),"personal":personal,"garagen":garagen,"kasse":kasse,"job_stufe":job_stufe}
+	return {"besitz":besitz.keys(),"personal":personal,"garagen":garagen,"kasse":kasse,"job_stufe":job_stufe,"autos":autos}
 func lade_daten(d:Dictionary):
 	for k in d.get("besitz",[]):besitz[k]=true
-	personal=d.get("personal",{});garagen=d.get("garagen",{});kasse=d.get("kasse",{});job_stufe=d.get("job_stufe",{})
+	personal=d.get("personal",{});garagen=d.get("garagen",{});kasse=d.get("kasse",{});job_stufe=d.get("job_stufe",{});autos=d.get("autos",[])
 	for k in personal:
 		for f in ["fahrer","lkw","stapler","mitarbeiter"]:personal[k][f]=int(personal[k].get(f,0))
 	_betrieb_bauen()

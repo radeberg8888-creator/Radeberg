@@ -18,6 +18,7 @@ var e:={
 	"hud_groesse":1.0,
 	"fps":false,
 	"gras":true,
+	"grafik":1,          # 0 mittel, 1 hoch, 2 ultra
 }
 const DATEI:="user://einstellungen.json"
 

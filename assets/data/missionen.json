@@ -17,13 +17,13 @@
   },
   "viktor": {
    "name": "Viktor Sokolov",
-   "ort": "hafen",
+   "ort": "docks",
    "rolle": "Schmuggler mit Containerfirma"
   },
   "ines": {
    "name": "Ines Hartmann",
-   "ort": "downtown",
-   "rolle": "Immobilienhai mit Kontakten ins Rathaus"
+   "ort": "sonnenhuegel",
+   "rolle": "Millionärin mit Villa am Sonnenhügel, Immobilienhai"
   },
   "jojo": {
    "name": "Jojo",
@@ -32,12 +32,12 @@
   },
   "baron": {
    "name": "Der Baron",
-   "ort": "flugplatz",
-   "rolle": "Waffenhändler am alten Flugplatz"
+   "ort": "staubwinkel",
+   "rolle": "Waffenhändler, haust im Trailer in Staubwinkel"
   },
   "petro": {
    "name": "Familie Petrović",
-   "ort": "altstadt",
+   "ort": "oststadt",
    "rolle": "Clubbesitzer, alte Familie"
   }
  },
@@ -53,14 +53,14 @@
    "kontakt": "rudi",
    "titel": "Heimkehr",
    "typ": "transport",
-   "start": "bahnhof",
-   "ziel": "ghetto",
+   "start": "nordbucht",
+   "ziel": "suedstadt",
    "gang": "",
    "belohnung": 200,
    "briefing": "Du kommst nach Jahren zurück. Rudi holt dich nicht ab – also nimm dir ein Auto.",
    "schritte": [
     "Fahrzeug bei bahnhof abholen",
-    "Unbeschädigt nach ghetto bringen"
+    "Unbeschädigt nach suedstadt bringen"
    ],
    "id": 1
   },
@@ -68,13 +68,13 @@
    "kontakt": "rudi",
    "titel": "Alte Freunde",
    "typ": "schiesserei",
-   "start": "ghetto",
-   "ziel": "altstadt",
+   "start": "kleinseoul",
+   "ziel": "hafenviertel",
    "gang": "Kanal-Kobras",
    "belohnung": 500,
    "briefing": "Die Kobras haben deinen Kumpel festgesetzt.",
    "schritte": [
-    "Treffpunkt altstadt erreichen",
+    "Treffpunkt hafenviertel erreichen",
     "Hinterhalt überleben",
     "Verletzten Kontakt nach ghetto bringen"
    ],
@@ -84,13 +84,13 @@
    "kontakt": "rudi",
    "titel": "Farbe bekennen",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "ghetto",
+   "start": "see",
+   "ziel": "docks",
    "gang": "Kanal-Kobras",
    "belohnung": 800,
    "briefing": "Übermale die Tags der Kobras und zeig, wem die Straße gehört.",
    "schritte": [
-    "Nach ghetto fahren",
+    "Nach docks fahren",
     "Alle Mitglieder der Kanal-Kobras ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -100,14 +100,14 @@
    "kontakt": "rudi",
    "titel": "Lieferservice",
    "typ": "lieferung",
-   "start": "ghetto",
-   "ziel": "ost",
+   "start": "docks",
+   "ziel": "kleinseoul",
    "gang": "",
    "belohnung": 600,
    "briefing": "Rudis Ware muss pünktlich bei den Kunden sein.",
    "schritte": [
     "Ware bei ghetto laden",
-    "In der Zeit nach ost liefern"
+    "In der Zeit nach kleinseoul liefern"
    ],
    "id": 4
   },
@@ -115,13 +115,13 @@
    "kontakt": "rudi",
    "titel": "Grillfest",
    "typ": "verteidigen",
-   "start": "ghetto",
-   "ziel": "ghetto",
+   "start": "hafenviertel",
+   "ziel": "fischerdorf",
    "gang": "Kanal-Kobras",
    "belohnung": 900,
    "briefing": "Die Kobras stürmen das Nachbarschaftsfest.",
    "schritte": [
-    "Nach ghetto",
+    "Nach fischerdorf",
     "Angriffswellen der Kanal-Kobras abwehren",
     "Gebäude halten"
    ],
@@ -147,13 +147,13 @@
    "kontakt": "rudi",
    "titel": "Kanal-Säuberung",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "ghetto",
+   "start": "hafenviertel",
+   "ziel": "fischerdorf",
    "gang": "Kanal-Kobras",
    "belohnung": 1500,
    "briefing": "Räum das Kobra-Versteck am Kanal aus.",
    "schritte": [
-    "Nach ghetto fahren",
+    "Nach fischerdorf fahren",
     "Alle Mitglieder der Kanal-Kobras ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -163,7 +163,7 @@
    "kontakt": "rudi",
    "titel": "Verrat in den eigenen Reihen",
    "typ": "verfolgung",
-   "start": "ghetto",
+   "start": "nordbucht",
    "ziel": "hafen",
    "gang": "",
    "belohnung": 1800,
@@ -210,7 +210,7 @@
    "kontakt": "rudi",
    "titel": "Der Lindenhof steht",
    "typ": "verteidigen",
-   "start": "ghetto",
+   "start": "hafenviertel",
    "ziel": "ghetto",
    "gang": "Kanal-Kobras",
    "belohnung": 5000,
@@ -226,7 +226,7 @@
    "kontakt": "rudi",
    "titel": "Familie",
    "typ": "flucht",
-   "start": "ghetto",
+   "start": "kleinseoul",
    "ziel": "berg",
    "gang": "",
    "belohnung": 4000,
@@ -275,13 +275,13 @@
    "titel": "Nitro auf Rezept",
    "typ": "lieferung",
    "start": "werkstatt",
-   "ziel": "industrie",
+   "ziel": "kleinseoul",
    "gang": "",
    "belohnung": 650,
    "briefing": "Lachgasflaschen aus dem Industriegebiet holen – vorsichtig fahren!",
    "schritte": [
     "Ware bei werkstatt laden",
-    "In der Zeit nach industrie liefern"
+    "In der Zeit nach kleinseoul liefern"
    ],
    "id": 15
   },
@@ -289,13 +289,13 @@
    "kontakt": "mara",
    "titel": "Autobahnsprint",
    "typ": "rennen",
-   "start": "autobahn",
-   "ziel": "autobahn",
+   "start": "nordstadt",
+   "ziel": "staubwinkel",
    "gang": "",
    "belohnung": 1000,
    "briefing": "Einmal um die ganze Insel, durch den Tunnel.",
    "schritte": [
-    "Zum Start in autobahn",
+    "Zum Start in staubwinkel",
     "Rennen über die Insel gewinnen",
     "Siegerauto in die Werkstatt bringen"
    ],
@@ -305,7 +305,7 @@
    "kontakt": "mara",
    "titel": "Drift am Berg",
    "typ": "rennen",
-   "start": "berg",
+   "start": "fischerdorf",
    "ziel": "berg",
    "gang": "",
    "belohnung": 1200,
@@ -337,13 +337,13 @@
    "kontakt": "mara",
    "titel": "Hafenrennen",
    "typ": "rennen",
-   "start": "hafen",
-   "ziel": "hafen",
+   "start": "hafenviertel",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 1500,
    "briefing": "Zwischen Containern, Kränen und LKW.",
    "schritte": [
-    "Zum Start in hafen",
+    "Zum Start in farm",
     "Rennen über die Insel gewinnen",
     "Siegerauto in die Werkstatt bringen"
    ],
@@ -370,12 +370,12 @@
    "titel": "Wüstenrallye",
    "typ": "rennen",
    "start": "flugplatz",
-   "ziel": "flugplatz",
+   "ziel": "docks",
    "gang": "",
    "belohnung": 2000,
    "briefing": "Offroad über die Landebahn und die Dünen.",
    "schritte": [
-    "Zum Start in flugplatz",
+    "Zum Start in docks",
     "Rennen über die Insel gewinnen",
     "Siegerauto in die Werkstatt bringen"
    ],
@@ -385,13 +385,13 @@
    "kontakt": "mara",
    "titel": "Underground-Meisterschaft",
    "typ": "rennen",
-   "start": "downtown",
-   "ziel": "downtown",
+   "start": "wueste",
+   "ziel": "nordstadt",
    "gang": "",
    "belohnung": 6000,
    "briefing": "Das Finale: Nachtrennen durch Downtown.",
    "schritte": [
-    "Zum Start in downtown",
+    "Zum Start in nordstadt",
     "Rennen über die Insel gewinnen",
     "Siegerauto in die Werkstatt bringen"
    ],
@@ -402,13 +402,13 @@
    "titel": "Abschleppdienst",
    "typ": "abschleppen",
    "start": "werkstatt",
-   "ziel": "altstadt",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 500,
    "briefing": "Ein Kunde hat seinen Tuningwagen in der Altstadt geschrottet.",
    "schritte": [
     "Abschleppwagen holen",
-    "Fahrzeug in altstadt aufladen",
+    "Fahrzeug in farm aufladen",
     "Zum Schrottplatz in werkstatt"
    ],
    "id": 23
@@ -417,14 +417,14 @@
    "kontakt": "brandt",
    "titel": "Ein Gefallen",
    "typ": "transport",
-   "start": "downtown",
-   "ziel": "berg",
+   "start": "gefaengnis",
+   "ziel": "kleinseoul",
    "gang": "",
    "belohnung": 0,
    "briefing": "Brandt hat Beweise gegen dich. Bring sein ‚Paket‘ zur Berghütte.",
    "schritte": [
     "Fahrzeug bei downtown abholen",
-    "Unbeschädigt nach berg bringen"
+    "Unbeschädigt nach kleinseoul bringen"
    ],
    "id": 24
   },
@@ -448,16 +448,16 @@
    "kontakt": "brandt",
    "titel": "Asservatenkammer",
    "typ": "ueberfall",
-   "start": "downtown",
-   "ziel": "downtown",
+   "start": "militaer",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 1500,
    "briefing": "Hol das beschlagnahmte Geld aus dem Präsidium.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in downtown",
+    "Überfall in farm",
     "Polizei abschütteln (Fahndungslevel 3)",
-    "Versteck in downtown erreichen"
+    "Versteck in farm erreichen"
    ],
    "id": 26
   },
@@ -466,12 +466,12 @@
    "titel": "Kollegenschwein",
    "typ": "spionage",
    "start": "downtown",
-   "ziel": "altstadt",
+   "ziel": "docks",
    "gang": "",
    "belohnung": 800,
    "briefing": "Beschatte die Internen Ermittlungen.",
    "schritte": [
-    "Zielperson in altstadt beschatten",
+    "Zielperson in docks beschatten",
     "Gespräch mitschneiden",
     "Unentdeckt bleiben"
    ],
@@ -482,12 +482,12 @@
    "titel": "Razzia",
    "typ": "gang",
    "start": "downtown",
-   "ziel": "ost",
+   "ziel": "gefaengnis",
    "gang": "Ostblock-Brüder",
    "belohnung": 1800,
    "briefing": "Brandt braucht Erfolge – du lieferst sie.",
    "schritte": [
-    "Nach ost fahren",
+    "Nach gefaengnis fahren",
     "Alle Mitglieder der Ostblock-Brüder ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -497,15 +497,15 @@
    "kontakt": "brandt",
    "titel": "Akte X",
    "typ": "flucht",
-   "start": "downtown",
-   "ziel": "flugplatz",
+   "start": "militaer",
+   "ziel": "hafenviertel",
    "gang": "",
    "belohnung": 2500,
    "briefing": "Brandts Ex-Partner flieht mit belastenden Akten.",
    "schritte": [
     "Kontakt in downtown abholen",
     "Polizeisperren umfahren",
-    "Sicher nach flugplatz"
+    "Sicher nach hafenviertel"
    ],
    "id": 29
   },
@@ -529,7 +529,7 @@
    "kontakt": "brandt",
    "titel": "Abrechnung",
    "typ": "schiesserei",
-   "start": "downtown",
+   "start": "stausee",
    "ziel": "gueterbahnhof",
    "gang": "",
    "belohnung": 5000,
@@ -545,15 +545,15 @@
    "kontakt": "viktor",
    "titel": "Container 47",
    "typ": "bergung",
-   "start": "hafen",
-   "ziel": "hafen",
+   "start": "staubwinkel",
+   "ziel": "espenwald",
    "gang": "",
    "belohnung": 900,
    "briefing": "Ein Container, der nicht auf der Liste steht.",
    "schritte": [
-    "Mit dem Boot/LKW nach hafen",
+    "Mit dem Boot/LKW nach espenwald",
     "Kisten bergen",
-    "Zurück nach hafen"
+    "Zurück nach espenwald"
    ],
    "id": 32
   },
@@ -561,13 +561,13 @@
    "kontakt": "viktor",
    "titel": "Hafenratten",
    "typ": "gang",
-   "start": "hafen",
-   "ziel": "hafen",
+   "start": "suedstadt",
+   "ziel": "weststadt",
    "gang": "Hafenratten",
    "belohnung": 1500,
    "briefing": "Die Ratten klauen Viktors Ware.",
    "schritte": [
-    "Nach hafen fahren",
+    "Nach weststadt fahren",
     "Alle Mitglieder der Hafenratten ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -577,14 +577,14 @@
    "kontakt": "viktor",
    "titel": "Nachtschicht",
    "typ": "lieferung",
-   "start": "hafen",
-   "ziel": "gueterbahnhof",
+   "start": "fischerdorf",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 1100,
    "briefing": "LKW mit Ware vom Terminal zum Güterbahnhof.",
    "schritte": [
     "Ware bei hafen laden",
-    "In der Zeit nach gueterbahnhof liefern"
+    "In der Zeit nach farm liefern"
    ],
    "id": 34
   },
@@ -592,15 +592,15 @@
    "kontakt": "viktor",
    "titel": "Zollkontrolle",
    "typ": "flucht",
-   "start": "hafen",
-   "ziel": "industrie",
+   "start": "staubwinkel",
+   "ziel": "sonnenhuegel",
    "gang": "",
    "belohnung": 1300,
    "briefing": "Die Kontrolle kommt früher als erwartet.",
    "schritte": [
     "Kontakt in hafen abholen",
     "Polizeisperren umfahren",
-    "Sicher nach industrie"
+    "Sicher nach sonnenhuegel"
    ],
    "id": 35
   },
@@ -624,12 +624,12 @@
    "titel": "Güterzug",
    "typ": "verfolgung",
    "start": "gueterbahnhof",
-   "ziel": "bahn",
+   "ziel": "wueste",
    "gang": "",
    "belohnung": 2000,
    "briefing": "Die Ostblock-Brüder haben einen Wagen am Zug angehängt.",
    "schritte": [
-    "Ziel bei gueterbahnhof finden",
+    "Ziel bei gueterwuestehof finden",
     "Fahrzeug verfolgen und rammen",
     "Ware sichern"
    ],
@@ -655,14 +655,14 @@
    "kontakt": "viktor",
    "titel": "Die Ostroute",
    "typ": "eskorte",
-   "start": "hafen",
-   "ziel": "ost",
+   "start": "fischerdorf",
+   "ziel": "sandufer",
    "gang": "",
    "belohnung": 2200,
    "briefing": "Viktors Konvoi durch das Ostviertel.",
    "schritte": [
     "Konvoi bei hafen treffen",
-    "Konvoi bis ost beschützen"
+    "Konvoi bis sandufer beschützen"
    ],
    "id": 39
   },
@@ -670,15 +670,15 @@
    "kontakt": "viktor",
    "titel": "Tauchgang",
    "typ": "bergung",
-   "start": "hafen",
-   "ziel": "hafen",
+   "start": "gefaengnis",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 2600,
    "briefing": "Versenkte Kisten vor der Kaimauer.",
    "schritte": [
-    "Mit dem Boot/LKW nach hafen",
+    "Mit dem Boot/LKW nach farm",
     "Kisten bergen",
-    "Zurück nach hafen"
+    "Zurück nach farm"
    ],
    "id": 40
   },
@@ -687,14 +687,14 @@
    "titel": "Der große Deal",
    "typ": "schiesserei",
    "start": "hafen",
-   "ziel": "hafen",
+   "ziel": "weststadt",
    "gang": "",
    "belohnung": 7000,
    "briefing": "Der Deal platzt – und alle ziehen.",
    "schritte": [
-    "Treffpunkt hafen erreichen",
+    "Treffpunkt weststadt erreichen",
     "Hinterhalt überleben",
-    "Verletzten Kontakt nach hafen bringen"
+    "Verletzten Kontakt nach weststadt bringen"
    ],
    "id": 41
   },
@@ -702,7 +702,7 @@
    "kontakt": "ines",
    "titel": "Mietpreisbremse",
    "typ": "verteidigen",
-   "start": "downtown",
+   "start": "wueste",
    "ziel": "altstadt",
    "gang": "Kanal-Kobras",
    "belohnung": 800,
@@ -719,12 +719,12 @@
    "titel": "Grundbuch",
    "typ": "spionage",
    "start": "downtown",
-   "ziel": "downtown",
+   "ziel": "nordbucht",
    "gang": "",
    "belohnung": 900,
    "briefing": "Finde heraus, wem das Grundstück am Bahnhof wirklich gehört.",
    "schritte": [
-    "Zielperson in downtown beschatten",
+    "Zielperson in nordbucht beschatten",
     "Gespräch mitschneiden",
     "Unentdeckt bleiben"
    ],
@@ -765,7 +765,7 @@
    "kontakt": "ines",
    "titel": "Rathausfest",
    "typ": "eskorte",
-   "start": "downtown",
+   "start": "gefaengnis",
    "ziel": "vorort",
    "gang": "",
    "belohnung": 1600,
@@ -780,15 +780,15 @@
    "kontakt": "ines",
    "titel": "Hochhausbrand",
    "typ": "flucht",
-   "start": "downtown",
-   "ziel": "downtown",
+   "start": "stausee",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 2000,
    "briefing": "Feuer im Turm – hol Ines' Dokumente raus.",
    "schritte": [
-    "Kontakt in downtown abholen",
+    "Kontakt in farm abholen",
     "Polizeisperren umfahren",
-    "Sicher nach downtown"
+    "Sicher nach farm"
    ],
    "id": 47
   },
@@ -797,13 +797,13 @@
    "titel": "Penthouse",
    "typ": "ueberfall",
    "start": "vorort",
-   "ziel": "downtown",
+   "ziel": "docks",
    "gang": "",
    "belohnung": 3500,
    "briefing": "Der Tresor eines Konkurrenten.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in downtown",
+    "Überfall in docks",
     "Polizei abschütteln (Fahndungslevel 3)",
     "Versteck in vorort erreichen"
    ],
@@ -814,12 +814,12 @@
    "titel": "Grundsteinlegung",
    "typ": "sniper",
    "start": "downtown",
-   "ziel": "bahnhof",
+   "ziel": "strand",
    "gang": "",
    "belohnung": 4000,
    "briefing": "Ein Auftragskiller zielt auf Ines.",
    "schritte": [
-    "Aussichtspunkt in bahnhof erreichen",
+    "Aussichtspunkt in strand erreichen",
     "Zielperson mit Scharfschützengewehr ausschalten",
     "Entkommen"
    ],
@@ -829,13 +829,13 @@
    "kontakt": "jojo",
    "titel": "Lauschangriff",
    "typ": "spionage",
-   "start": "altstadt",
-   "ziel": "downtown",
+   "start": "suedstadt",
+   "ziel": "hafenviertel",
    "gang": "",
    "belohnung": 500,
    "briefing": "Wanzen im Büro der Ostblock-Brüder.",
    "schritte": [
-    "Zielperson in downtown beschatten",
+    "Zielperson in hafenviertel beschatten",
     "Gespräch mitschneiden",
     "Unentdeckt bleiben"
    ],
@@ -845,7 +845,7 @@
    "kontakt": "jojo",
    "titel": "Serverfarm",
    "typ": "ueberfall",
-   "start": "altstadt",
+   "start": "strand",
    "ziel": "industrie",
    "gang": "",
    "belohnung": 1200,
@@ -863,14 +863,14 @@
    "titel": "Ampelchaos",
    "typ": "flucht",
    "start": "altstadt",
-   "ziel": "downtown",
+   "ziel": "kornfeld",
    "gang": "",
    "belohnung": 900,
    "briefing": "Jojo schaltet die Ampeln – du fährst.",
    "schritte": [
     "Kontakt in altstadt abholen",
     "Polizeisperren umfahren",
-    "Sicher nach downtown"
+    "Sicher nach kornfeld"
    ],
    "id": 52
   },
@@ -879,7 +879,7 @@
    "titel": "Kamerafahrt",
    "typ": "verfolgung",
    "start": "altstadt",
-   "ziel": "ost",
+   "ziel": "sonnenhuegel",
    "gang": "",
    "belohnung": 1100,
    "briefing": "Ein Drohnenpilot filmt dich. Hol die Drohne runter.",
@@ -911,12 +911,12 @@
    "titel": "Funkloch",
    "typ": "verteidigen",
    "start": "altstadt",
-   "ziel": "berg",
+   "ziel": "farm",
    "gang": "Ostblock-Brüder",
    "belohnung": 2000,
    "briefing": "Den Sendemast auf dem Berg halten.",
    "schritte": [
-    "Nach berg",
+    "Nach farm",
     "Angriffswellen der Ostblock-Brüder abwehren",
     "Gebäude halten"
    ],
@@ -927,13 +927,13 @@
    "titel": "Backup",
    "typ": "transport",
    "start": "altstadt",
-   "ziel": "bahnhof",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 1000,
    "briefing": "Ein Koffer voller Daten in den Zug.",
    "schritte": [
     "Fahrzeug bei altstadt abholen",
-    "Unbeschädigt nach bahnhof bringen"
+    "Unbeschädigt nach farm bringen"
    ],
    "id": 56
   },
@@ -941,14 +941,14 @@
    "kontakt": "jojo",
    "titel": "Systemabsturz",
    "typ": "ueberfall",
-   "start": "altstadt",
-   "ziel": "downtown",
+   "start": "nordbucht",
+   "ziel": "nordstadt",
    "gang": "",
    "belohnung": 5000,
    "briefing": "Die Bank in Downtown – ohne Alarm.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in downtown",
+    "Überfall in nordstadt",
     "Polizei abschütteln (Fahndungslevel 3)",
     "Versteck in altstadt erreichen"
    ],
@@ -959,13 +959,13 @@
    "titel": "Willkommen in der Wüste",
    "typ": "transport",
    "start": "flugplatz",
-   "ziel": "ghetto",
+   "ziel": "militaer",
    "gang": "",
    "belohnung": 700,
    "briefing": "Waffenkisten in die Stadt.",
    "schritte": [
     "Fahrzeug bei flugplatz abholen",
-    "Unbeschädigt nach ghetto bringen"
+    "Unbeschädigt nach militaer bringen"
    ],
    "id": 58
   },
@@ -973,13 +973,13 @@
    "kontakt": "baron",
    "titel": "Wüstenfüchse",
    "typ": "gang",
-   "start": "flugplatz",
-   "ziel": "flugplatz",
+   "start": "oststadt",
+   "ziel": "see",
    "gang": "Wüstenfüchse",
    "belohnung": 1500,
    "briefing": "Die Biker-Gang hält Hangar 2 besetzt.",
    "schritte": [
-    "Nach flugplatz fahren",
+    "Nach see fahren",
     "Alle Mitglieder der Wüstenfüchse ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -989,7 +989,7 @@
    "kontakt": "baron",
    "titel": "Notlandung",
    "typ": "bergung",
-   "start": "flugplatz",
+   "start": "militaer",
    "ziel": "berg",
    "gang": "",
    "belohnung": 1800,
@@ -1005,15 +1005,15 @@
    "kontakt": "baron",
    "titel": "Schießstand",
    "typ": "schiesserei",
-   "start": "flugplatz",
-   "ziel": "flugplatz",
+   "start": "see",
+   "ziel": "kowloon",
    "gang": "",
    "belohnung": 600,
    "briefing": "Zeig, was du mit dem Gewehr kannst.",
    "schritte": [
-    "Treffpunkt flugplatz erreichen",
+    "Treffpunkt kowloon erreichen",
     "Hinterhalt überleben",
-    "Verletzten Kontakt nach flugplatz bringen"
+    "Verletzten Kontakt nach kowloon bringen"
    ],
    "id": 61
   },
@@ -1036,7 +1036,7 @@
    "kontakt": "baron",
    "titel": "Hangar in Flammen",
    "typ": "verteidigen",
-   "start": "flugplatz",
+   "start": "flughafen",
    "ziel": "flugplatz",
    "gang": "Wüstenfüchse",
    "belohnung": 2500,
@@ -1052,7 +1052,7 @@
    "kontakt": "baron",
    "titel": "Panzerknacker",
    "typ": "diebstahl",
-   "start": "flugplatz",
+   "start": "fischerdorf",
    "ziel": "industrie",
    "gang": "",
    "belohnung": 3000,
@@ -1069,12 +1069,12 @@
    "titel": "Waffenstillstand",
    "typ": "spionage",
    "start": "flugplatz",
-   "ziel": "altstadt",
+   "ziel": "fischerdorf",
    "gang": "",
    "belohnung": 1500,
    "briefing": "Wer verhandelt hinter dem Rücken des Barons?",
    "schritte": [
-    "Zielperson in altstadt beschatten",
+    "Zielperson in fischerdorf beschatten",
     "Gespräch mitschneiden",
     "Unentdeckt bleiben"
    ],
@@ -1101,14 +1101,14 @@
    "titel": "Türsteher",
    "typ": "schiesserei",
    "start": "altstadt",
-   "ziel": "altstadt",
+   "ziel": "fischerdorf",
    "gang": "",
    "belohnung": 500,
    "briefing": "Ärger vor dem Club.",
    "schritte": [
-    "Treffpunkt altstadt erreichen",
+    "Treffpunkt fischerdorf erreichen",
     "Hinterhalt überleben",
-    "Verletzten Kontakt nach altstadt bringen"
+    "Verletzten Kontakt nach fischerdorf bringen"
    ],
    "id": 67
   },
@@ -1131,15 +1131,15 @@
    "kontakt": "petro",
    "titel": "Der Neffe",
    "typ": "flucht",
-   "start": "altstadt",
-   "ziel": "vorort",
+   "start": "see",
+   "ziel": "oststadt",
    "gang": "",
    "belohnung": 1200,
    "briefing": "Der Neffe hat Schulden bei den Ostblock-Brüdern.",
    "schritte": [
     "Kontakt in altstadt abholen",
     "Polizeisperren umfahren",
-    "Sicher nach vorort"
+    "Sicher nach oststadt"
    ],
    "id": 69
   },
@@ -1164,13 +1164,13 @@
    "titel": "Hochzeit",
    "typ": "eskorte",
    "start": "altstadt",
-   "ziel": "berg",
+   "ziel": "espenwald",
    "gang": "",
    "belohnung": 1500,
    "briefing": "Die Hochzeitskolonne zum Aussichtspunkt.",
    "schritte": [
     "Konvoi bei altstadt treffen",
-    "Konvoi bis berg beschützen"
+    "Konvoi bis espenwald beschützen"
    ],
    "id": 71
   },
@@ -1179,13 +1179,13 @@
    "titel": "Spieleabend",
    "typ": "ueberfall",
    "start": "altstadt",
-   "ziel": "ost",
+   "ziel": "flughafen",
    "gang": "",
    "belohnung": 2600,
    "briefing": "Das illegale Casino der Brüder.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in ost",
+    "Überfall in flughafen",
     "Polizei abschütteln (Fahndungslevel 3)",
     "Versteck in altstadt erreichen"
    ],
@@ -1196,12 +1196,12 @@
    "titel": "Blutrache",
    "typ": "gang",
    "start": "altstadt",
-   "ziel": "ost",
+   "ziel": "fischerdorf",
    "gang": "Ostblock-Brüder",
    "belohnung": 4000,
    "briefing": "Das Hauptquartier im Ostviertel.",
    "schritte": [
-    "Nach ost fahren",
+    "Nach fischerdorf fahren",
     "Alle Mitglieder der Ostblock-Brüder ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1211,13 +1211,13 @@
    "kontakt": "petro",
    "titel": "Erbe",
    "typ": "verteidigen",
-   "start": "altstadt",
-   "ziel": "altstadt",
+   "start": "farm",
+   "ziel": "kornfeld",
    "gang": "Ostblock-Brüder",
    "belohnung": 6000,
    "briefing": "Die Brüder schlagen zurück – verteidige den Club.",
    "schritte": [
-    "Nach altstadt",
+    "Nach kornfeld",
     "Angriffswellen der Ostblock-Brüder abwehren",
     "Gebäude halten"
    ],
@@ -1244,13 +1244,13 @@
    "titel": "Coup: Fahrplan",
    "typ": "ueberfall",
    "start": "altstadt",
-   "ziel": "bahnhof",
+   "ziel": "kowloon",
    "gang": "",
    "belohnung": 0,
    "briefing": "Hol den Fahrplan aus dem Stellwerk.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in bahnhof",
+    "Überfall in kowloon",
     "Polizei abschütteln (Fahndungslevel 3)",
     "Versteck in altstadt erreichen"
    ],
@@ -1261,12 +1261,12 @@
    "titel": "Coup: Fluchtwagen",
    "typ": "diebstahl",
    "start": "werkstatt",
-   "ziel": "downtown",
+   "ziel": "kowloon",
    "gang": "",
    "belohnung": 0,
    "briefing": "Vier schnelle Autos, unauffällig lackiert.",
    "schritte": [
-    "Wagen in downtown finden",
+    "Wagen in kowloon finden",
     "Wagen stehlen ohne Alarm",
     "In der Garage werkstatt abstellen"
    ],
@@ -1276,14 +1276,14 @@
    "kontakt": "baron",
    "titel": "Coup: Ausrüstung",
    "typ": "transport",
-   "start": "flugplatz",
-   "ziel": "ghetto",
+   "start": "gefaengnis",
+   "ziel": "stausee",
    "gang": "",
    "belohnung": 0,
    "briefing": "Schweißgeräte, Westen, Waffen.",
    "schritte": [
     "Fahrzeug bei flugplatz abholen",
-    "Unbeschädigt nach ghetto bringen"
+    "Unbeschädigt nach stausee bringen"
    ],
    "id": 78
   },
@@ -1308,15 +1308,15 @@
    "titel": "Coup: Der Zug",
    "typ": "ueberfall",
    "start": "gueterbahnhof",
-   "ziel": "bahn",
+   "ziel": "kowloon",
    "gang": "",
    "belohnung": 25000,
    "briefing": "Der Geldzug im Tunnel am Berg.",
    "schritte": [
     "Ausrüstung holen",
-    "Überfall in bahn",
+    "Überfall in kowloon",
     "Polizei abschütteln (Fahndungslevel 3)",
-    "Versteck in gueterbahnhof erreichen"
+    "Versteck in gueterkowloonhof erreichen"
    ],
    "id": 80
   },
@@ -1324,15 +1324,15 @@
    "kontakt": "rudi",
    "titel": "Coup: Flucht",
    "typ": "flucht",
-   "start": "bahn",
-   "ziel": "hafen",
+   "start": "stausee",
+   "ziel": "docks",
    "gang": "",
    "belohnung": 0,
    "briefing": "Alle Polizisten der Insel sind hinter euch her.",
    "schritte": [
     "Kontakt in bahn abholen",
     "Polizeisperren umfahren",
-    "Sicher nach hafen"
+    "Sicher nach docks"
    ],
    "id": 81
   },
@@ -1341,12 +1341,12 @@
    "titel": "Epilog: König der Insel",
    "typ": "verteidigen",
    "start": "ghetto",
-   "ziel": "ghetto",
+   "ziel": "nordbucht",
    "gang": "Kanal-Kobras",
    "belohnung": 10000,
    "briefing": "Ein letzter Angriff auf den Lindenhof.",
    "schritte": [
-    "Nach ghetto",
+    "Nach nordbucht",
     "Angriffswellen der Kanal-Kobras abwehren",
     "Gebäude halten"
    ],
@@ -1356,7 +1356,7 @@
    "kontakt": "fremd",
    "titel": "Der Tourist",
    "typ": "transport",
-   "start": "bahnhof",
+   "start": "hafenviertel",
    "ziel": "berg",
    "gang": "",
    "belohnung": 400,
@@ -1372,7 +1372,7 @@
    "titel": "Paparazzo",
    "typ": "verfolgung",
    "start": "downtown",
-   "ziel": "vorort",
+   "ziel": "espenwald",
    "gang": "",
    "belohnung": 400,
    "briefing": "Fotografier den Star in seiner Villa.",
@@ -1403,7 +1403,7 @@
    "kontakt": "fremd",
    "titel": "Zirkusbär",
    "typ": "transport",
-   "start": "hafen",
+   "start": "kleinseoul",
    "ziel": "flugplatz",
    "gang": "",
    "belohnung": 400,
@@ -1418,13 +1418,13 @@
    "kontakt": "fremd",
    "titel": "Marathon",
    "typ": "rennen",
-   "start": "altstadt",
-   "ziel": "altstadt",
+   "start": "kowloon",
+   "ziel": "nordbucht",
    "gang": "",
    "belohnung": 400,
    "briefing": "Zu Fuß durch die Altstadt.",
    "schritte": [
-    "Zum Start in altstadt",
+    "Zum Start in nordbucht",
     "Rennen über die Insel gewinnen",
     "Siegerauto in die Werkstatt bringen"
    ],
@@ -1434,7 +1434,7 @@
    "kontakt": "fremd",
    "titel": "Schatzsucher",
    "typ": "bergung",
-   "start": "flugplatz",
+   "start": "kornfeld",
    "ziel": "flugplatz",
    "gang": "",
    "belohnung": 400,
@@ -1450,14 +1450,14 @@
    "kontakt": "fremd",
    "titel": "Der Prediger",
    "typ": "eskorte",
-   "start": "ghetto",
-   "ziel": "downtown",
+   "start": "sonnenhuegel",
+   "ziel": "see",
    "gang": "",
    "belohnung": 400,
    "briefing": "Bring den Straßenprediger zur Kundgebung.",
    "schritte": [
     "Konvoi bei ghetto treffen",
-    "Konvoi bis downtown beschützen"
+    "Konvoi bis see beschützen"
    ],
    "id": 89
   },
@@ -1465,14 +1465,14 @@
    "kontakt": "fremd",
    "titel": "Fahrradkurier",
    "typ": "lieferung",
-   "start": "downtown",
-   "ziel": "altstadt",
+   "start": "hafenviertel",
+   "ziel": "kleinseoul",
    "gang": "",
    "belohnung": 400,
    "briefing": "Zehn Pakete, zehn Minuten.",
    "schritte": [
     "Ware bei downtown laden",
-    "In der Zeit nach altstadt liefern"
+    "In der Zeit nach kleinseoul liefern"
    ],
    "id": 90
   },
@@ -1480,13 +1480,13 @@
    "kontakt": "fremd",
    "titel": "Graffiti-Jagd",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "industrie",
+   "start": "nordbucht",
+   "ziel": "flughafen",
    "gang": "Kanal-Kobras",
    "belohnung": 400,
    "briefing": "Die Kobras übersprühen deine Tags.",
    "schritte": [
-    "Nach industrie fahren",
+    "Nach flughafen fahren",
     "Alle Mitglieder der Kanal-Kobras ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1543,7 +1543,7 @@
    "kontakt": "fremd",
    "titel": "Schrottkönig",
    "typ": "abschleppen",
-   "start": "ghetto",
+   "start": "nordbucht",
    "ziel": "industrie",
    "gang": "",
    "belohnung": 400,
@@ -1559,7 +1559,7 @@
    "kontakt": "fremd",
    "titel": "Der Erpresser",
    "typ": "spionage",
-   "start": "vorort",
+   "start": "staubwinkel",
    "ziel": "downtown",
    "gang": "",
    "belohnung": 400,
@@ -1591,15 +1591,15 @@
    "kontakt": "fremd",
    "titel": "Bergrettung",
    "typ": "bergung",
-   "start": "berg",
-   "ziel": "berg",
+   "start": "nordbucht",
+   "ziel": "strand",
    "gang": "",
    "belohnung": 400,
    "briefing": "Wanderer im Nebel.",
    "schritte": [
-    "Mit dem Boot/LKW nach berg",
-    "Kisten bergen",
-    "Zurück nach berg"
+    "Mit dem Boot/LKW nach strand",
+    "Kisten stranden",
+    "Zurück nach strand"
    ],
    "id": 98
   },
@@ -1608,7 +1608,7 @@
    "titel": "Zugverspätung",
    "typ": "rennen",
    "start": "bahnhof",
-   "ziel": "flugplatz",
+   "ziel": "see",
    "gang": "",
    "belohnung": 400,
    "briefing": "Schneller als der Zug zum Wüstenhalt.",
@@ -1624,13 +1624,13 @@
    "titel": "Taubenzüchter",
    "typ": "transport",
    "start": "altstadt",
-   "ziel": "berg",
+   "ziel": "strand",
    "gang": "",
    "belohnung": 400,
    "briefing": "Freilassung am Gipfel.",
    "schritte": [
     "Fahrzeug bei altstadt abholen",
-    "Unbeschädigt nach berg bringen"
+    "Unbeschädigt nach strand bringen"
    ],
    "id": 100
   },
@@ -1639,13 +1639,13 @@
    "titel": "Die Rocker-Oma",
    "typ": "eskorte",
    "start": "flugplatz",
-   "ziel": "ghetto",
+   "ziel": "kornfeld",
    "gang": "",
    "belohnung": 400,
    "briefing": "Eine alte Dame auf einer Harley.",
    "schritte": [
     "Konvoi bei flugplatz treffen",
-    "Konvoi bis ghetto beschützen"
+    "Konvoi bis kornfeld beschützen"
    ],
    "id": 101
   },
@@ -1653,7 +1653,7 @@
    "kontakt": "fremd",
    "titel": "Der letzte Bus",
    "typ": "transport",
-   "start": "bahnhof",
+   "start": "strand",
    "ziel": "ghetto",
    "gang": "",
    "belohnung": 400,
@@ -1685,12 +1685,12 @@
    "titel": "Gebietskampf: Industrie",
    "typ": "gang",
    "start": "ghetto",
-   "ziel": "industrie",
+   "ziel": "espenwald",
    "gang": "Kanal-Kobras",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel industrie von den Kanal-Kobras.",
    "schritte": [
-    "Nach industrie fahren",
+    "Nach espenwald fahren",
     "Alle Mitglieder der Kanal-Kobras ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1716,13 +1716,13 @@
    "kontakt": "lindenhof",
    "titel": "Gebietskampf: Gueterbahnhof",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "gueterbahnhof",
+   "start": "sonnenhuegel",
+   "ziel": "kleinseoul",
    "gang": "Hafenratten",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel gueterbahnhof von den Hafenratten.",
    "schritte": [
-    "Nach gueterbahnhof fahren",
+    "Nach kleinseoul fahren",
     "Alle Mitglieder der Hafenratten ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1748,7 +1748,7 @@
    "kontakt": "lindenhof",
    "titel": "Gebietskampf: Altstadt",
    "typ": "gang",
-   "start": "ghetto",
+   "start": "see",
    "ziel": "altstadt",
    "gang": "Ostblock-Brüder",
    "belohnung": 1500,
@@ -1765,12 +1765,12 @@
    "titel": "Gebietskampf: Flugplatz",
    "typ": "gang",
    "start": "ghetto",
-   "ziel": "flugplatz",
+   "ziel": "kleinseoul",
    "gang": "Wüstenfüchse",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel flugplatz von den Wüstenfüchse.",
    "schritte": [
-    "Nach flugplatz fahren",
+    "Nach kleinseoul fahren",
     "Alle Mitglieder der Wüstenfüchse ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1781,12 +1781,12 @@
    "titel": "Gebietskampf: Berg",
    "typ": "gang",
    "start": "ghetto",
-   "ziel": "berg",
+   "ziel": "staubwinkel",
    "gang": "Wüstenfüchse",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel berg von den Wüstenfüchse.",
    "schritte": [
-    "Nach berg fahren",
+    "Nach staubwinkel fahren",
     "Alle Mitglieder der Wüstenfüchse ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1796,13 +1796,13 @@
    "kontakt": "lindenhof",
    "titel": "Gebietskampf: Vorort",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "vorort",
+   "start": "strand",
+   "ziel": "nordstadt",
    "gang": "Ostblock-Brüder",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel vorort von den Ostblock-Brüder.",
    "schritte": [
-    "Nach vorort fahren",
+    "Nach nordstadt fahren",
     "Alle Mitglieder der Ostblock-Brüder ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1812,13 +1812,13 @@
    "kontakt": "lindenhof",
    "titel": "Gebietskampf: Bahnhof",
    "typ": "gang",
-   "start": "ghetto",
-   "ziel": "bahnhof",
+   "start": "fischerdorf",
+   "ziel": "kornfeld",
    "gang": "Hafenratten",
    "belohnung": 1500,
    "briefing": "Erobere das Viertel bahnhof von den Hafenratten.",
    "schritte": [
-    "Nach bahnhof fahren",
+    "Nach kornfeld fahren",
     "Alle Mitglieder der Hafenratten ausschalten",
     "Gebiet halten bis Verstärkung"
    ],
@@ -1841,7 +1841,7 @@
    "titel": "Sand im Getriebe",
    "typ": "gang",
    "start": "staubwinkel",
-   "ziel": "canyon",
+   "ziel": "militaer",
    "gang": "fuechse",
    "belohnung": 1800,
    "briefing": "Die Wüstenfüchse lagern Waffen am Roten Canyon. Räum das Lager.",
@@ -1853,7 +1853,7 @@
    "titel": "Kowloon-Nacht",
    "typ": "schiesserei",
    "start": "lindstadt",
-   "ziel": "kowloon",
+   "ziel": "sonnenhuegel",
    "gang": "ost",
    "belohnung": 2200,
    "briefing": "Die Ostblock-Brüder haben sich in Neu-Kowloon verschanzt.",
@@ -1876,8 +1876,8 @@
    "kontakt": "baron",
    "titel": "Die Wüstenbank",
    "typ": "ueberfall",
-   "start": "staubwinkel",
-   "ziel": "lindstadt",
+   "start": "strand",
+   "ziel": "farm",
    "gang": "",
    "belohnung": 3500,
    "briefing": "Der Händler in Staubwinkel bunkert Bargeld. Hol es dir – und dann ab nach Lindstadt.",
@@ -1888,7 +1888,7 @@
    "kontakt": "mara",
    "titel": "Schatten im Espenwald",
    "typ": "spionage",
-   "start": "espenwald",
+   "start": "gefaengnis",
    "ziel": "kowloon",
    "gang": "",
    "belohnung": 1400,
@@ -1900,7 +1900,7 @@
    "kontakt": "viktor",
    "titel": "Canyon-Kontrolle",
    "typ": "sniper",
-   "start": "canyon",
+   "start": "wueste",
    "ziel": "canyon",
    "gang": "fuechse",
    "belohnung": 2500,
@@ -1912,8 +1912,8 @@
    "kontakt": "petro",
    "titel": "Stellung halten",
    "typ": "verteidigen",
-   "start": "staubwinkel",
-   "ziel": "staubwinkel",
+   "start": "wueste",
+   "ziel": "nordstadt",
    "gang": "fuechse",
    "belohnung": 2600,
    "briefing": "Die Füchse greifen Petros Werkstatt an. Halte durch!",
@@ -1924,8 +1924,8 @@
    "kontakt": "jojo",
    "titel": "Fluchtwagen Kowloon",
    "typ": "flucht",
-   "start": "kowloon",
-   "ziel": "ghetto",
+   "start": "flughafen",
+   "ziel": "kleinseoul",
    "gang": "",
    "belohnung": 1600,
    "briefing": "Bring den heißen Wagen aus Kowloon zurück ins Ghetto, bevor die Polizei dich hat.",
@@ -2054,14 +2054,6 @@
    "speichern": true
   },
   {
-   "id": "wuestenranch",
-   "titel": "Ranch in der Wüste",
-   "ort": "flugplatz",
-   "preis": 90000,
-   "garage": 3,
-   "speichern": true
-  },
-  {
    "id": "garage_hafen",
    "titel": "Garage am Hafen",
    "ort": "hafen",
@@ -2084,6 +2076,134 @@
    "preis": 8000,
    "garage": 3,
    "speichern": false
+  },
+  {
+   "id": "wohnung_oststadt",
+   "titel": "Wohnung Oststadt",
+   "ort": "oststadt",
+   "preis": 30000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "haus_suedstadt",
+   "titel": "Reihenhaus Südstadt",
+   "ort": "suedstadt",
+   "preis": 20000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "strandhaus",
+   "titel": "Strandhaus",
+   "ort": "strand",
+   "preis": 120000,
+   "garage": 3,
+   "speichern": true
+  },
+  {
+   "id": "haus_nordbucht",
+   "titel": "Fischerhaus Nordbucht",
+   "ort": "nordbucht",
+   "preis": 35000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "wohnwagen_sandufer",
+   "titel": "Wohnwagen Sandufer",
+   "ort": "sandufer",
+   "preis": 8000,
+   "garage": 1,
+   "speichern": true
+  },
+  {
+   "id": "wuestenranch",
+   "titel": "Ranch in der Wüste",
+   "ort": "staubwinkel",
+   "preis": 90000,
+   "garage": 4,
+   "speichern": true
+  },
+  {
+   "id": "hof_kornfeld",
+   "titel": "Bauernhof Kornfeld",
+   "ort": "kornfeld",
+   "preis": 70000,
+   "garage": 4,
+   "speichern": true
+  },
+  {
+   "id": "huette_fischerdorf",
+   "titel": "Seehütte Fischerdorf",
+   "ort": "fischerdorf",
+   "preis": 22000,
+   "garage": 1,
+   "speichern": true
+  },
+  {
+   "id": "wohnung_kowloon",
+   "titel": "Kleine Wohnung Neu-Kowloon",
+   "ort": "kowloon",
+   "preis": 12000,
+   "garage": 1,
+   "speichern": true
+  },
+  {
+   "id": "wohnung_weststadt",
+   "titel": "Wohnung Weststadt",
+   "ort": "weststadt",
+   "preis": 28000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "haus_nordstadt",
+   "titel": "Stadthaus Nordstadt",
+   "ort": "nordstadt",
+   "preis": 65000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "villa_sonnenhuegel",
+   "titel": "Villa Sonnenhügel",
+   "ort": "sonnenhuegel",
+   "preis": 650000,
+   "garage": 8,
+   "speichern": true
+  },
+  {
+   "id": "haus_kleinseoul",
+   "titel": "Haus Klein-Seoul",
+   "ort": "kleinseoul",
+   "preis": 26000,
+   "garage": 2,
+   "speichern": true
+  },
+  {
+   "id": "loft_hafenviertel",
+   "titel": "Loft Hafenviertel",
+   "ort": "hafenviertel",
+   "preis": 55000,
+   "garage": 3,
+   "speichern": true
+  },
+  {
+   "id": "haus_ostvororte",
+   "titel": "Haus Ostvororte",
+   "ort": "ost",
+   "preis": 85000,
+   "garage": 3,
+   "speichern": true
+  },
+  {
+   "id": "hangar_flughafen",
+   "titel": "Hangar am Flughafen",
+   "ort": "flughafen",
+   "preis": 400000,
+   "garage": 12,
+   "speichern": true
   }
  ],
  "geschaefte": [

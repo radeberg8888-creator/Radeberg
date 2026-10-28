@@ -25,3 +25,7 @@ static func place(root:Node3D,size:float,axis:=1)->Node3D:
 	var c=ab.get_center()*s
 	root.position=Vector3(-c.x,-ab.position.y*s,-c.z)
 	return wrap
+# Vereinfachte Fassung eines schweren Modells (tools/modell_lod.gd), sonst das Original
+static func leicht(pfad:String)->String:
+	var c="res://assets/cache/leicht/"+pfad.get_file().get_basename()+".scn"
+	return c if ResourceLoader.exists(c) else pfad

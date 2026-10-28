@@ -1,92 +1,92 @@
 extends RefCounted
-# Gelände der Insel Radeberg: Höhenfunktion, Bezirke, Geländemesh mit Bodenarten.
-# Koordinaten: x = Osten, z = Süden. Insel ca. 3,4 x 2,8 km, rundherum Meer (Wasser y = 0).
-# Weltgrenzen: Hauptinsel um (0,0), Ostinsel (Wüste, Städte) um (3450,0), verbunden über die Ostbrücke
-const X0:=-1760.0
-const X1:=4750.0
-const Z0:=-1500.0
-const Z1:=1500.0
-const SX:=1750.0      # Halbachsen der Hauptinsel
-const SZ:=1450.0
-const OST:=Vector2(3450,0)
-const OST_R:=Vector2(1150,1320)
+# Gelände von Radeberg County: eine große Insel (ca. 6 x 11 km). Süden: Radeberg City (Hauptstadt) mit Hafen,
+# Flughafen, Strand; nördlich davon die Sonnenhügel (Nobelviertel), dann die Staubebene mit dem Staubsee und dem
+# Trailerdorf Staubwinkel, Roter Canyon im Osten, Farmland, im Norden der Radeberg-Gipfel mit dem Espenwald und
+# die Küstenstadt Nordbucht. Koordinaten: x = Osten, z = Süden (negativ = Norden). Wasser y = 0.
+const X0:=-4400.0
+const X1:=4700.0
+const Z0:=-11300.0
+const Z1:=3500.0
 const STEP:=10.0
 
 var noise:=FastNoiseLite.new()
 var noise2:=FastNoiseLite.new()
+var noise3:=FastNoiseLite.new()
 var cut:Dictionary={}        # Gitterzelle -> [Sollhöhe, Gewicht] (Straßen/Plätze glätten das Gelände)
 var heights:PackedFloat32Array
 var holes:={}
 var nx:int;var nz:int
 
-# Bezirke (Mittelpunkt, Radius) für Höhen und Bodenarten
-const MOUNTAIN:=Vector2(-1080,-820)
-const HILLS:=Vector2(760,-860)
-const DESERT:=Vector2(-1080,620)
-const DESERT2:=Vector2(3950,300)     # große Wüste auf der Ostinsel
-const ESPEN:=Vector2(3400,-950)      # Espenwald (Hügel, Mischwald)
-const ESPEN2:=Vector2(-350,-1100)    # Wald im Norden der Hauptinsel
-const KOWLOON:=Vector2(2760,-560)
-const LINDSTADT:=Vector2(2760,560)
+# Landschaften
+const STADT:=Vector2(0,550)             # Radeberg City (Ellipse 2750 x 2050)
+const MOUNTAIN:=Vector2(-700,-8350)    # Radeberg-Gipfel
+const HILLS:=Vector2(-200,-1900)       # Sonnenhügel (Nobelviertel)
+const DESERT:=Vector2(-2050,2050)      # Flughafen-Halbinsel
+const DESERT2:=Vector2(900,-5700)      # Staubebene (Wüste)
+const SEE:=Vector2(550,-6650)          # Staubsee
+const SEE_R:=Vector2(1500,520)
+const CANYON:=Vector2(-250,-5650)
+const ESPEN:=Vector2(-2000,-6200)      # Espenwald
+const ESPEN2:=Vector2(1000,-8800)      # Nordwald
+const FARM:=Vector2(2350,-7700)
+const NORDBUCHT:=Vector2(-2350,-9100)  # langgezogene Küstenstadt im Nordwesten
+const DORF:=Vector2(1750,-5950)        # Staubwinkel (Trailerdorf am See)
+const MILITAER:=Vector2(-2600,-5450)   # Militärflugplatz
+const FLUGHAFEN:=Vector2(-2050,2050)   # internationaler Flughafen
+const DOCKS:=Vector2(800,2050)
+const STAUSEE:=Vector2(-650,-2550)
 
 func _init():
 	noise.seed=7;noise.frequency=0.0016;noise.fractal_octaves=5
 	noise2.seed=11;noise2.frequency=0.006;noise2.fractal_octaves=3
+	noise3.seed=23;noise3.frequency=0.0006;noise3.fractal_octaves=4
+	_laden()
 
-# Inselmaske 0..1 (1 = Land), Küste leicht zerklüftet
+# Vorberechnetes Gelände (tools/gelaende_bake.py): natürliche Höhen, Küstenabstand, Bodenarten
+var _nh:PackedFloat32Array;var _kd:PackedFloat32Array;var _bo:PackedByteArray
+var rx:int;var rz:int
+func _laden():
+	var f=FileAccess.open("res://assets/cache/gelaende.bin",FileAccess.READ)
+	if f==null:push_error("gelaende.bin fehlt");return
+	f.get_buffer(4);rx=f.get_32();rz=f.get_32();f.get_float();f.get_float();f.get_float()
+	_nh=f.get_buffer(rx*rz*4).to_float32_array()
+	_kd=f.get_buffer(rx*rz*4).to_float32_array()
+	_bo=f.get_buffer(rx*rz*4)
+
+func _bilin(a:PackedFloat32Array,x:float,z:float)->float:
+	var fx=(x-X0)/STEP;var fz=(z-Z0)/STEP
+	var i=clampi(int(fx),0,rx-2);var k=clampi(int(fz),0,rz-2);var tx=clamp(fx-i,0.0,1.0);var tz=clamp(fz-k,0.0,1.0)
+	var j=k*rx+i
+	return lerp(lerp(a[j],a[j+1],tx),lerp(a[j+rx],a[j+rx+1],tx),tz)
+
+func kuesten_abstand(x:float,z:float)->float:return _bilin(_kd,x,z)
+
+# Inselmaske 0..1 (1 = Land)
 func island(x:float,z:float)->float:
-	var nz=noise.get_noise_2d(x*0.6,z*0.6)*0.12
-	var e=Vector2(x/SX,z/SZ).length()+nz
-	var e2=Vector2((x-OST.x)/OST_R.x,(z-OST.y)/OST_R.y).length()+nz
-	return clamp((1.0-min(e,e2))/0.12,0.0,1.0)
-func auf_ost(x:float,z:float)->bool:return x>2000.0
+	return clamp((kuesten_abstand(x,z)+40.0)/160.0,0.0,1.0)
 
-var plateaus:=[]   # [Vector2 Mitte, Radius, Übergang, Höhe] – ebene Flächen (Bahnhof, Flugplatz, Hafen)
+var plateaus:=[]   # [Vector2 Mitte, Radius, Übergang, Höhe] – ebene Flächen (Bahnhof, Flugplatz, Hafen, Dörfer)
 func base_height(x:float,z:float)->float:
 	var h=_nat(x,z)
 	for p in plateaus:
 		var d=Vector2(x,z).distance_to(p[0])
 		if d<p[1]+p[2]:h=lerp(h,p[3],1.0-smoothstep(p[1],p[1]+p[2],d))
 	return h
-func _nat(x:float,z:float)->float:
-	var m=island(x,z)
-	var h=13.0+noise.get_noise_2d(x,z)*11.0
-	# Berg im Nordwesten (wie Mount Chiliad), mit Graten
-	var dm=Vector2(x,z).distance_to(MOUNTAIN)
-	h+=235.0*exp(-pow(dm/430.0,2))*(0.9+0.18*noise2.get_noise_2d(x*0.35,z*0.35))+18.0*exp(-pow(dm/200.0,2))
-	h+=60.0*exp(-pow(Vector2(x,z).distance_to(Vector2(-700,-1050))/260.0,2))
-	# Hügel im Nordosten (Villenviertel)
-	h+=70.0*exp(-pow(Vector2(x,z).distance_to(HILLS)/330.0,2))
-	h+=30.0*exp(-pow(Vector2(x,z).distance_to(Vector2(200,-1020))/240.0,2))
-	# Wüste im Südwesten: flach mit Dünen und Tafelbergen
-	var dd=Vector2(x,z).distance_to(DESERT)
-	if dd<650:
-		var k=1.0-smoothstep(380.0,650.0,dd)
-		h=lerp(h,9.0+abs(noise2.get_noise_2d(x*2.0,z*2.0))*7.0,k)
-		h+=45.0*exp(-pow(Vector2(x,z).distance_to(Vector2(-1420,330))/120.0,2))
-	# Ostinsel: Wüste mit Dünen und Tafelbergen, Waldhügel im Norden
-	var d2=Vector2(x,z).distance_to(DESERT2)
-	if d2<900:
-		var k2=1.0-smoothstep(550.0,900.0,d2)
-		h=lerp(h,8.0+abs(noise2.get_noise_2d(x*1.6,z*1.6))*9.0,k2)
-		h+=70.0*exp(-pow(Vector2(x,z).distance_to(Vector2(4300,700))/140.0,2))+55.0*exp(-pow(Vector2(x,z).distance_to(Vector2(3600,950))/110.0,2))
-	h+=48.0*exp(-pow(Vector2(x,z).distance_to(ESPEN)/380.0,2))*(0.8+0.4*noise2.get_noise_2d(x*0.5,z*0.5))
-	h+=22.0*exp(-pow(Vector2(x,z).distance_to(ESPEN2)/300.0,2))
-	# Stadtgebiet sanft (leichte Hügel und eine Senke im Ghetto)
-	h-=7.0*exp(-pow(Vector2(x,z).distance_to(Vector2(-250,640))/300.0,2))
-	h+=12.0*exp(-pow(Vector2(x,z).distance_to(Vector2(650,520))/300.0,2))
-	# Küste: Strand und Meeresboden
-	if m>=1.0:h=max(h,3.0+abs(noise2.get_noise_2d(x,z))*2.0)
-	# Küstenabfall: im Randstreifen sanft zum Strand, dann Meeresgrund
-	return lerp(-14.0,lerp(1.2,h,smoothstep(0.0,1.0,m*m)),smoothstep(0.0,0.35,m)) if m<1.0 else h
+
+func _nat(x:float,z:float)->float:return _bilin(_nh,x,z)
 
 func idx(i:int,k:int)->int:return k*nx+i
 func build_heights():
-	nx=int((X1-X0)/STEP)+1;nz=int((Z1-Z0)/STEP)+1
-	heights.resize(nx*nz)
-	for k in nz:
-		for i in nx:
-			heights[idx(i,k)]=base_height(X0+i*STEP,Z0+k*STEP)
+	nx=rx;nz=rz
+	heights=_nh.duplicate()
+	for p in plateaus:
+		var r=p[1]+p[2]
+		var i0=max(int((p[0].x-r-X0)/STEP),0);var i1=min(int((p[0].x+r-X0)/STEP)+1,nx-1)
+		var k0=max(int((p[0].y-r-Z0)/STEP),0);var k1=min(int((p[0].y+r-Z0)/STEP)+1,nz-1)
+		for k in range(k0,k1+1):
+			for i in range(i0,i1+1):
+				var d=Vector2(X0+i*STEP,Z0+k*STEP).distance_to(p[0])
+				if d<r:heights[idx(i,k)]=lerp(heights[idx(i,k)],p[3],1.0-smoothstep(p[1],r,d))
 
 func h_at(x:float,z:float)->float:
 	var fx=(x-X0)/STEP;var fz=(z-Z0)/STEP
@@ -109,25 +109,14 @@ func apply_cut():
 	for key in cut:
 		var c=cut[key];heights[key]=lerp(heights[key],c[0]-0.15,c[1])
 
-# Bodenart je Punkt: RGBA = Gras, Wald, Sand, Fels (Rest = Trockengras)
+# Bodenart je Punkt: RGBA = Gras, Wald, Sand, Fels (Rest = Trockengras) – aus dem vorberechneten Raster
 func soil(x:float,z:float,h:float,slope:float)->Color:
-	var dd=Vector2(x,z).distance_to(DESERT)+noise2.get_noise_2d(x*0.35,z*0.35)*160.0;var dm=Vector2(x,z).distance_to(MOUNTAIN)
-	var dd2=Vector2(x,z).distance_to(DESERT2)+noise2.get_noise_2d(x*0.35,z*0.35)*180.0
-	dd=min(dd,dd2*0.75)
-	var sand=1.0-smoothstep(380.0,560.0,dd)
-	var beach=1.0-smoothstep(0.12,0.4,island(x,z))
-	sand=max(sand,beach)
-	var forest=(1.0-smoothstep(380.0,560.0,dm))*smoothstep(25.0,40.0,h)*(1.0-smoothstep(170.0,200.0,h))
-	forest=max(forest,(1.0-smoothstep(260.0,380.0,Vector2(x,z).distance_to(HILLS)))*0.6)
-	forest=max(forest,(1.0-smoothstep(300.0,480.0,Vector2(x,z).distance_to(ESPEN)))*0.85)
-	forest=max(forest,(1.0-smoothstep(220.0,380.0,Vector2(x,z).distance_to(ESPEN2)))*0.8)
-	var rock=smoothstep(0.55,0.85,slope)+smoothstep(175.0,215.0,h)
-	rock=clamp(rock,0.0,1.0)
-	var grass=clamp(1.0-sand-forest-rock,0.0,1.0)
-	# trockene Flecken und Übergang zur Wüste (Rest = Trockengras)
-	var dryp=smoothstep(0.05,0.35,noise2.get_noise_2d(x*0.25+400.0,z*0.25))*0.75+(1.0-smoothstep(500.0,760.0,dd))*0.8
-	grass*=1.0-clamp(dryp,0.0,0.9)
-	return Color(grass,forest*(1.0-rock),sand*(1.0-rock),rock)
+	var i=clampi(int(round((x-X0)/STEP)),0,rx-1);var k=clampi(int(round((z-Z0)/STEP)),0,rz-1)
+	var j=(k*rx+i)*4
+	var rock=max(_bo[j+3]/255.0,smoothstep(0.55,0.85,slope))
+	var c=Color(_bo[j]/255.0,_bo[j+1]/255.0,_bo[j+2]/255.0,rock)
+	if rock>c.a:c.r*=1.0-rock;c.g*=1.0-rock;c.b*=1.0-rock
+	return c
 
 # Geländemesh in Kacheln (640 m): Sichtbarkeit je Kachel, Meeresgrund weglassen
 const TILE:=64

@@ -1,9 +1,57 @@
 [
  {
+  "name": "Stadtpark",
+  "typ": "park",
+  "x": -150.0,
+  "z": 50.0
+ },
+ {
   "name": "Roter Canyon",
   "typ": "canyon",
-  "x": 4180.0,
-  "z": -470.0
+  "x": -250.0,
+  "z": -5650.0
+ },
+ {
+  "name": "Neu-Kowloon",
+  "typ": "stadt",
+  "x": -2050.0,
+  "z": -1150.0
+ },
+ {
+  "name": "Staubwinkel",
+  "typ": "stadt",
+  "x": 1750.0,
+  "z": -5950.0
+ },
+ {
+  "name": "Nordbucht",
+  "typ": "stadt",
+  "x": -2350.0,
+  "z": -9100.0
+ },
+ {
+  "name": "Sonnenhügel",
+  "typ": "stadt",
+  "x": -150.0,
+  "z": -1650.0
+ },
+ {
+  "name": "Strandviertel",
+  "typ": "stadt",
+  "x": -2150.0,
+  "z": -100.0
+ },
+ {
+  "name": "Oststadt",
+  "typ": "stadt",
+  "x": 2700.0,
+  "z": 600.0
+ },
+ {
+  "name": "Südstadt",
+  "typ": "stadt",
+  "x": 250.0,
+  "z": 1600.0
  },
  {
   "name": "Radeberg Customs (Tuning)",
@@ -20,8 +68,8 @@
  {
   "name": "Stoffwechsel (Kleidung)",
   "typ": "kleider",
-  "x": 40.308406829834,
-  "z": 94.3637390136719
+  "x": 55.1211357116699,
+  "z": 118.02033996582
  },
  {
   "name": "Zuhause (Speichern)",
@@ -32,14 +80,44 @@
  {
   "name": "Sands Waffenhandel (Wüste)",
   "typ": "waffen",
-  "x": 3588.77026367188,
-  "z": 507.891906738281
+  "x": 1667.71667480469,
+  "z": -5941.375
  },
  {
   "name": "Wüsten-Tuning Staubwinkel",
   "typ": "werkstatt",
-  "x": 3720.7646484375,
-  "z": 468.651702880859
+  "x": 1800.73034667969,
+  "z": -5974.037109375
+ },
+ {
+  "name": "Radeberg Autohaus",
+  "typ": "auto",
+  "x": 634.196411132812,
+  "z": 302.344451904297
+ },
+ {
+  "name": "Premium Motors",
+  "typ": "premium",
+  "x": 356.150482177734,
+  "z": -693.157043457031
+ },
+ {
+  "name": "Lackiererei (Fahndung weg)",
+  "typ": "lack",
+  "x": -2277.3798828125,
+  "z": -280.122436523438
+ },
+ {
+  "name": "Lackiererei (Fahndung weg)",
+  "typ": "lack",
+  "x": -2710.95629882812,
+  "z": -8283.365234375
+ },
+ {
+  "name": "Logistikzentrum",
+  "typ": "lager",
+  "x": 816.383361816406,
+  "z": 859.854553222656
  },
  {
   "name": "Hauptbahnhof",
@@ -50,31 +128,25 @@
  {
   "name": "Containerhafen",
   "typ": "hafen",
-  "x": 1545.0,
-  "z": 350.0
+  "x": 1678.0,
+  "z": 450.0
  },
  {
-  "name": "Alter Flugplatz",
+  "name": "Internationaler Flughafen",
   "typ": "flugplatz",
-  "x": -1080.0,
-  "z": 540.0
+  "x": -2000.0,
+  "z": 1750.0
  },
  {
-  "name": "Neu-Kowloon",
-  "typ": "stadt",
-  "x": 2760.0,
-  "z": -560.0
+  "name": "Militärbasis (Sperrgebiet)",
+  "typ": "militaer",
+  "x": -2600.0,
+  "z": -5450.0
  },
  {
-  "name": "Lindstadt",
-  "typ": "stadt",
-  "x": 2760.0,
-  "z": 560.0
- },
- {
-  "name": "Staubwinkel",
-  "typ": "stadt",
-  "x": 3640.0,
-  "z": 600.0
+  "name": "Docks",
+  "typ": "hafen",
+  "x": 500.0,
+  "z": 2200.0
  }
 ]

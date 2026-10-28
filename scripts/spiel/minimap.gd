@@ -9,8 +9,10 @@ var zoom:=260.0             # sichtbarer Radius in Metern
 var ziel=null               # Vector2 oder null
 var rect_mat:ShaderMaterial
 var R:=88.0
+var kampf=null
+var story_punkte:=[]      # [Vector2, Buchstabe, Farbe]
 const COL={"werkstatt":Color(0.95,0.6,0.1),"waffen":Color(0.85,0.12,0.1),"kleider":Color(0.65,0.3,0.85),"zuhause":Color(0.15,0.7,0.3),
-	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
+	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"militaer":Color(0.4,0.45,0.25),"lack":Color(0.85,0.25,0.65),"auto":Color(0.2,0.45,0.9),"premium":Color(0.85,0.7,0.15),"lager":Color(0.55,0.4,0.25),"park":Color(0.3,0.7,0.3),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -34,6 +36,10 @@ func w2m(p:Vector2)->Vector2:
 	var d=(p-mitte)/zoom*R
 	return Vector2(R,R)+d.rotated(-drehung)
 
+func _punkt(p:Vector2,c:Color,r:float):
+	var q=w2m(p);var d=q-Vector2(R,R)
+	if d.length()<R-4:draw_circle(q,r,Color(0,0,0,0.8));draw_circle(q,r-1.5,c)
+
 func _draw():
 	draw_arc(Vector2(R,R),R,0,TAU,64,Color(0,0,0,0.85),5.0)
 	for i in icons:
@@ -41,6 +47,19 @@ func _draw():
 		var d=p-Vector2(R,R)
 		if d.length()>R-10:p=Vector2(R,R)+d.normalized()*(R-10)
 		draw_circle(p,8,Color(0,0,0,0.8));draw_circle(p,6.5,COL.get(i.typ,Color(0.6,0.6,0.6)))
+	if kampf!=null:
+		if kampf.sterne>=1.0:
+			var c0=w2m(Vector2(kampf.such_mitte.x,kampf.such_mitte.z))
+			var blink=int(Time.get_ticks_msec()/350)%2==0
+			draw_arc(c0,kampf.such_r/zoom*R,0,TAU,48,Color(1,0.15,0.15,0.8) if blink else Color(0.2,0.4,1.0,0.8),3.0)
+		for c in kampf.streifen:
+			if is_instance_valid(c):_punkt(Vector2(c.global_position.x,c.global_position.z),Color(0.2,0.45,1.0) if int(Time.get_ticks_msec()/250)%2==0 else Color(1,0.2,0.2),6.0)
+		for g in kampf.gegner:
+			if is_instance_valid(g) and not g.tot:_punkt(Vector2(g.global_position.x,g.global_position.z),Color(0.3,0.5,1.0) if g.fraktion=="polizei" else (Color(0.3,0.9,0.3) if g.verbuendet else Color(0.95,0.15,0.1)),4.5)
+	for sp in story_punkte:
+		var q=w2m(sp[0]);var dq=q-Vector2(R,R)
+		if dq.length()>R-10:q=Vector2(R,R)+dq.normalized()*(R-10)
+		draw_circle(q,9,Color(0,0,0,0.85));draw_circle(q,7.5,sp[2]);draw_string(ThemeDB.fallback_font,q+Vector2(-4.5,5),sp[1],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color(0,0,0))
 	if ziel!=null:
 		var p2=w2m(ziel);var d2=p2-Vector2(R,R)
 		if d2.length()>R-8:p2=Vector2(R,R)+d2.normalized()*(R-8)

@@ -12,7 +12,7 @@ for d in ['scripts','scenes','shaders','tools']:
     shutil.copytree(os.path.join(SRC,d),os.path.join(DST,d),ignore=shutil.ignore_patterns('__pycache__'))
 A=['buildings/einzeln','buildings/ghetto','buildings/house','buildings/stash','props/tree','props/polyhaven','textures','ui','data','cache','animations',
    'characters/joe','characters/biker','characters/daya','characters/female','characters/police','characters/woman','characters/aiman','characters/hqman',
-   'weapons','staedte/kowloon','staedte/canyon','staedte/citybuilding','staedte/realbuilding','staedte/marino']
+   'weapons','props/neu/bank','props/neu/muelleimer','props/neu/container','props/neu/stapler','props/neu/hubwagen','props/neu/lagerhalle','props/neu/park','props/neu/bruecke','props/neu/harley','staedte/kowloon','staedte/canyon','staedte/citybuilding','staedte/realbuilding','staedte/marino']
 for d in A:
     shutil.copytree(os.path.join(SRC,'assets',d),os.path.join(DST,'assets',d))
 # Fahrzeuge: nur Texturen (Meshes stecken fertig vorbereitet in assets/cache/autos/*.scn)
