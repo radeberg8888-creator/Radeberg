@@ -1,13 +1,23 @@
 extends Node
-# Gebäude nach und nach einblenden (nah zuerst), damit das Spiel schnell startet.
-# Jedes Haus bekommt beim Einblenden seinen Kollisionskasten.
+# Gebäude zellenweise einblenden und wieder entfernen.
+# Jedes Gebäudemodell liegt vorbereitet als EIN Mesh mit Detailstufen vor (assets/cache/geb/, tools/gebaeude_bake.gd).
+# Pro Zelle wird je Modell ein MultiMesh gebaut (Tönung/Schmutz über die Instanzfarbe) und ein Körper mit
+# Kollisionskästen. Modelle werden im Hintergrund-Thread geladen – im Spielbild wird nie auf die Festplatte gewartet.
+const GEB:="res://assets/cache/geb/"
 var welt
-var zelle:=160.0
+var zelle:=128.0
 var gitter:={}          # Vector2i -> [indizes]
-var fertig:={}          # index -> true
+var zellen:={}          # Vector2i -> Node3D (fertig gebaut)
 var _wurzel:Node3D
-var radius:=750.0
-var budget_ms:=5.0
+var radius:=700.0       # einblenden
+var radius_weg:=880.0   # wieder entfernen
+var budget_ms:=4.0
+var sicht_f:=1.0
+var meshes:={}          # Vorlagenname -> Mesh
+var _angefragt:={}      # Vorlagenname -> Pfad
+var _alt:=false         # keine vorbereiteten Modelle -> altes Verfahren
+
+const TINTS=[Color(1,1,1),Color(1.0,0.93,0.84),Color(0.86,0.9,0.95)]
 
 func setup(w):
 	welt=w
@@ -18,22 +28,86 @@ func setup(w):
 		var k=Vector2i(floor(c.x/zelle),floor(c.y/zelle))
 		if not gitter.has(k):gitter[k]=[]
 		gitter[k].append(i)
+	_alt=not ResourceLoader.exists(GEB+"house.res")
+	welt.B.ohne_dach=not _alt
+	if _alt:push_warning("Gebäude: keine vorbereiteten Modelle gefunden, langsames Verfahren")
 
-func _bauen(i:int):
-	var w=welt.B.einzeln(_wurzel,i)
-	var pl=welt.B.placed[i];var t=welt.B.get_tpl(pl.t)
-	var sb=StaticBody3D.new();w.add_child(sb)
-	var cs=CollisionShape3D.new();var bx=BoxShape3D.new();bx.size=t.ab.size*Vector3(0.96,1.0,0.96);cs.shape=bx;sb.add_child(cs)
-	cs.position=Vector3(0,t.ab.size.y*0.5+0.02,0)
-	fertig[i]=true
+func _pfad(t:String)->String:return GEB+t+".res"
 
-# alles im Umkreis sofort (beim Start)
+# Modell anfordern (Hintergrund); true, wenn schon da
+func _bereit(t:String)->bool:
+	if meshes.has(t):return true
+	var p=_pfad(t)
+	if not _angefragt.has(t):
+		_angefragt[t]=p
+		if ResourceLoader.load_threaded_request(p,"",true)!=OK:meshes[t]=null;return true
+		return false
+	var s=ResourceLoader.load_threaded_get_status(p)
+	if s==ResourceLoader.THREAD_LOAD_LOADED:
+		meshes[t]=ResourceLoader.load_threaded_get(p);return true
+	if s==ResourceLoader.THREAD_LOAD_FAILED or s==ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		meshes[t]=null;return true
+	return false
+
+func _zelle_bereit(k:Vector2i)->bool:
+	var ok=true
+	for i in gitter[k]:
+		if not _bereit(welt.B.placed[i].t):ok=false
+	return ok
+
+func _farbe(pl)->Color:
+	var v=int(pl.v)%3;var dirt=float(pl.dirt)
+	dirt=0.2 if dirt<0.35 else (0.5 if dirt<0.7 else 0.9)
+	var grime=Color(0.78,0.72,0.62).lerp(Color(1,1,1),1.0-dirt)
+	var t=TINTS[v]
+	return Color(t.r*grime.r,t.g*grime.g,t.b*grime.b,1.0)
+
+func _bauen(k:Vector2i):
+	var n=Node3D.new();n.name="Z_%d_%d"%[k.x,k.y];_wurzel.add_child(n)
+	var gruppen={}
+	var sb=StaticBody3D.new();n.add_child(sb)
+	for i in gitter[k]:
+		var pl=welt.B.placed[i];var t=welt.B.get_tpl(pl.t)
+		var xf=Transform3D(Basis(Vector3.UP,pl.yaw),Vector3(pl.c.x,pl.y-0.12,pl.c.y))
+		if _alt:
+			welt.B.einzeln(n,i)
+		else:
+			if not gruppen.has(pl.t):gruppen[pl.t]=[]
+			gruppen[pl.t].append([xf,_farbe(pl)])
+		var cs=CollisionShape3D.new();var bx=BoxShape3D.new();bx.size=t.ab.size*Vector3(0.96,1.0,0.96);cs.shape=bx;sb.add_child(cs)
+		cs.transform=xf*Transform3D(Basis(),Vector3(0,t.ab.size.y*0.5+0.02,0))
+	for name in gruppen:
+		var mesh=meshes.get(name)
+		if mesh==null:continue
+		var l=gruppen[name]
+		var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.use_colors=true;mm.mesh=mesh;mm.instance_count=l.size()
+		for j in l.size():mm.set_instance_transform(j,l[j][0]);mm.set_instance_color(j,l[j][1])
+		var mi=MultiMeshInstance3D.new();mi.multimesh=mm;mi.name=name;n.add_child(mi)
+		var h=welt.B.get_tpl(name).ab.size.y
+		var vr=1100.0 if h>40 else 480.0
+		mi.set_meta("vr",vr);mi.visibility_range_end=vr*sicht_f
+	zellen[k]=n
+
+func sichtweite_anwenden():
+	for k in zellen:
+		for mi in zellen[k].get_children():
+			if mi.has_meta("vr"):mi.visibility_range_end=mi.get_meta("vr")*sicht_f
+
+# alles im Umkreis sofort (beim Start, Ladebildschirm): Modelle parallel im Hintergrund laden, dann bauen
 func sofort(p:Vector3,r:float):
-	for k in _zellen(p,r):
-		for i in gitter[k]:
-			if not fertig.has(i):_bauen(i)
+	var ks=_zellen_um(p,r)
+	if not _alt:
+		var t0=Time.get_ticks_msec()
+		while Time.get_ticks_msec()-t0<60000:
+			var ok=true
+			for k in ks:
+				if not _zelle_bereit(k):ok=false
+			if ok:break
+			await get_tree().process_frame
+	for k in ks:
+		if not zellen.has(k):_bauen(k)
 
-func _zellen(p:Vector3,r:float)->Array:
+func _zellen_um(p:Vector3,r:float)->Array:
 	var out=[]
 	var c=Vector2i(floor(p.x/zelle),floor(p.z/zelle));var n=int(ceil(r/zelle))
 	for dz in range(-n,n+1):
@@ -46,14 +120,28 @@ func _zellen(p:Vector3,r:float)->Array:
 var _offen:=[]
 var _letzt:=Vector3(1e9,0,0)
 func schritt(p:Vector3):
-	if p.distance_to(_letzt)>60.0 or _offen.is_empty():
-		_letzt=p;_offen=[]
-		for k in _zellen(p,radius):
-			for i in gitter[k]:
-				if not fertig.has(i):_offen.append(i)
-	var t0=Time.get_ticks_usec()
-	while not _offen.is_empty() and (Time.get_ticks_usec()-t0)<budget_ms*1000.0:
-		var i=_offen.pop_front()
-		if not fertig.has(i):_bauen(i)
+	if p.distance_to(_letzt)>40.0:
+		_letzt=p
+		_offen=[]
+		for k in _zellen_um(p,radius):
+			if not zellen.has(k):_offen.append(k)
+		# ferne Zellen freigeben
+		var mitte=Vector2(p.x,p.z)
+		for k in zellen.keys():
+			var zm=(Vector2(k)+Vector2(0.5,0.5))*zelle
+			if zm.distance_to(mitte)>radius_weg:
+				zellen[k].queue_free();zellen.erase(k)
+	if _offen.is_empty():return
+	var t0=Time.get_ticks_usec();var gebaut=0
+	var i=0
+	while i<_offen.size() and (Time.get_ticks_usec()-t0)<budget_ms*1000.0:
+		var k=_offen[i]
+		if zellen.has(k):_offen.remove_at(i);continue
+		if _alt or _zelle_bereit(k):
+			_bauen(k);_offen.remove_at(i);gebaut+=1
+			if gebaut>=2:break
+		else:
+			i+=1
+			if i>=6:break   # nur die nächsten Zellen gleichzeitig anfordern
 
-func anteil()->float:return float(fertig.size())/max(1,welt.B.placed.size())
+func anteil()->float:return float(zellen.size())/max(1,gitter.size())

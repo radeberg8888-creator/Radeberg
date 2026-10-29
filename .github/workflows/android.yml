@@ -101,13 +101,20 @@ jobs:
           ls -la assets/cache/welt/
           test -f assets/cache/welt/welt.scn
 
+      - name: Gebäudemodelle vereinfachen (ein Mesh + Detailstufen je Modell)
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          timeout 1800 $GODOT --headless --path . -s tools/gebaeude_bake.gd > build/geb.log 2>&1 || true
+          grep -E "FERTIG|SCRIPT ERROR" build/geb.log | head; ls assets/cache/geb | wc -l
+          test -f assets/cache/geb/house.res
+
       - name: Spieldaten-Paket exportieren und teilen
         run: |
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
           $GODOT --headless --path . --export-pack "Android" build/daten.pck > build/pack.log 2>&1 || true
           tail -5 build/pack.log; ls -la build/daten.pck
           # Pflichtdateien müssen im Paket stecken (sonst baut das Handy die Welt selbst und ohne Gelände)
-          for f in cache/welt/welt.scn cache/welt/welt_daten.bin cache/gelaende.bin; do
+          for f in cache/welt/welt.scn cache/welt/welt_daten.bin cache/gelaende.bin cache/geb/house.res; do
             grep -c -a "$f" build/daten.pck > /dev/null || { echo "FEHLT im Paket: $f"; exit 1; }
           done
           cd build && split -b 450000000 -d -a 2 daten.pck radeberg_daten.part && rm daten.pck && ls -la

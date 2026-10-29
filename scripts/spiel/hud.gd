@@ -129,7 +129,10 @@ func _draw():
 	_txt(Vector2(s.x-110,40),uhr,28,Color(1,1,1),HORIZONTAL_ALIGNMENT_RIGHT,true)
 	_txt(Vector2(s.x-110,80),"$"+_fmt(geld),34,Color(0.45,0.95,0.45),HORIZONTAL_ALIGNMENT_RIGHT,true)
 	if kampf!=null:_kampf_anzeige(s)
-	if st.e.fps:_txt(Vector2(330,40),str(Engine.get_frames_per_second())+" FPS",22,Color(1,1,0.6),HORIZONTAL_ALIGNMENT_LEFT,true)
+	if st.e.fps:
+		var dc=int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME));var pr=int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
+		var ms=Performance.get_monitor(Performance.TIME_PROCESS)*1000.0
+		_txt(Vector2(330,40),"%d FPS · %d Aufrufe · %.1f Mio. Dreiecke · Logik %.1f ms"%[Engine.get_frames_per_second(),dc,pr/1e6,ms],22,Color(1,1,0.6),HORIZONTAL_ALIGNMENT_LEFT,true)
 	if job_text!="":_txt(Vector2(s.x*0.5,110),job_text,26,Color(1,0.85,0.3),HORIZONTAL_ALIGNMENT_CENTER,true)
 	if meldung_zeit>0:
 		var a=clamp(meldung_zeit,0.0,1.0)

@@ -97,7 +97,7 @@ func shrub_mesh()->ArrayMesh:
 
 # ---------------- Wälder ----------------
 func forests(parent:Node3D):
-	if spiel:NEAR=140.0
+	_weiten()
 	var pines=[];var leafs=[];var shrubs=[]
 	var step=10.0
 	var z=G.Z0
@@ -129,33 +129,81 @@ func forests(parent:Node3D):
 				if grove>0.16 and rng.randf()<0.65:leafs.append([p,h])
 				elif rng.randf()<0.006:leafs.append([p,h])
 		z+=step
-	_mm(parent,pine_mesh(),pines,0.75,1.35,"Nadelwald")
-	_mm(parent,broadleaf_mesh(4.0,4.6),leafs,0.75,1.3,"Laubbaeume",real_tree_mesh())
-	var shm=shrub_mesh()
-	_mm(parent,shm,shrubs,0.6,1.3,"Wuestenbuesche")
+	var pm=pine_mesh();var bm=broadleaf_mesh(4.0,4.6)
+	_stufen(parent,pines,0.75,1.35,"Nadelwald",[[pm,0.0,W_MITTEL,200.0],[fern_mesh(true),W_MITTEL,W_FERN,500.0]])
+	_stufen(parent,leafs,0.75,1.3,"Laubbaeume",[[baum_nah(),0.0,W_NAH,100.0],[bm,W_NAH,W_MITTEL,200.0],[fern_mesh(false),W_MITTEL,W_FERN,500.0]])
+	_stufen(parent,shrubs,0.6,1.3,"Wuestenbuesche",[[shrub_mesh(),0.0,W_MITTEL-40.0,200.0]])
 	print("WELT Bäume: Nadel ",pines.size()," Laub ",leafs.size()," Büsche ",shrubs.size())
 
-# Bäume kachelweise (250 m): nah das echte Baummodell, fern die leichte Version (Detailstufen)
-const TILE:=250.0
-var NEAR:=230.0
-func _mm(parent:Node3D,mesh:Mesh,pts:Array,s0:float,s1:float,name:String,near_mesh:Mesh=null):
-	var tiles={}
+# Bäume in Detailstufen: nah ein ausgedünntes echtes Baummodell (kleine Kacheln), mittel ein einfaches Modell,
+# fern nur noch ein Kegel/Kristall mit wenigen Dreiecken. Jede Stufe hat ihre eigene Sichtweite – so werden
+# nie zehntausende Detailbäume gleichzeitig gezeichnet.
+var W_NAH:=70.0
+var W_MITTEL:=260.0
+var W_FERN:=1600.0
+func _weiten():
+	if not spiel:W_NAH=200.0;W_MITTEL=900.0;W_FERN=4000.0
+func _stufen(parent:Node3D,pts:Array,s0:float,s1:float,name:String,stufen:Array,schon_xf:=false):
+	_weiten()
+	var lst=[]
 	for e in pts:
-		var k=Vector2i(floor(e[0].x/TILE),floor(e[0].y/TILE))
-		if not tiles.has(k):tiles[k]=[]
-		var s=rng.randf_range(s0,s1)
-		var xf=Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3(s*rng.randf_range(0.9,1.1),s,s*rng.randf_range(0.9,1.1))),Vector3(e[0].x,e[1]-0.4,e[0].y))
+		var xf:Transform3D
+		if schon_xf:xf=e
+		else:
+			var s=rng.randf_range(s0,s1)
+			xf=Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3(s*rng.randf_range(0.9,1.1),s,s*rng.randf_range(0.9,1.1))),Vector3(e[0].x,e[1]-0.4,e[0].y))
 		var v=rng.randf_range(0.82,1.12)
-		tiles[k].append([xf,Color(v*rng.randf_range(0.95,1.05),v,v*rng.randf_range(0.9,1.02))])
-	for k in tiles:
-		var lst=tiles[k]
-		for lod in ([0,1] if near_mesh!=null else [0]):
-			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.use_colors=true;mm.mesh=mesh if lod==0 else near_mesh;mm.instance_count=lst.size()
-			for i in lst.size():mm.set_instance_transform(i,lst[i][0]);mm.set_instance_color(i,lst[i][1])
+		lst.append([xf,Color(v*rng.randf_range(0.95,1.05),v,v*rng.randf_range(0.9,1.02))])
+	for st in stufen:
+		var mesh:Mesh=st[0];var b0:float=st[1];var b1:float=st[2];var kachel:float=st[3]
+		var tiles={}
+		for e in lst:
+			var k=Vector2i(floor(e[0].origin.x/kachel),floor(e[0].origin.z/kachel))
+			if not tiles.has(k):tiles[k]=[]
+			tiles[k].append(e)
+		for k in tiles:
+			var l=tiles[k]
+			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.use_colors=true;mm.mesh=mesh;mm.instance_count=l.size()
+			for i in l.size():mm.set_instance_transform(i,l[i][0]);mm.set_instance_color(i,l[i][1])
 			var mi=MultiMeshInstance3D.new();mi.multimesh=mm;mi.name=name;parent.add_child(mi)
-			if near_mesh!=null:
-				if lod==0:mi.visibility_range_begin=NEAR
-				else:mi.visibility_range_end=NEAR
+			mi.visibility_range_begin=b0;mi.visibility_range_end=b1
+			if b1<=W_NAH+1.0:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			elif b0>=W_MITTEL-1.0:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+# Fernstufe: Kegel (Nadelbaum) bzw. Doppelpyramide (Laubbaum), undurchsichtig, ~10 Dreiecke
+var _fern_mat:StandardMaterial3D
+func fern_mesh(nadel:bool)->ArrayMesh:
+	if _fern_mat==null:
+		_fern_mat=StandardMaterial3D.new();_fern_mat.vertex_color_use_as_albedo=true;_fern_mat.roughness=1.0
+	var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var seg=5
+	var col=Color(0.2,0.3,0.17) if nadel else Color(0.33,0.42,0.22)
+	var unten=1.4 if nadel else 3.2;var mitte=4.5 if nadel else 6.6;var oben=15.0 if nadel else 10.5;var r=3.2 if nadel else 4.2
+	for k in seg:
+		var a0=TAU*k/seg;var a1=TAU*(k+1)/seg
+		var p0=Vector3(cos(a0)*r,mitte,sin(a0)*r);var p1=Vector3(cos(a1)*r,mitte,sin(a1)*r)
+		for tri in [[Vector3(0,oben,0),p1,p0],[Vector3(0,unten,0),p0,p1]]:
+			var n=(tri[1]-tri[0]).cross(tri[2]-tri[0]).normalized()
+			if n.y<0 and tri[0].y>mitte:n=-n
+			for v in tri:st.set_color(col);st.set_normal((n+Vector3(0,0.6,0)).normalized());st.add_vertex(v)
+	var am=st.commit();am.surface_set_material(0,_fern_mat);return am
+
+# Nahstufe: echtes Baummodell mit ausgedünnten (dafür größeren) Blattkarten und vereinfachtem Stamm
+var _baum_nah:ArrayMesh
+func baum_nah()->ArrayMesh:
+	if _baum_nah:return _baum_nah
+	var VE=load("res://scripts/vereinfachen.gd")
+	var voll=real_tree_mesh();var am=ArrayMesh.new()
+	for s in voll.get_surface_count():
+		var arr=voll.surface_get_arrays(s);var mat=voll.surface_get_material(s)
+		if arr[Mesh.ARRAY_INDEX]==null:arr[Mesh.ARRAY_INDEX]=PackedInt32Array(range(arr[Mesh.ARRAY_VERTEX].size()))
+		for k in [Mesh.ARRAY_CUSTOM0,Mesh.ARRAY_CUSTOM1,Mesh.ARRAY_CUSTOM2,Mesh.ARRAY_CUSTOM3,Mesh.ARRAY_BONES,Mesh.ARRAY_WEIGHTS]:arr[k]=null
+		var blatt=mat is BaseMaterial3D and mat.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED
+		if blatt:arr=VE.ausduennen(arr,0.3,1.6)
+		else:arr[Mesh.ARRAY_INDEX]=VE.cluster(arr,arr[Mesh.ARRAY_INDEX],0.6)
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr)
+		am.surface_set_material(am.get_surface_count()-1,mat)
+	_baum_nah=am;return am
 
 # echtes Baummodell als ein Mesh (alle Teile zusammengeführt, auf ~9 m Höhe skaliert)
 func real_tree_mesh()->ArrayMesh:
@@ -172,13 +220,10 @@ func real_tree_mesh()->ArrayMesh:
 	w.free();return am
 
 # ---------------- Stadtbäume, Laternen ----------------
-var _tree_tpl:Node3D
-func street_tree(parent:Node3D,p:Vector2,y:float):
-	if _tree_tpl==null:
-		var n=load("res://assets/props/tree/tree.gltf").instantiate();_tree_tpl=F.place(n,9.5)
-	var w=_tree_tpl.duplicate();parent.add_child(w);w.position=Vector3(p.x,y-0.3,p.y);w.rotation.y=rng.randf()*TAU
-	var s=rng.randf_range(0.85,1.15);w.scale=Vector3(s,s,s)
-	for m in w.find_children("*","MeshInstance3D",true,false):m.visibility_range_end=200.0 if spiel else 320.0
+var _strassenbaeume:=[]
+func street_tree(_parent:Node3D,p:Vector2,y:float):
+	var sc=rng.randf_range(0.85,1.15)
+	_strassenbaeume.append(Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3.ONE*sc),Vector3(p.x,y-0.3,p.y)))
 
 func lamp_mesh()->ArrayMesh:
 	var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -227,10 +272,21 @@ func streets(parent:Node3D):
 				var t:Vector2=at[2];var n=Vector2(-t.y,t.x)
 				for sd in [1,-1]:ab_lamps.append(Transform3D(Basis(Vector3.UP,atan2(n.x*sd,n.y*sd)),Vector3(at[0].x,at[1]+0.9,at[0].y)))
 	var lm=lamp_mesh()
-	for set in [lamps,ab_lamps]:
+	var kacheln={}
+	for xf in lamps+ab_lamps:
+		var k=Vector2i(floor(xf.origin.x/250.0),floor(xf.origin.z/250.0))
+		if not kacheln.has(k):kacheln[k]=[]
+		kacheln[k].append(xf)
+	for k in kacheln:
+		var set=kacheln[k]
 		var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=lm;mm.instance_count=set.size()
-		for k in set.size():mm.set_instance_transform(k,set[k])
+		for j in set.size():mm.set_instance_transform(j,set[j])
 		var mi=MultiMeshInstance3D.new();mi.multimesh=mm;mi.name="Laternen";parent.add_child(mi)
+		mi.visibility_range_end=450.0 if spiel else 1500.0
+	if not _strassenbaeume.is_empty():
+		_weiten()
+		_stufen(parent,_strassenbaeume,1.0,1.0,"Strassenbaeume",[[baum_nah(),0.0,W_NAH*1.6,100.0],[broadleaf_mesh(4.0,4.6),W_NAH*1.6,W_MITTEL,200.0]],true)
+		print("WELT Straßenbäume ",_strassenbaeume.size())
 	print("WELT Laternen ",lamps.size()+ab_lamps.size())
 
 # ---------------- Autos ----------------
@@ -330,7 +386,7 @@ func ghetto_props(parent:Node3D):
 					for k in int(len/2.5)+1:b.cyl(fence,Vector3(-len*0.5+k*2.5,1.0,0.6),0.04,2.0,xf)
 					b.box(chain,Vector3(-len*0.5,0.0,0.59),Vector3(len*0.5,2.0,0.61),xf);b.cyl(fence,Vector3(0,2.0,0.6),0.03,len,xf,Basis(Vector3(0,0,1),PI*0.5))
 			cnt+=1
-	b.commit(parent)
+	for gm in b.commit(parent):gm.visibility_range_end=350.0 if spiel else 1500.0
 	print("WELT Ghetto-Kram ",cnt)
 
 # ---------------- Stadtmöbel aus echten Modellen (Bank, Betonmülleimer, Müllcontainer) als MultiMesh ----------------

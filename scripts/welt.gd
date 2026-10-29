@@ -782,6 +782,25 @@ func generate(progress:Callable):
 		await step.call("Laternen und Straßenbäume …",0.82)
 		LV.streets(lr);LV.ghetto_props(lr);LV.moebel(lr);mark.call("laternen")
 		if not spiel and not "nocars" in args:LV.cars(lr);LV.people(lr,90);mark.call("autos/leute")
+	sichtweiten()
+
+# Alles ohne eigene Sichtweite bekommt eine nach Größe (kleine Dinge verschwinden früh) – sonst zeichnet das Handy
+# Ausstellungsautos, Stapler, Kräne usw. auf der ganzen Insel gleichzeitig.
+func sichtweiten():
+	var n=0
+	for wurzel in ["Anlagen","Leben"]:
+		var w=get_node_or_null(wurzel)
+		if w==null:continue
+		for g in w.find_children("*","GeometryInstance3D",true,false):
+			if g.visibility_range_end>0.0:continue
+			var ab:AABB=g.get_aabb()
+			if g is MeshInstance3D or g is MultiMeshInstance3D:ab=g.global_transform*ab
+			var gr=max(ab.size.x,max(ab.size.y,ab.size.z))
+			if gr>2500.0:continue
+			g.visibility_range_end=clamp(gr*25.0,140.0,2600.0)*(1.0 if spiel else 3.0)
+			if gr<6.0 and spiel:g.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			n+=1
+	print("WELT Sichtweiten gesetzt: ",n)
 
 # ================= Welt-Cache: einmal am PC erzeugen, im Spiel nur laden (schneller Start auf dem Handy) =================
 const CACHE_DIR:="res://assets/cache/welt/"
@@ -875,6 +894,7 @@ func aus_cache():
 	B=BAU.new(G,S);B.spiel=true;B.placed=d.B.placed;B.occ=d.B.occ;B.ox=d.B.ox;B.oz=d.B.oz
 	A=ANL.new(G,S,B);A.shops=d.A.shops;A.icons=d.A.icons;A.villen=d.A.villen
 	var geb=Node3D.new();geb.name="Gebaeude";add_child(geb)
+	sichtweiten()   # Teile eingebundener Modelle (Autos im Autohaus, Stadtkacheln) speichert die Szene ohne Sichtweite
 
 func _after(t0):
 	print("WELT Gelände+Straßen ",Time.get_ticks_msec()-t0," ms, Straßen ",S.roads.size()," Kreuzungen ",S.junctions.size())

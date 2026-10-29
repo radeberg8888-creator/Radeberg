@@ -3,3 +3,4 @@ build/
 *.tmp
 
 assets/cache/welt/
+assets/cache/geb/

@@ -12,6 +12,7 @@ func shot(name:String):
 	print("  verkehr=",spiel.verkehr.size()," geparkt=",spiel.geparkt.size()," passanten sichtbar=",spiel.passanten.filter(func(e):return e.n.visible).size())
 	for c in spiel.verkehr.slice(0,3):print("   ki ",c.kind," ",c.global_position.snapped(Vector3.ONE*0.1)," v=",snapped(c.ki_speed,0.1))
 	if spiel.auto:print("  AUTO ",spiel.auto.global_position.snapped(Vector3.ONE*0.1)," kmh ",snapped(spiel.auto.kmh(),0.1))
+	print("LEISTUNG ",name," Aufrufe=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," Knoten=",Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
 	print("TESTBILD ",name," fps=",Engine.get_frames_per_second()," pos=",spiel.spieler.global_position," auto=",spiel.auto!=null," kmh=",spiel.auto.kmh() if spiel.auto else 0)
 
 var ui_schritt:=0

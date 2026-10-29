@@ -250,7 +250,7 @@ func shape_terrain():
 # ---------------- Geometrie ----------------
 var mats:={}
 func _road_mat(r:Dictionary)->ShaderMaterial:
-	var key=r.typ+str(r.wear)
+	var key=r.typ   # Verschleiß steckt in der Vertexfarbe
 	if mats.has(key):return mats[key]
 	var m=ShaderMaterial.new();m.shader=load("res://shaders/road.gdshader")
 	var T="res://assets/textures/"
@@ -266,6 +266,23 @@ func _road_mat(r:Dictionary)->ShaderMaterial:
 	if r.typ=="gasse":m.set_shader_parameter("edge_lines",0.0)
 	if r.typ=="autobahn":m.set_shader_parameter("tint",Color(0.92,0.92,0.95))
 	mats[key]=m;return m
+
+# Geometrie in 400-m-Kacheln aufteilen: nur sichtbare Kacheln werden gezeichnet (vorher: ein Netz für die ganze Insel)
+class Kacheln:
+	var teile:={}
+	var weite:=1800.0
+	const Z:=400.0
+	func quad(a:Vector3,b:Vector3,c:Vector3,d:Vector3,ua:Vector2,ub:Vector2,uc:Vector2,ud:Vector2,col:=Color(0,0,0,1),col2:=Color(0,0,0,1)):
+		var k=Vector2i(floor((a.x+c.x)*0.5/Z),floor((a.z+c.z)*0.5/Z))
+		if not teile.has(k):teile[k]=Strip.new()
+		teile[k].quad(a,b,c,d,ua,ub,uc,ud,col,col2)
+	func commit(parent:Node3D,m:Material,name:="",shadow:=true)->MeshInstance3D:
+		var first=null
+		for k in teile:
+			var mi=teile[k].commit(parent,m,name,shadow)
+			mi.visibility_range_end=weite
+			if first==null:first=mi
+		return first
 
 class Strip:
 	var st:=SurfaceTool.new()
@@ -301,13 +318,17 @@ func build(parent:Node3D):
 	var ballast=Mats.pbr("gravel",0.5,Color(0.62,0.58,0.54))
 	var rail_m=_two(Mats.flat(Color(0.38,0.34,0.32),0.35,0.9))
 	var wood=Mats.flat(Color(0.3,0.24,0.19),0.9)
-	var gs=Strip.new();var cs=Strip.new();var ps=Strip.new();var ks=Strip.new();var ss=Strip.new();var bs=Strip.new();var rs=Strip.new();var lm=Strip.new()
+	var gs=Kacheln.new();var cs=Kacheln.new();var ps=Kacheln.new();var ks=Kacheln.new();var ss=Kacheln.new();var bs=Kacheln.new();var rs=Kacheln.new();var lm=Kacheln.new()
+	ps.weite=700.0;ks.weite=500.0;ss.weite=900.0;gs.weite=1200.0;bs.weite=900.0;rs.weite=700.0;lm.weite=600.0;cs.weite=2500.0
+	var fahrbahn:={}   # Material -> Kacheln (alle Straßen eines Typs zusammen)
 	var sleepers=[]
 	for r in roads:
 		var n=r.P.size();var w=r.w
 		if r.typ=="schiene":
 			_rails(r,bs,rs,sleepers);continue
-		var st=Strip.new()
+		var rm=_road_mat(r)
+		if not fahrbahn.has(rm):fahrbahn[rm]=Kacheln.new();fahrbahn[rm].weite=2600.0 if r.typ=="autobahn" else 1500.0
+		var st=fahrbahn[rm]
 		for i in n-1:
 			var p0=r.P[i];var p1=r.P[i+1];var t0=r.T[i];var t1=r.T[i+1]
 			var n0=Vector2(-t0.y,t0.x);var n1=Vector2(-t1.y,t1.x)
@@ -381,8 +402,6 @@ func build(parent:Node3D):
 					for sd in [1,-1]:
 						var lp=p0+n0*(w*0.55)*sd
 						lm.quad(_v(lp+n0*0.25+t0*1.2,y0+6.95),_v(lp-n0*0.25+t0*1.2,y0+6.95),_v(lp-n0*0.25-t0*1.2,y0+6.95),_v(lp+n0*0.25-t0*1.2,y0+6.95),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
-		var mi=st.commit(parent,_road_mat(r),"Strasse_"+r.typ,false)
-		r.mesh=mi
 		_portals(cs,ps,r)
 	# Kreuzungsflächen (Pflaster unter den Fahrbahnen, füllt die Ecken)
 	for j in junctions:
@@ -391,6 +410,7 @@ func build(parent:Node3D):
 		for k in 20:
 			var a1=TAU*k/20.0;var a2=TAU*(k+1)/20.0
 			ps.quad(c,c,c+Vector3(cos(a2),0,sin(a2))*rr,c+Vector3(cos(a1),0,sin(a1))*rr,Vector2(j.p.x,j.p.y)/2.0,Vector2(j.p.x,j.p.y)/2.0,Vector2(j.p.x+cos(a2)*rr,j.p.y+sin(a2)*rr)/2.0,Vector2(j.p.x+cos(a1)*rr,j.p.y+sin(a1)*rr)/2.0)
+	for rm in fahrbahn:fahrbahn[rm].commit(parent,rm,"Strasse",false)
 	cs.commit(parent,conc,"Beton");ps.commit(parent,paver,"Gehweg",false);ks.commit(parent,curbm,"Bordstein",false);ss.commit(parent,steel,"Leitplanke");gs.commit(parent,grass,"Mittelstreifen",false)
 	bs.commit(parent,ballast,"Schotter",false);rs.commit(parent,rail_m,"Schienen",false);lm.commit(parent,lamp_m,"Tunnellicht",false)
 	# Schwellen als MultiMesh
@@ -399,7 +419,7 @@ func build(parent:Node3D):
 	for k in sleepers.size():mm.set_instance_transform(k,sleepers[k])
 	var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.material_override=wood;mmi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(mmi)
 
-func _pillar(s:Strip,p:Vector2,t:Vector2,y0:float,y1:float,size:float):
+func _pillar(s,p:Vector2,t:Vector2,y0:float,y1:float,size:float):
 	var n=Vector2(-t.y,t.x)*size*0.5;var tt=t*size*0.5
 	var c=[p+n+tt,p-n+tt,p-n-tt,p+n-tt]
 	for k in 4:
@@ -414,7 +434,7 @@ func _pillar(s:Strip,p:Vector2,t:Vector2,y0:float,y1:float,size:float):
 	s.quad(_v(cc[0],y1-1.1),_v(cc[1],y1-1.1),_v(cc[2],y1-1.1),_v(cc[3],y1-1.1),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
 
 # Stützmauern am Tunnelmund (verdecken das ausgeschnittene Gelände)
-func _trench(s:Strip,r:Dictionary,i:int):
+func _trench(s,r:Dictionary,i:int):
 	if i>=r.P.size()-1:return
 	var p0=r.P[i];var p1=r.P[i+1];var t0=r.T[i];var t1=r.T[i+1];var n0=Vector2(-t0.y,t0.x);var n1=Vector2(-t1.y,t1.x)
 	var y0=r.h[i];var y1=r.h[i+1];var w=r.w+1.2
@@ -484,7 +504,7 @@ func _fix_one(r:Dictionary,k:int,dir:int):
 	var kw=clampi(k-ext*dir,0,r.P.size()-1)
 	portals.append({"r":r,"k":kw,"dir":dir,"cells":cells})
 
-func _portals(s:Strip,floor_s:Strip,r:Dictionary):
+func _portals(s,floor_s,r:Dictionary):
 	for po in portals:
 		if po.r!=r:continue
 		var k=po.k;var dir=po.dir
@@ -516,7 +536,7 @@ func _portals(s:Strip,floor_s:Strip,r:Dictionary):
 				var ly=max(G.h_at((a.x+bb.x)*0.5,(a.y+bb.y)*0.5),yy+8.2)
 				s.quad(_v(a,ly),_v(Vector2(bb.x,a.y),ly),_v(bb,ly),_v(Vector2(a.x,bb.y),ly),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
 
-func _rails(r:Dictionary,bs:Strip,rs:Strip,sleepers:Array):
+func _rails(r:Dictionary,bs,rs,sleepers:Array):
 	var n=r.P.size()
 	for i in n-1:
 		var p0=r.P[i];var p1=r.P[i+1];var t0=r.T[i];var t1=r.T[i+1];var n0=Vector2(-t0.y,t0.x);var n1=Vector2(-t1.y,t1.x)

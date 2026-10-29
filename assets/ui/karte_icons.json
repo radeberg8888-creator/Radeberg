@@ -60,16 +60,16 @@
   "z": 541.437194824219
  },
  {
-  "name": "Waffen Krause",
+  "name": "Waffenladen Krause",
   "typ": "waffen",
   "x": -512.532775878906,
   "z": 461.940368652344
  },
  {
-  "name": "Stoffwechsel (Kleidung)",
+  "name": "Kleidung Stoffwechsel",
   "typ": "kleider",
-  "x": 55.1211357116699,
-  "z": 118.02033996582
+  "x": 57.144603729248,
+  "z": 121.687126159668
  },
  {
   "name": "Zuhause (Speichern)",
@@ -80,44 +80,224 @@
  {
   "name": "Sands Waffenhandel (Wüste)",
   "typ": "waffen",
-  "x": 1667.71667480469,
-  "z": -5941.375
+  "x": 1658.06127929688,
+  "z": -5951.85546875
  },
  {
   "name": "Wüsten-Tuning Staubwinkel",
   "typ": "werkstatt",
-  "x": 1800.73034667969,
-  "z": -5974.037109375
+  "x": 1792.38330078125,
+  "z": -5970.994140625
  },
  {
-  "name": "Radeberg Autohaus",
+  "name": "Autohaus Radeberg",
   "typ": "auto",
   "x": 634.196411132812,
   "z": 302.344451904297
  },
  {
-  "name": "Premium Motors",
+  "name": "Premium Motors ",
   "typ": "premium",
-  "x": 356.150482177734,
-  "z": -693.157043457031
+  "x": 265.727508544922,
+  "z": -741.325927734375
  },
  {
-  "name": "Lackiererei (Fahndung weg)",
+  "name": "Lackiererei  (Fahndung weg)",
   "typ": "lack",
   "x": -2277.3798828125,
   "z": -280.122436523438
  },
  {
-  "name": "Lackiererei (Fahndung weg)",
+  "name": "Lackiererei  (Fahndung weg)",
   "typ": "lack",
-  "x": -2710.95629882812,
-  "z": -8283.365234375
+  "x": -2732.60546875,
+  "z": -8255.5263671875
  },
  {
   "name": "Logistikzentrum",
   "typ": "lager",
   "x": 816.383361816406,
   "z": 859.854553222656
+ },
+ {
+  "name": "Tuning Oststadt",
+  "typ": "werkstatt",
+  "x": 2696.74853515625,
+  "z": 615.589477539062
+ },
+ {
+  "name": "Tuning Nordbucht",
+  "typ": "werkstatt",
+  "x": -2196.6875,
+  "z": -8645.1435546875
+ },
+ {
+  "name": "Tuning Strand",
+  "typ": "werkstatt",
+  "x": -1956.44348144531,
+  "z": -203.078460693359
+ },
+ {
+  "name": "Tuning Kornfeld",
+  "typ": "werkstatt",
+  "x": 1672.03967285156,
+  "z": -7542.72119140625
+ },
+ {
+  "name": "Tuning Südstadt",
+  "typ": "werkstatt",
+  "x": 316.591918945312,
+  "z": 1510.001953125
+ },
+ {
+  "name": "Tuning Nordstadt",
+  "typ": "werkstatt",
+  "x": -785.279357910156,
+  "z": -1016.03356933594
+ },
+ {
+  "name": "Lackiererei Sandufer (Fahndung weg)",
+  "typ": "lack",
+  "x": 905.166564941406,
+  "z": -5830.9453125
+ },
+ {
+  "name": "Lackiererei Oststadt (Fahndung weg)",
+  "typ": "lack",
+  "x": 2586.23681640625,
+  "z": 1297.78356933594
+ },
+ {
+  "name": "Lackiererei Nordstadt (Fahndung weg)",
+  "typ": "lack",
+  "x": -374.879699707031,
+  "z": -947.031311035156
+ },
+ {
+  "name": "Lackiererei Hafenviertel (Fahndung weg)",
+  "typ": "lack",
+  "x": 1593.89172363281,
+  "z": 1309.05419921875
+ },
+ {
+  "name": "Lackiererei Kornfeld (Fahndung weg)",
+  "typ": "lack",
+  "x": 1767.60412597656,
+  "z": -7412.908203125
+ },
+ {
+  "name": "Lackiererei Klein-Seoul (Fahndung weg)",
+  "typ": "lack",
+  "x": -1225.46484375,
+  "z": 893.199829101562
+ },
+ {
+  "name": "Waffenladen Downtown",
+  "typ": "waffen",
+  "x": 299.033142089844,
+  "z": -178.24919128418
+ },
+ {
+  "name": "Waffenladen Oststadt",
+  "typ": "waffen",
+  "x": 2788.55615234375,
+  "z": 232.397689819336
+ },
+ {
+  "name": "Waffenladen Nordbucht",
+  "typ": "waffen",
+  "x": -1971.96228027344,
+  "z": -8859.005859375
+ },
+ {
+  "name": "Waffenladen Sandufer",
+  "typ": "waffen",
+  "x": 606.184692382812,
+  "z": -5815.31884765625
+ },
+ {
+  "name": "Waffenladen Strand",
+  "typ": "waffen",
+  "x": -1924.92224121094,
+  "z": 419.4033203125
+ },
+ {
+  "name": "Waffenladen Südstadt",
+  "typ": "waffen",
+  "x": 502.839965820312,
+  "z": 1598.0078125
+ },
+ {
+  "name": "Autohaus Weststadt",
+  "typ": "auto",
+  "x": -868.552307128906,
+  "z": -467.862335205078
+ },
+ {
+  "name": "Autohaus Oststadt",
+  "typ": "auto",
+  "x": 2485.94213867188,
+  "z": 1570.15124511719
+ },
+ {
+  "name": "Autohaus Sandufer",
+  "typ": "auto",
+  "x": 1227.09240722656,
+  "z": -5829.232421875
+ },
+ {
+  "name": "Premium Motors Strand",
+  "typ": "premium",
+  "x": -2136.30249023438,
+  "z": -601.778564453125
+ },
+ {
+  "name": "Premium Motors Nordstadt",
+  "typ": "premium",
+  "x": 148.566635131836,
+  "z": -1059.85681152344
+ },
+ {
+  "name": "Kleidung Downtown",
+  "typ": "kleider",
+  "x": 473.531372070312,
+  "z": -488.495025634766
+ },
+ {
+  "name": "Kleidung Strand",
+  "typ": "kleider",
+  "x": -2177.12866210938,
+  "z": 301.611724853516
+ },
+ {
+  "name": "Kleidung Oststadt",
+  "typ": "kleider",
+  "x": 2654.60278320312,
+  "z": 907.257080078125
+ },
+ {
+  "name": "Kleidung Nordbucht",
+  "typ": "kleider",
+  "x": -2302.005859375,
+  "z": -8565.7822265625
+ },
+ {
+  "name": "Kleidung Sandufer",
+  "typ": "kleider",
+  "x": 995.446655273438,
+  "z": -5912.27099609375
+ },
+ {
+  "name": "Kleidung Südstadt",
+  "typ": "kleider",
+  "x": -240.963119506836,
+  "z": 1389.06896972656
+ },
+ {
+  "name": "Kleidung Kornfeld",
+  "typ": "kleider",
+  "x": 1703.16967773438,
+  "z": -7512.95849609375
  },
  {
   "name": "Hauptbahnhof",
@@ -129,7 +309,7 @@
   "name": "Containerhafen",
   "typ": "hafen",
   "x": 1678.0,
-  "z": 450.0
+  "z": 680.0
  },
  {
   "name": "Internationaler Flughafen",
@@ -142,6 +322,12 @@
   "typ": "militaer",
   "x": -2600.0,
   "z": -5450.0
+ },
+ {
+  "name": "JVA Staubtal",
+  "typ": "militaer",
+  "x": 2000.0,
+  "z": -5050.0
  },
  {
   "name": "Docks",

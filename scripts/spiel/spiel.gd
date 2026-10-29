@@ -95,11 +95,11 @@ func _ready():
 	await _schritt("Spieler …",0.9)
 	_spieler()
 	await _schritt("Häuser in der Nähe …",0.92)
-	strom.sofort(spieler.global_position,320.0)
+	await strom.sofort(spieler.global_position,320.0)
 	await _schritt("Orte und Passanten …",0.95)
-	_zonen()
-	wirt.setup()
-	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup()
+	_zonen();_log("zonen ok")
+	wirt.setup();_log("wirtschaft ok")
+	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup();_log("story ok")
 	_passanten_pool(22)
 	_log("passanten ok")
 	if test_modus=="":
@@ -785,11 +785,7 @@ func einstellungen_anwenden():
 	vp.mesh_lod_threshold=[2.5,1.5,1.0][q]
 	Engine.max_fps=[45,60,60][q]
 	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
-	var g=welt.get_node_or_null("Gebaeude")
-	if g:
-		for m in g.find_children("*","MeshInstance3D",true,false):
-			if not m.has_meta("vr"):m.set_meta("vr",m.visibility_range_end)
-			if m.get_meta("vr")>0.0:m.visibility_range_end=m.get_meta("vr")*f
+	if strom:strom.sicht_f=f;strom.sichtweite_anwenden()
 	var far=[900.0,1600.0,2600.0][int(st.e.sichtweite)]
 	kam.cam.far=far
 	env.fog_density=[0.0016,0.0009,0.0005][int(st.e.sichtweite)]

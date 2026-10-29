@@ -116,6 +116,7 @@ func _path(name:String)->Array:
 func _meshes(n:Node)->Array:return n.find_children("*","MeshInstance3D",true,false)
 
 var spiel:=false
+var ohne_dach:=false   # Spiel mit vorbereiteten Gebäudemodellen: Dach steckt schon im Mesh
 const CACHE:="res://assets/cache/"
 var _cache_meta=null
 func _meta()->Dictionary:
@@ -146,7 +147,7 @@ func get_tpl(name:String)->Dictionary:
 	if m.has(name):
 		var e=m[name];var pp=_path(name);var a=e.ab
 		var t={"name":name,"path":pp[0],"sc":pp[1],"fixed":pp[2],"ab":AABB(Vector3(a[0],a[1],a[2]),Vector3(a[3],a[4],a[5])),"hide":e.hide,"var":{}}
-		t.roof=load(CACHE+"dach_"+name+".res") if e.roof else null
+		t.roof=load(CACHE+"dach_"+name+".res") if e.roof and not ohne_dach else null
 		tpl[name]=t;return t
 	tpl[name]=_build_tpl(name);return tpl[name]
 
@@ -343,13 +344,17 @@ func kloetze(root:Node3D):
 
 # Fundamentsockel unter allen Häusern (verhindert sichtbare Spalten an Hängen) – ein Mesh
 func fundamente(root:Node3D):
-	var Batch=load("res://scripts/batch.gd");var fb=Batch.new();var fm=load("res://scripts/mats.gd").pbr("concrete",0.4,Color(0.5,0.48,0.45))
+	var Batch=load("res://scripts/batch.gd");var fm=load("res://scripts/mats.gd").pbr("concrete",0.4,Color(0.5,0.48,0.45))
+	var kacheln={}
 	for pl in placed:
+		var k=Vector2i(floor(pl.c.x/400.0),floor(pl.c.y/400.0))
+		if not kacheln.has(k):kacheln[k]=Batch.new()
 		var t=get_tpl(pl.t);var hx=t.ab.size.x*0.49;var hz=t.ab.size.z*0.49
 		var xf=Transform3D(Basis(Vector3.UP,pl.yaw),Vector3(pl.c.x,pl.y,pl.c.y))
-		fb.box(fm,Vector3(-hx,-4.0,-hz),Vector3(hx,0.02,hz),xf)
-	var ms=fb.commit(root)
-	for m in ms:m.name="Fundamente";m.visibility_range_end=900.0
+		kacheln[k].box(fm,Vector3(-hx,-4.0,-hz),Vector3(hx,0.02,hz),xf)
+	var f=Node3D.new();f.name="Fundamente";root.add_child(f)
+	for k in kacheln:
+		for m in kacheln[k].commit(f,false):m.visibility_range_end=600.0 if spiel else 2400.0
 
 # ein Haus aufstellen (auch zum Nachladen im Spiel)
 func einzeln(root:Node3D,i:int)->Node3D:
