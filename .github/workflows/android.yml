@@ -55,9 +55,15 @@ jobs:
           key: import-${{ hashFiles('**/*.import') }}
           restore-keys: import-
 
+      - name: Debug-Schlüssel (Cache)
+        uses: actions/cache@v4
+        with:
+          path: ~/debug.keystore
+          key: debug-keystore-v1
+
       - name: Debug-Schlüssel und Editor-Einstellungen
         run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore ~/debug.keystore -storepass android \
+          test -f ~/debug.keystore || keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore ~/debug.keystore -storepass android \
             -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
           mkdir -p ~/.config/godot
           for f in editor_settings-4.tres editor_settings-4.7.tres; do
@@ -95,39 +101,47 @@ jobs:
           ls -la assets/cache/welt/
           test -f assets/cache/welt/welt.scn
 
-      - name: APK exportieren
+      - name: Spieldaten-Paket exportieren und teilen
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          $GODOT --headless --path . --export-pack "Android" build/daten.pck > build/pack.log 2>&1 || true
+          tail -5 build/pack.log; ls -la build/daten.pck
+          # Pflichtdateien müssen im Paket stecken (sonst baut das Handy die Welt selbst und ohne Gelände)
+          for f in cache/welt/welt.scn cache/welt/welt_daten.bin cache/gelaende.bin; do
+            grep -c -a "$f" build/daten.pck > /dev/null || { echo "FEHLT im Paket: $f"; exit 1; }
+          done
+          cd build && split -b 450000000 -d -a 2 daten.pck radeberg_daten.part && rm daten.pck && ls -la
+          cd .. && python3 - <<PY
+          import os,json
+          t=[{"name":n,"groesse":os.path.getsize("build/"+n)} for n in sorted(os.listdir("build")) if n.startswith("radeberg_daten.part")]
+          json.dump({"build":${{ github.run_number }},"url":"https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/","teile":t},open("build_info.json","w"))
+          print(open("build_info.json").read())
+          PY
+
+      - name: APK (Startprogramm) exportieren
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
-          mkdir -p build
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
-          $GODOT --headless --path . --export-debug "Android" build/radeberg.apk > build/export.log 2>&1 || true
-          tail -60 build/export.log
-          ls -la build/
-          # Ausdrücklich ausrichten und signieren (Godots eigenes Signieren klappt bei sehr großen APKs nicht zuverlässig)
+          sed -i 's#^run/main_scene=.*#run/main_scene="res://scenes/boot.tscn"#' project.godot
+          sed -i 's/^version\/code=.*/version\/code=${{ github.run_number }}/' export_presets.cfg
+          $GODOT --headless --path . --export-debug "AndroidStart" build/radeberg.apk > build/export.log 2>&1 || true
+          tail -30 build/export.log
           BT=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -1)
-          echo "Build-Tools: $BT"
           $BT/zipalign -p -f 4 build/radeberg.apk build/aligned.apk
-          $BT/apksigner sign --ks ~/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android \
-            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out build/signed.apk build/aligned.apk
-          $BT/apksigner verify --verbose build/signed.apk | head -8
+          $BT/apksigner sign --ks ~/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --out build/signed.apk build/aligned.apk
+          $BT/apksigner verify --verbose build/signed.apk | head -6
           mv build/signed.apk build/radeberg.apk && rm -f build/aligned.apk
-          # Pflichtdateien müssen in der APK stecken (sonst baut das Handy die Welt selbst und ohne Gelände)
-          for f in assets/cache/welt/welt.scn assets/cache/welt/welt_daten.bin assets/cache/gelaende.bin; do
-            unzip -l build/radeberg.apk | grep -q "assets/$f" || { echo "FEHLT in APK: $f"; exit 1; }
-          done
+          unzip -l build/radeberg.apk | grep -E "boot|build_info" | head
           ls -la build/
           {
-            echo "Automatisch gebaute Testversion. APK aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
+            echo "Installation: radeberg.apk aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
+            echo "Beim ersten Start lädt die App die Spieldaten (ca. $(du -cb build/radeberg_daten.part* | tail -1 | awk '{printf "%.1f", $1/1e9}') GB) automatisch herunter – bitte im WLAN."
+            echo "Die Dateien radeberg_daten.part* NICHT herunterladen, das macht die App selbst."
             echo ""
             echo "APK-Größe: $(du -h build/radeberg.apk | cut -f1)"
-            echo ""
-            echo "Signatur: $($(ls -d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -1)/apksigner verify build/radeberg.apk >/dev/null 2>&1 && echo OK || echo FEHLT)"
-            echo '```'
-            grep -E "ERROR|SCRIPT ERROR|WARNING" build/import.log build/export.log | sed 's/\x1b\[[0-9;]*m//g' | sort | uniq -c | sort -rn | head -40
-            echo '```'
           } > build/notes.md
           test -f build/radeberg.apk
 
@@ -144,5 +158,7 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Radeberg Testversion ${{ github.run_number }}
           body_path: build/notes.md
-          files: build/radeberg.apk
+          files: |
+            build/radeberg.apk
+            build/radeberg_daten.part*
           prerelease: true
