@@ -88,8 +88,9 @@ func _ready():
 		welt.kollision_bauen()
 	strom=STROM.new();add_child(strom);strom.setup(welt)
 	await _schritt("Autos werden vorbereitet …",0.86)
+	# alle Fahrzeuge jetzt laden (kein Nachladen im Hintergrund – das hat das Spiel auf dem Handy blockiert)
 	var alle=[]
-	for k in ["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","polizei","porsche911"]:
+	for k in FARB+["lkw","lkw_blau","bus","feuerwehr","rtw","armored"]:
 		if not k in alle:alle.append(k)
 	for i in alle.size():
 		AUTO.vorlage(alle[i]);_log("  vorlage "+alle[i])
@@ -104,9 +105,9 @@ func _ready():
 	wirt.setup();_log("wirtschaft ok")
 	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup();_log("story ok")
 	_passanten_pool(22)
+	var r3=RandomNumberGenerator.new();r3.seed=99
+	_fahrer_ped=PE.make(PE.CIVIL[0],r3);add_child(_fahrer_ped);_fahrer_ped.visible=false
 	_log("passanten ok")
-	if test_modus=="":
-		for k in FARB+["lkw","lkw_blau","bus","feuerwehr","rtw"]:AUTO.vorladen(k)
 	laden()
 	if test_modus!="":st.e.sichtweite=0;st.e.schatten=false
 	einstellungen_anwenden()
@@ -501,7 +502,6 @@ func _spawn_auto(p2:Vector2):
 		elif rng.randf()<0.03:k=["feuerwehr","bus"][rng.randi()%2]
 		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="taxi"
 		if wirt and r.typ=="autobahn" and rng.randf()<int(wirt.personal.get("logistik",{}).get("lkw",0))*0.04:k="lkw_blau"
-		if not AUTO.bereit(k):k=FARB[rng.randi()%8]   # Modell lädt noch im Hintergrund
 		c.setup(k)
 		var dir=1 if rng.randf()<0.5 else -1
 		c.als_ki(r,s,dir,c._lane(r),welt.S)

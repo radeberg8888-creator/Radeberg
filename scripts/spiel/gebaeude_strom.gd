@@ -34,30 +34,16 @@ func setup(w):
 
 func _pfad(t:String)->String:return GEB+t+".res"
 
-# Modell anfordern (Hintergrund); true, wenn schon da.
-# Immer nur EIN Ladeauftrag gleichzeitig und ohne Unter-Threads: viele parallele Aufträge mit gemeinsamen
-# Texturen können sich auf dem Handy gegenseitig blockieren (Spiel hängt).
-var _laed:="";var _laed_seit:=0
-var _warte:=[]
+# Modell holen; true, wenn schon da. Kein Laden im Hintergrund-Thread mehr: auf dem Handy blockierten sich
+# Hintergrund-Ladeaufträge gegenseitig und das ganze Spiel blieb stehen. Stattdessen höchstens ein Modell
+# alle paar Bilder direkt laden (kurzes Stocken statt Hänger).
+var _naechstes_laden:=0
 func _bereit(t:String)->bool:
 	if meshes.has(t):return true
-	if not t in _warte and t!=_laed:_warte.append(t)
-	_pumpe()
-	return meshes.has(t)
-func _pumpe():
-	if _laed!="":
-		var p=_pfad(_laed)
-		var s=ResourceLoader.load_threaded_get_status(p)
-		if s==ResourceLoader.THREAD_LOAD_LOADED:meshes[_laed]=ResourceLoader.load_threaded_get(p);_laed=""
-		elif s==ResourceLoader.THREAD_LOAD_FAILED or s==ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:meshes[_laed]=null;_laed=""
-		elif Time.get_ticks_msec()-_laed_seit>30000:push_warning("Gebäude lädt zu lange: "+_laed);meshes[_laed]=null;_laed=""
-		else:return
-	while _laed=="" and not _warte.is_empty():
-		var t=_warte.pop_front()
-		if meshes.has(t):continue
-		if not ResourceLoader.exists(_pfad(t)):meshes[t]=null;continue
-		if ResourceLoader.load_threaded_request(_pfad(t),"",false)!=OK:meshes[t]=null;continue
-		_laed=t;_laed_seit=Time.get_ticks_msec()
+	if Engine.get_process_frames()<_naechstes_laden:return false
+	_naechstes_laden=Engine.get_process_frames()+6
+	meshes[t]=load(_pfad(t)) if ResourceLoader.exists(_pfad(t)) else null
+	return true
 
 func _zelle_bereit(k:Vector2i)->bool:
 	var ok=true
