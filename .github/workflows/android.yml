@@ -139,7 +139,7 @@ jobs:
           {
             echo "Installation: radeberg.apk aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
             echo "Beim ersten Start lädt die App die Spieldaten (ca. $(du -cb build/radeberg_daten.part* | tail -1 | awk '{printf "%.1f", $1/1e9}') GB) automatisch herunter – bitte im WLAN."
-            echo "Die Dateien radeberg_daten.part* NICHT herunterladen, das macht die App selbst."
+            echo "Ist der Online-Download nicht möglich: alle Dateien radeberg_daten.part* hier herunterladen (Download-Ordner), in der App „Aus Download-Ordner übernehmen“ tippen, danach dürfen die Teile gelöscht werden."
             echo ""
             echo "APK-Größe: $(du -h build/radeberg.apk | cut -f1)"
           } > build/notes.md
