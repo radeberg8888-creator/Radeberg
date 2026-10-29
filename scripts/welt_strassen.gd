@@ -293,7 +293,7 @@ func _v(p:Vector2,y:float)->Vector3:return Vector3(p.x,y,p.y)
 
 func build(parent:Node3D):
 	var conc=_two(Mats.pbr("concrete",0.25,Color(0.72,0.71,0.69)))
-	var paver=Mats.pbr("gehweg",0.35,Color(1.45,1.42,1.36))
+	var paver=Mats.pbr("pavers",0.45,Color(0.86,0.84,0.8))
 	var curbm=_two(Mats.pbr("concrete",0.6,Color(0.78,0.78,0.77)))
 	var steel=_two(Mats.flat(Color(0.62,0.64,0.66),0.35,0.85))
 	var lamp_m=Mats.emissive(Color(1,0.93,0.78),3.0);lamp_m.cull_mode=BaseMaterial3D.CULL_DISABLED

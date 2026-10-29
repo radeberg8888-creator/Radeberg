@@ -18,10 +18,11 @@ void fragment(){
 	float x = UV.x; float ax = abs(x); float s = UV.y;
 	vec2 uv = vec2(x, s) / 5.0;
 	vec3 a = mix(texture(alb, uv).rgb, texture(alb, wpos.xz * 0.013).rgb, 0.3) * tint;
+	a = mix(a, vec3(0.30, 0.30, 0.31) * tint, 0.4);   // weniger fleckig
 	float wear = COLOR.r;
 	// Flicken und Risse (dunkler) bei Verschleiß
 	float patchv = texture(crack, wpos.xz * 0.021).r;
-	a *= 1.0 - wear * 0.35 * smoothstep(0.55, 0.75, patchv);
+	a *= 1.0 - wear * 0.15 * smoothstep(0.5, 0.85, patchv);
 	float m = 0.0;
 	float lw = (half_width - 0.5 - median) / float(lanes);
 	if (edge_lines > 0.5) m += band(ax, half_width - 0.45, 0.2);

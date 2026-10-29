@@ -114,6 +114,10 @@ jobs:
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out build/signed.apk build/aligned.apk
           $BT/apksigner verify --verbose build/signed.apk | head -8
           mv build/signed.apk build/radeberg.apk && rm -f build/aligned.apk
+          # Pflichtdateien müssen in der APK stecken (sonst baut das Handy die Welt selbst und ohne Gelände)
+          for f in assets/cache/welt/welt.scn assets/cache/welt/welt_daten.bin assets/cache/gelaende.bin; do
+            unzip -l build/radeberg.apk | grep -q "assets/$f" || { echo "FEHLT in APK: $f"; exit 1; }
+          done
           ls -la build/
           {
             echo "Automatisch gebaute Testversion. APK aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."

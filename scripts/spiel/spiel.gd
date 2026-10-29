@@ -144,17 +144,17 @@ func _ladebildschirm():
 # Hauptmenü: normales Spiel oder Admin-/Testmodus
 signal _gewaehlt
 func _hauptmenue():
-	var box=VBoxContainer.new();box.theme=theme_ui;lade.add_child(box)
-	box.set_anchors_preset(Control.PRESET_CENTER);box.position=Vector2(-230,-120);box.custom_minimum_size=Vector2(460,0)
-	box.add_theme_constant_override("separation",16)
+	# zwei große Knöpfe genau in der Bildschirmmitte
+	var cc=CenterContainer.new();cc.theme=theme_ui;ui.add_child(cc);cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var box=VBoxContainer.new();box.add_theme_constant_override("separation",22);cc.add_child(box)
+	box.add_child(Control.new());box.get_child(0).custom_minimum_size=Vector2(0,140)
 	lade_bar.visible=false;lade_text.visible=false
-	var b1=Button.new();b1.text="SPIELEN";b1.custom_minimum_size=Vector2(460,86);b1.add_theme_font_size_override("font_size",38);box.add_child(b1)
-	var b2=Button.new();b2.text="ADMIN-MODUS (alles testen)";b2.custom_minimum_size=Vector2(460,70);box.add_child(b2)
-	var hinweis=Label.new();hinweis.text="Admin: unendlich Geld, Gott-Modus, alle Autos & Waffen, Teleport, Uhrzeit, Fahndung, alle Missionen";hinweis.autowrap_mode=TextServer.AUTOWRAP_WORD;hinweis.add_theme_font_size_override("font_size",18);hinweis.custom_minimum_size=Vector2(460,0);box.add_child(hinweis)
+	var b1=Button.new();b1.text="START";b1.custom_minimum_size=Vector2(420,96);b1.add_theme_font_size_override("font_size",42);box.add_child(b1)
+	var b2=Button.new();b2.text="ADMIN";b2.custom_minimum_size=Vector2(420,96);b2.add_theme_font_size_override("font_size",42);box.add_child(b2)
 	b1.pressed.connect(func():admin=false;_gewaehlt.emit())
 	b2.pressed.connect(func():admin=true;_gewaehlt.emit())
 	await _gewaehlt
-	box.queue_free();lade_bar.visible=true;lade_text.visible=true
+	cc.queue_free();lade_bar.visible=true;lade_text.visible=true
 
 func _lade(t:String,p:float):
 	if lade_text:lade_text.text=t;lade_bar.value=p
@@ -721,7 +721,7 @@ func einstellungen_menue():
 	_slider(w,"Größe der Touch-Knöpfe","hud_groesse",0.7,1.4)
 	var sw=OptionButton.new();for t in ["Sichtweite: niedrig (schnell)","Sichtweite: mittel","Sichtweite: hoch"]:sw.add_item(t)
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
-	var gq=OptionButton.new();for t in ["Grafik: Mittel (schnell)","Grafik: Hoch","Grafik: Ultra (realistisch, braucht starkes Handy)"]:gq.add_item(t)
+	var gq=OptionButton.new();for t in ["Grafik: Mittel (Akku schonen)","Grafik: Hoch","Grafik: Ultra"]:gq.add_item(t)
 	gq.selected=int(st.e.get("grafik",1));w.add_child(gq);gq.item_selected.connect(func(i):st.e.grafik=i;einstellungen_anwenden())
 	var sh=CheckButton.new();sh.text="Schatten";sh.button_pressed=st.e.schatten;w.add_child(sh);sh.toggled.connect(func(b):st.e.schatten=b;einstellungen_anwenden())
 	var gr=CheckButton.new();gr.text="Dichtes Gras";gr.button_pressed=st.e.get("gras",true);w.add_child(gr);gr.toggled.connect(func(b):st.e.gras=b)
@@ -737,20 +737,18 @@ func _slider(v:Control,t:String,key:String,a:float,b:float):
 func einstellungen_anwenden():
 	sun.shadow_enabled=st.e.schatten
 	# Grafikstufe: Umgebungsverdeckung, indirektes Licht, Spiegelungen, Lichtnebel, Schattenreichweite, Auflösungs-Skalierung (FSR 2)
+	# Handy-Renderer (Mobile): Glow und Nebel, Schatten je nach Stufe, Auflösung per FSR hochskaliert, max. 60 FPS
 	var q=int(st.e.get("grafik",1))
-	env.ssao_enabled=q>=1;env.ssao_radius=1.2;env.ssao_intensity=1.8;env.ssao_detail=0.6
-	env.ssil_enabled=q>=2;env.ssil_radius=4.0;env.ssil_intensity=0.8
-	env.ssr_enabled=q>=2;env.ssr_max_steps=48;env.ssr_fade_in=0.15;env.ssr_fade_out=2.0
-	env.volumetric_fog_enabled=q>=2;env.volumetric_fog_density=0.0035;env.volumetric_fog_length=180.0;env.volumetric_fog_anisotropy=0.6
-	env.glow_enabled=true;env.glow_intensity=0.45;env.glow_bloom=0.05
-	sun.directional_shadow_max_distance=[120.0,200.0,320.0][q]
-	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if q==0 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.shadow_blur=1.0;sun.light_angular_distance=0.6 if q>=1 else 0.0
+	env.ssao_enabled=false;env.ssil_enabled=false;env.ssr_enabled=false;env.volumetric_fog_enabled=false;env.sdfgi_enabled=false
+	env.glow_enabled=q>=1;env.glow_intensity=0.4;env.glow_bloom=0.04
+	sun.directional_shadow_max_distance=[70.0,110.0,180.0][q]
+	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if q<2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.shadow_blur=1.0;sun.light_angular_distance=0.0
 	var vp=get_viewport()
-	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR2
-	vp.scaling_3d_scale=[0.6,0.77,1.0][q]
-	vp.use_taa=false
-	vp.mesh_lod_threshold=[2.0,1.0,0.5][q]
+	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR
+	vp.scaling_3d_scale=[0.67,0.8,1.0][q]
+	vp.mesh_lod_threshold=[2.5,1.5,1.0][q]
+	Engine.max_fps=[45,60,60][q]
 	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
 	var g=welt.get_node_or_null("Gebaeude")
 	if g:
