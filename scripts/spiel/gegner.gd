@@ -31,7 +31,7 @@ func setup(f:String,w:String,opt:={}):
 	fraktion=f;waffe=w
 	mission=opt.get("mission",false);stationaer=opt.get("stationaer",false);verbuendet=opt.get("verbuendet",false)
 	hp=float(opt.get("hp",100.0 if f!="polizei" else 110.0))
-	collision_layer=2;collision_mask=1
+	collision_layer=2;collision_mask=1|8
 	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.3;cap.height=1.75;cs.shape=cap;cs.position.y=0.88;add_child(cs)
 	floor_snap_length=0.5
 	var r=RandomNumberGenerator.new();r.randomize()

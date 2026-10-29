@@ -374,7 +374,7 @@ func ghetto_props(parent:Node3D):
 			var nn=Vector2(-t.y,t.x)*(1 if rng.randf()<0.5 else -1)
 			var q=p+nn*(r.w+r.sw-0.7);var y=at[1]+0.14
 			var xf=Transform3D(Basis(Vector3.UP,atan2(t.x,t.y)),Vector3(q.x,y,q.y))
-			match rng.randi()%4:
+			match rng.randi()%3:   # (Maschendrahtzaun entfernt – wirkte wie eine Glasscheibe auf dem Gehweg)
 				0:   # Müllcontainer
 					b.box(green,Vector3(-0.9,0.05,-0.55),Vector3(0.9,1.25,0.55),xf);b.box(Mats.flat(Color(0.08,0.15,0.1),0.6),Vector3(-0.95,1.25,-0.6),Vector3(0.95,1.32,0.6),xf)
 				1:   # Ölfässer

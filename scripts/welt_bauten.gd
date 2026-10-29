@@ -16,7 +16,7 @@ var DIST=[
 	{"n":"downtown","c":Vector2(250,-350),"r":560.0,"gap":[0.5,3.0],"dirt":0.15,
 		"list":[["nycity_00",2],["nycity_01",2],["nycity_02",2],["nycity_03",2],["nycity_04",2],["nycity_06",2],["nycity_07",2],["nycity_09",2],["nycity_10",3],["nycity_19",3],["nycity_20",3],
 			["city_01",1],["city_02",1],["city_03",1],["city_04",1],["city_06",1],["city_07",1],["city_09",2],["city_10",2],["city_11",2],["city_12",2],["city_17",1],
-			["beautiful_00",2],["beautiful_01",2],["beautiful_02",2],["beautiful_03",2],["beautiful_04",2],["seoul_00",1],["seoul_01",2],["nyc_00",1],["realcity_10",2],["realcity_04",2],["realcity_01",2],["citybuilding",2],["realbuilding",2],["harley",2]]},
+			["beautiful_00",2],["beautiful_01",2],["beautiful_02",2],["beautiful_03",2],["beautiful_04",2],["seoul_01",2],["nyc_00",1],["realcity_10",2],["realcity_04",2],["realcity_01",2],["realbuilding",2]]},
 	{"n":"ghetto","c":Vector2(-250,680),"r":520.0,"gap":[0.0,9.0],"dirt":1.0,
 		"list":[["house",7],["ghetto",7],["stash",3],["nyc_01",2],["city3_02",2],["cityscene_00",2],["cityscene_01",2],["chicago_00",2],
 			["cityscene2_04",1],["cityscene2_08",1],["cityscene2_13",1],["cityscene2_14",1],["cityscene2_22",1],["cityscene2_29",1],["cityscene2_35",1]]},
@@ -29,11 +29,11 @@ var DIST=[
 	{"n":"vorort","c":Vector2(760,-840),"r":340.0,"gap":[8.0,22.0],"dirt":0.25,
 		"list":[["stash",6],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1]]},
 	{"n":"strand","c":Vector2(-2080,-80),"r":520.0,"gap":[2.0,8.0],"dirt":0.25,
-		"list":[["cityscene2_01",2],["cityscene2_02",2],["cityscene2_05",2],["cityscene2_07",2],["cityscene2_11",2],["beautiful_01",1],["beautiful_03",1],["nyc_00",1],["london_00",1],["realcity_18",1],["realcity_13",1]]},
+		"list":[["cityscene2_01",2],["cityscene2_02",2],["cityscene2_05",2],["cityscene2_07",2],["cityscene2_11",2],["beautiful_01",1],["beautiful_03",1],["nyc_00",1],["realcity_18",1],["realcity_13",1]]},
 	{"n":"kowloon","c":Vector2(-2050,-1150),"r":260.0,"gap":[0.0,3.0],"dirt":0.6,
-		"list":[["cityscene2_04",2],["cityscene2_13",2],["cityscene2_20",2],["nyc_00",2],["nyc_01",2],["chicago_00",2],["city3_02",2],["seoul_00",1],["seoul_01",1]]},
+		"list":[["cityscene2_04",2],["cityscene2_13",2],["cityscene2_20",2],["nyc_00",2],["nyc_01",2],["chicago_00",2],["city3_02",2],["seoul_01",1]]},
 	{"n":"stern","c":Vector2(1080,-520),"r":330.0,"gap":[0.0,3.0],"dirt":0.3,
-		"list":[["realcity_18",2],["realcity_13",2],["realcity_00",2],["realcity_01",2],["realcity_04",2],["realcity_10",1],["london_00",2],["citybuilding",2],["realbuilding",2],["city_09",1],["beautiful_02",1],["cityscene2_15",2],["cityscene2_16",2]]},
+		"list":[["realcity_18",2],["realcity_13",2],["realcity_00",2],["realcity_01",2],["realcity_04",2],["realcity_10",1],["realbuilding",2],["city_09",1],["beautiful_02",1],["cityscene2_15",2],["cityscene2_16",2]]},
 	{"n":"nordbucht","c":Vector2(-2150,-8700),"r":700.0,"gap":[3.0,10.0],"dirt":0.4,
 		"list":[["stash",3],["house",2],["cityscene2_01",2],["cityscene2_02",2],["cityscene2_05",1],["cityscene2_07",2],["cityscene2_11",1],["cityscene2_04",1],["marino",1]]},
 	{"n":"staubwinkel","c":Vector2(1750,-5950),"r":260.0,"gap":[4.0,14.0],"dirt":1.0,
@@ -53,11 +53,11 @@ var DIST=[
 	{"n":"ostvorort","c":Vector2(2500,-1050),"r":800.0,"gap":[8.0,22.0],"dirt":0.2,
 		"list":[["stash",6],["cityscene2_01",1],["cityscene2_02",1],["cityscene2_07",1],["cityscene2_11",1]]},
 	{"n":"oststadt","c":Vector2(2750,700),"r":1300.0,"gap":[0.5,4.0],"dirt":0.3,
-		"list":[["realcity_18",2],["realcity_13",2],["realcity_00",2],["realcity_01",2],["realcity_04",2],["realcity_10",1],["citybuilding",2],["realbuilding",2],["city_09",1],["city_10",1],["city_11",1],["nycity_04",1],["nycity_06",1],["beautiful_02",1],["cityscene2_15",2],["cityscene2_16",2],["cityscene2_20",2],["nyc_00",2],["harley",2]]},
+		"list":[["realcity_18",2],["realcity_13",2],["realcity_00",2],["realcity_01",2],["realcity_04",2],["realcity_10",1],["realbuilding",2],["city_09",1],["city_10",1],["city_11",1],["nycity_04",1],["nycity_06",1],["beautiful_02",1],["cityscene2_15",2],["cityscene2_16",2],["cityscene2_20",2],["nyc_00",2]]},
 	{"n":"stadt","c":Vector2(-200,500),"r":3800.0,"zmin":-1600.0,"gap":[0.5,5.0],"dirt":0.4,
 		"list":[["cityscene2_00",1],["cityscene2_03",1],["cityscene2_04",2],["cityscene2_06",1],["cityscene2_08",2],["cityscene2_10",1],["cityscene2_12",1],["cityscene2_13",2],
 			["cityscene2_14",2],["cityscene2_15",1],["cityscene2_16",1],["cityscene2_20",2],["cityscene2_24",2],["cityscene2_28",1],["cityscene2_34",1],["nyc_00",2],["nyc_01",2],
-			["chicago_00",2],["city3_02",1],["city_00",1],["city_13",1],["city_18",1],["realcity_18",2],["realcity_13",2],["realcity_00",1],["london_00",1],["realbuilding",1],["citybuilding",1]]},
+			["chicago_00",2],["city3_02",1],["city_00",1],["city_13",1],["city_18",1],["realcity_18",2],["realcity_13",2],["realcity_00",1],["realbuilding",1]]},
 ]
 
 func _init(g,s):
@@ -344,17 +344,41 @@ func kloetze(root:Node3D):
 
 # Fundamentsockel unter allen Häusern (verhindert sichtbare Spalten an Hängen) – ein Mesh
 func fundamente(root:Node3D):
-	var Batch=load("res://scripts/batch.gd");var fm=load("res://scripts/mats.gd").pbr("concrete",0.4,Color(0.5,0.48,0.45))
+	var fm=load("res://scripts/mats.gd").pbr("concrete",0.4,Color(0.5,0.48,0.45))
 	var kacheln={}
 	for pl in placed:
 		var k=Vector2i(floor(pl.c.x/400.0),floor(pl.c.y/400.0))
-		if not kacheln.has(k):kacheln[k]=Batch.new()
-		var t=get_tpl(pl.t);var hx=t.ab.size.x*0.49;var hz=t.ab.size.z*0.49
+		if not kacheln.has(k):kacheln[k]=SurfaceTool.new();kacheln[k].begin(Mesh.PRIMITIVE_TRIANGLES)
 		var xf=Transform3D(Basis(Vector3.UP,pl.yaw),Vector3(pl.c.x,pl.y,pl.c.y))
-		kacheln[k].box(fm,Vector3(-hx,-4.0,-hz),Vector3(hx,0.02,hz),xf)
+		var poly=grundriss(pl.t)
+		var st:SurfaceTool=kacheln[k]
+		var n=poly.size()
+		for i in n:
+			var a=poly[i];var b=poly[(i+1)%n]
+			var q=[Vector3(a.x,-4.0,a.y),Vector3(b.x,-4.0,b.y),Vector3(b.x,0.02,b.y),Vector3(a.x,0.02,a.y)]
+			var nv=xf.basis*Vector3(b.y-a.y,0,a.x-b.x).normalized()
+			for j in [0,1,2,0,2,3]:st.set_normal(nv);st.set_uv(Vector2(q[j].x+q[j].z,q[j].y)*0.25);st.add_vertex(xf*q[j])
+		for j in Geometry2D.triangulate_polygon(poly):
+			st.set_normal(Vector3.UP);st.set_uv(poly[j]*0.25);st.add_vertex(xf*Vector3(poly[j].x,0.02,poly[j].y))
 	var f=Node3D.new();f.name="Fundamente";root.add_child(f)
 	for k in kacheln:
-		for m in kacheln[k].commit(f,false):m.visibility_range_end=600.0 if spiel else 2400.0
+		var mi=MeshInstance3D.new();mi.mesh=kacheln[k].commit();mi.material_override=fm;f.add_child(mi)
+		mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;mi.visibility_range_end=600.0 if spiel else 2400.0
+
+# Grundriss eines Gebäudes (vorbereitet von tools/gebaeude_bake.gd), sonst das Rechteck der Vorlage
+var _grundrisse=null
+func grundriss(name:String)->PackedVector2Array:
+	if _grundrisse==null:
+		_grundrisse={}
+		var txt=FileAccess.get_file_as_string("res://assets/cache/geb/grundrisse.json")
+		if txt!="":_grundrisse=JSON.parse_string(txt)
+	if _grundrisse.has(name) and _grundrisse[name].p.size()>=3:
+		var out=PackedVector2Array()
+		for v in _grundrisse[name].p:out.append(Vector2(v[0],v[1]))
+		var innen=Geometry2D.offset_polygon(out,-0.15)
+		return innen[0] if innen.size()>0 else out
+	var t=get_tpl(name);var hx=t.ab.size.x*0.49;var hz=t.ab.size.z*0.49
+	return PackedVector2Array([Vector2(-hx,-hz),Vector2(hx,-hz),Vector2(hx,hz),Vector2(-hx,hz)])
 
 # ein Haus aufstellen (auch zum Nachladen im Spiel)
 func einzeln(root:Node3D,i:int)->Node3D:

@@ -35,7 +35,7 @@ var _blitz:MeshInstance3D;var _blitz_licht:OmniLight3D;var _blitz_t:=0.0
 var _spuren:=[]
 var treffer_marke:=0.0
 var schaden_blitz:=0.0
-const MASKE:=1|2|4|8
+const MASKE:=1|2|4|8|16
 
 func _ready():
 	add_to_group("kampf")

@@ -63,7 +63,7 @@ func _brand_schritt(dt:float):
 var _stau:=0.0;var _rueck:=0.0
 func verfolge(ziel:Node3D,dt:float):
 	if modus!="verfolger":
-		modus="verfolger";freeze=false;sleeping=false;brake=0.0
+		modus="verfolger";freeze=false;sleeping=false;brake=0.0;_schicht(false)
 	var me=global_transform
 	var d=ziel.global_position-me.origin;var dist=d.length()
 	var lok=me.basis.inverse()*d
@@ -160,18 +160,29 @@ func setup(k:String):
 	kopf_hoehe=ab.size.y+0.3
 	parken()
 
+# Kollisionsebenen: 1 Welt/Spieler, 8 stehende und gefahrene Autos, 16 Verkehr (kinematisch).
+# Verkehr und Spieler-Figur berühren sich physikalisch nie (das brachte das Spiel zum Hängen) – Anfahren wird von Hand geprüft.
+const SCHICHT_AUTO:=8
+const SCHICHT_VERKEHR:=16
+func _schicht(ki:bool):
+	if ki:collision_layer=SCHICHT_VERKEHR;collision_mask=0
+	else:collision_layer=SCHICHT_AUTO;collision_mask=1|SCHICHT_AUTO|SCHICHT_VERKEHR
+
 func parken():
+	_schicht(false)
 	modus="geparkt";freeze=false;engine_force=0;brake=6.0;steering=0
 	sleeping=true
 
 func als_ki(road,s:float,dir:int,lane:float,road_sys):
 	S=road_sys;ki_road=road;ki_s=s;ki_dir=dir;ki_lane=lane;modus="ki"
+	_schicht(true)
 	freeze_mode=RigidBody3D.FREEZE_MODE_KINEMATIC;freeze=true
 	ki_ziel=randf_range(9.0,14.0) if road.typ!="autobahn" else randf_range(22.0,30.0)
 	ki_speed=ki_ziel*0.6
 	_ki_place(0.0)
 
 func uebernehmen():
+	_schicht(false)
 	modus="spieler";freeze=false;brake=0.0;sleeping=false
 
 func kmh()->float:return linear_velocity.length()*3.6

@@ -10,6 +10,9 @@ func _init():
 	var meta=B._meta();var namen=meta.keys()
 	if not OS.get_cmdline_user_args().is_empty():namen=OS.get_cmdline_user_args()
 	var roh=0;var neu=0
+	var grundrisse={}
+	var alt=FileAccess.get_file_as_string(ZIEL+"grundrisse.json")
+	if alt!="":grundrisse=JSON.parse_string(alt)
 	for name in namen:
 		var t=B.get_tpl(name)
 		var n:Node3D=load(t.path).instantiate();n.scale=Vector3.ONE*t.sc
@@ -31,6 +34,31 @@ func _init():
 		if t.roof!=null:
 			var st2=SurfaceTool.new();st2.begin(Mesh.PRIMITIVE_TRIANGLES)
 			st2.append_from(t.roof,0,Transform3D(Basis(),off));gruppen[B.roof_mat()]=st2
+		# Grundriss (konvexe Hülle von oben) für Fundament, Kollision und – bei hohlen Fassaden – den Gebäudekern
+		var pts=PackedVector2Array();var ys=PackedFloat32Array()
+		for m in ms:
+			if not m.visible or m.mesh==null:continue
+			var xf=Transform3D(Basis(),off)*_rel(m,w)
+			for si in m.mesh.get_surface_count():
+				var mt=m.get_active_material(si)
+				if mt is BaseMaterial3D and mt.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED:continue   # Bäume, Glas
+				var V:PackedVector3Array=m.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+				var schritt=max(1,V.size()/4000)
+				var y_min=min(4.0,t.ab.size.y*0.3)   # Boden, Gehweg, Autos davor nicht mitzählen
+				for q in range(0,V.size(),schritt):
+					var v=xf*V[q]
+					if v.y<y_min:continue
+					pts.append(Vector2(v.x,v.z));ys.append(v.y)
+		var huelle=Geometry2D.convex_hull(pts)
+		ys.sort()
+		var h_kern=ys[int(ys.size()*0.85)] if ys.size()>0 else t.ab.size.y
+		grundrisse[name]={"p":Array(huelle).map(func(v):return [snapped(v.x,0.01),snapped(v.y,0.01)]),"h":snapped(t.ab.size.y,0.01)}
+		if HOHL.has(name):
+			var kern=_kern_raster(ms,w,off,t,h_kern,HOHL[name][0])
+			if kern.size()>0:
+				gruppen[kern[1]]=kern[0]
+				var kh=Geometry2D.convex_hull(kern[2])
+				grundrisse[name]["p"]=Array(kh).map(func(v):return [snapped(v.x,0.01),snapped(v.y,0.01)])
 		var am:=ArrayMesh.new();var tris_neu=0;var lodtxt=""
 		for mat in gruppen:
 			gruppen[mat].index()
@@ -70,8 +98,71 @@ func _init():
 		print("GEB %s: %d Teile -> %d Flächen, %d -> %d Dreiecke | %s (%s)"%[name,ms.size(),flaechen,tris,tris_neu,lodtxt.left(160),error_string(e)])
 		roh+=ms.size();neu+=flaechen
 		w.free()
+	var f=FileAccess.open(ZIEL+"grundrisse.json",FileAccess.WRITE);f.store_string(JSON.stringify(grundrisse));f.close()
 	print("FERTIG Zeichenaufrufe je Haus vorher ~",roh/max(namen.size(),1)," jetzt ~",neu/max(namen.size(),1))
 	quit()
+# Fassadenmodelle, die hinten offen sind: Kern mit Wandmaterial [Textur, Farbe] und Abstand hinter der Fassade
+const HOHL={"cityscene_00":[["concrete",Color(0.72,0.64,0.52)],0.6],"cityscene_01":[["bricks",Color(0.75,0.55,0.45)],0.6],
+	"city3_00":[["bricks",Color(0.55,0.42,0.36)],0.5],"city3_01":[["bricks",Color(0.7,0.5,0.4)],0.5],"city3_02":[["bricks",Color(0.75,0.55,0.45)],0.4],
+	"chicago_00":[["bricks",Color(0.7,0.6,0.55)],0.5]}
+# Kern hinter hohlen Fassaden: Raster von oben (1 m). Wandzellen = Fassadengeometrie über Bodenhöhe.
+# Eine Zelle gehört zum Kern, wenn man von ihr aus in Blickrichtung der Fassade (Mittel der Normalen) auf eine Wand trifft –
+# also liegt sie HINTER der Fassade. So funktioniert es auch bei nach innen gebogenen Fassaden.
+func _kern_raster(ms:Array,w:Node3D,off:Vector3,t:Dictionary,h:float,art:Array)->Array:
+	var ab:AABB=t.ab;var cs=1.0
+	var x0=-ab.size.x*0.5-1.0;var z0=-ab.size.z*0.5-1.0
+	var nx=int(ceil(ab.size.x/cs))+2;var nz=int(ceil(ab.size.z/cs))+2
+	var wand=PackedByteArray();wand.resize(nx*nz)
+	var nsum=Vector2.ZERO
+	var y_min=min(4.0,ab.size.y*0.3)
+	for m in ms:
+		if not m.visible or m.mesh==null:continue
+		var xf=Transform3D(Basis(),off)*_rel(m,w)
+		for si in m.mesh.get_surface_count():
+			var mt=m.get_active_material(si)
+			if mt is BaseMaterial3D and mt.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED:continue
+			var arr=m.mesh.surface_get_arrays(si);var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX];var N=arr[Mesh.ARRAY_NORMAL]
+			var schritt=max(1,V.size()/30000)
+			for q in range(0,V.size(),schritt):
+				var v=xf*V[q]
+				if v.y<y_min:continue
+				var ix=int((v.x-x0)/cs);var iz=int((v.z-z0)/cs)
+				if ix>=0 and iz>=0 and ix<nx and iz<nz:wand[iz*nx+ix]=1
+				if N!=null and q<N.size():
+					var nn=xf.basis*N[q];nsum+=Vector2(nn.x,nn.z)
+	if nsum.length()<1e-3:return []
+	var vorn=nsum.normalized()
+	var kern=PackedByteArray();kern.resize(nx*nz)
+	for iz in nz:
+		for ix in nx:
+			if wand[iz*nx+ix]==1:continue
+			for k in range(1,80):
+				var px=int(ix+0.5+vorn.x*k*0.5);var pz=int(iz+0.5+vorn.y*k*0.5)
+				if px<0 or pz<0 or px>=nx or pz>=nz:break
+				if wand[pz*nx+px]==1:kern[iz*nx+ix]=1;break
+	# Zellen direkt an der Wand frei lassen (kein Durchscheinen durch die Fassade)
+	var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);var n_box=0;var eck=PackedVector2Array()
+	for iz in nz:
+		var ix=0
+		while ix<nx:
+			if kern[iz*nx+ix]==0:ix+=1;continue
+			var s0=ix
+			while ix<nx and kern[iz*nx+ix]==1:ix+=1
+			var a=Vector3(x0+s0*cs,0,z0+iz*cs);var b=Vector3(x0+ix*cs,h,z0+(iz+1)*cs)
+			_box(st,a,b);n_box+=1
+			eck.append_array([Vector2(a.x,a.z),Vector2(b.x,a.z),Vector2(b.x,b.z),Vector2(a.x,b.z)])
+	if n_box==0:return []
+	var m=StandardMaterial3D.new()
+	m.albedo_texture=load("res://assets/textures/"+art[0]+"_albedo.jpg");m.albedo_color=art[1]
+	m.uv1_triplanar=true;m.uv1_scale=Vector3(0.33,0.33,0.33)
+	m.roughness=0.92;m.cull_mode=BaseMaterial3D.CULL_DISABLED;m.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	print("  Kern ",n_box," Blöcke, vorn=",vorn)
+	return [st,m,eck]
+func _box(st:SurfaceTool,a:Vector3,b:Vector3):
+	var P=[Vector3(a.x,a.y,a.z),Vector3(b.x,a.y,a.z),Vector3(b.x,a.y,b.z),Vector3(a.x,a.y,b.z),Vector3(a.x,b.y,a.z),Vector3(b.x,b.y,a.z),Vector3(b.x,b.y,b.z),Vector3(a.x,b.y,b.z)]
+	for f in [[0,1,5,4,Vector3(0,0,-1)],[1,2,6,5,Vector3(1,0,0)],[2,3,7,6,Vector3(0,0,1)],[3,0,4,7,Vector3(-1,0,0)],[4,5,6,7,Vector3.UP]]:
+		for i in [0,1,2,0,2,3]:st.set_normal(f[4]);st.add_vertex(P[f[i]])
+
 func _cluster(arr:Array,I:PackedInt32Array,c:float)->PackedInt32Array:return VE.cluster(arr,I,c)
 func _rel(n:Node,root:Node)->Transform3D:
 	var t=Transform3D.IDENTITY;var c=n

@@ -17,6 +17,7 @@ var blick_fest:=false   # beim Zielen schaut die Figur in Kamerarichtung (seitwÃ
 func _ready():
 	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.32;cap.height=1.75;cs.shape=cap;cs.position.y=0.88;add_child(cs)
 	floor_snap_length=0.5;floor_max_angle=deg_to_rad(50)
+	collision_mask=1|8   # Welt und stehende Autos; fahrender Verkehr wird von Hand geprÃ¼ft
 	figur_bauen()
 
 func figur_bauen():
@@ -43,6 +44,7 @@ func steuern(st,dt:float):
 	if not is_on_floor():velocity.y-=19.6*dt
 	elif st.pressed("springen"):velocity.y=5.2
 	move_and_slide()
+	_stufe(want)
 	if dir.length()>0.05 and not blick_fest:
 		var target=atan2(dir.x,dir.z)
 		figur.rotation.y=lerp_angle(figur.rotation.y,target,clamp(dt*12.0,0.0,1.0))
@@ -60,3 +62,15 @@ func steuern(st,dt:float):
 		im_wasser=0.0
 		if is_on_floor():_gelaende_ok=global_position
 	return false
+
+
+# Stufen (Bordstein, Treppenabsatz) bis 45 cm automatisch hochsteigen
+func _stufe(want:Vector3):
+	var h=Vector2(want.x,want.z)
+	if h.length()<0.5 or not is_on_wall() or velocity.y>0.5:return
+	var vor=Vector3(h.x,0,h.y).normalized()*0.3
+	var hoch=Vector3(0,0.45,0)
+	if test_move(global_transform,hoch):return
+	if test_move(global_transform.translated(hoch),vor):return
+	global_position+=hoch+vor
+	apply_floor_snap()

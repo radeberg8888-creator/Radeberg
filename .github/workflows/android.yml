@@ -91,6 +91,13 @@ jobs:
           (timeout 3000 $GODOT --headless --path . --import || true) >> build/import.log 2>&1
           tail -5 build/import.log
 
+      - name: Gebäudemodelle vereinfachen (ein Mesh + Detailstufen je Modell)
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          timeout 1800 $GODOT --headless --path . -s tools/gebaeude_bake.gd > build/geb.log 2>&1 || true
+          grep -E "FERTIG|SCRIPT ERROR" build/geb.log | head; ls assets/cache/geb | wc -l
+          test -f assets/cache/geb/house.res
+
       - name: Welt vorab bauen (kurze Ladezeit im Spiel)
         run: |
           sudo apt-get install -y xvfb > /dev/null 2>&1 || true
@@ -100,13 +107,6 @@ jobs:
           grep -E "ERZEUGT|GESPEICHERT|SCRIPT ERROR" build/bake.log | head -20
           ls -la assets/cache/welt/
           test -f assets/cache/welt/welt.scn
-
-      - name: Gebäudemodelle vereinfachen (ein Mesh + Detailstufen je Modell)
-        run: |
-          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
-          timeout 1800 $GODOT --headless --path . -s tools/gebaeude_bake.gd > build/geb.log 2>&1 || true
-          grep -E "FERTIG|SCRIPT ERROR" build/geb.log | head; ls assets/cache/geb | wc -l
-          test -f assets/cache/geb/house.res
 
       - name: Spieldaten-Paket exportieren und teilen
         run: |

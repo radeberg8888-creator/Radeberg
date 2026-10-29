@@ -17,7 +17,7 @@ var meshes:={}          # Vorlagenname -> Mesh
 var _angefragt:={}      # Vorlagenname -> Pfad
 var _alt:=false         # keine vorbereiteten Modelle -> altes Verfahren
 
-const TINTS=[Color(1,1,1),Color(1.0,0.93,0.84),Color(0.86,0.9,0.95)]
+const TINTS=[Color(1,1,1),Color(1.0,0.93,0.84),Color(0.86,0.9,0.95),Color(0.95,0.88,0.86),Color(0.9,0.93,0.86)]
 
 func setup(w):
 	welt=w
@@ -52,7 +52,7 @@ func _zelle_bereit(k:Vector2i)->bool:
 	return ok
 
 func _farbe(pl)->Color:
-	var v=int(pl.v)%3;var dirt=float(pl.dirt)
+	var v=int(pl.v)%TINTS.size();var dirt=float(pl.dirt)
 	dirt=0.2 if dirt<0.35 else (0.5 if dirt<0.7 else 0.9)
 	var grime=Color(0.78,0.72,0.62).lerp(Color(1,1,1),1.0-dirt)
 	var t=TINTS[v]
@@ -70,8 +70,8 @@ func _bauen(k:Vector2i):
 		else:
 			if not gruppen.has(pl.t):gruppen[pl.t]=[]
 			gruppen[pl.t].append([xf,_farbe(pl)])
-		var cs=CollisionShape3D.new();var bx=BoxShape3D.new();bx.size=t.ab.size*Vector3(0.96,1.0,0.96);cs.shape=bx;sb.add_child(cs)
-		cs.transform=xf*Transform3D(Basis(),Vector3(0,t.ab.size.y*0.5+0.02,0))
+		var cs=CollisionShape3D.new();cs.shape=_form(pl.t,t);sb.add_child(cs)
+		cs.transform=xf
 	for name in gruppen:
 		var mesh=meshes.get(name)
 		if mesh==null:continue
@@ -83,6 +83,16 @@ func _bauen(k:Vector2i):
 		var vr=1100.0 if h>40 else 480.0
 		mi.set_meta("vr",vr);mi.visibility_range_end=vr*sicht_f
 	zellen[k]=n
+
+# Kollisionskörper aus dem Grundriss (passt auch bei gebogenen Fassaden), je Vorlage einmal
+var _formen:={}
+func _form(name:String,t:Dictionary)->Shape3D:
+	if _formen.has(name):return _formen[name]
+	var poly:PackedVector2Array=welt.B.grundriss(name)
+	var pts=PackedVector3Array()
+	for v in poly:pts.append(Vector3(v.x,0.02,v.y));pts.append(Vector3(v.x,t.ab.size.y,v.y))
+	var sh=ConvexPolygonShape3D.new();sh.points=pts
+	_formen[name]=sh;return sh
 
 func sichtweite_anwenden():
 	for k in zellen:

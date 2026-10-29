@@ -20,6 +20,27 @@ var _ab:=0
 func _process(dt):
 	t+=dt
 	var st=spiel.st
+	if spiel.test_modus=="rundgang":
+		# Rundgang durch die Hauptstadt: an mehreren Straßenpunkten in vier Richtungen fotografieren
+		if t<1.2:return
+		t=0
+		var orte=[Vector2(-211,571),Vector2(-330,700),Vector2(-120,820),Vector2(200,-330),Vector2(-150,120),Vector2(300,1400)]
+		var i=ui_schritt/4;var j=ui_schritt%4
+		if i>=orte.size():get_tree().quit();return
+		if j==0:
+			var r=spiel.welt.S.roads;var best=null;var bd=1e9
+			for rr in r:
+				if not rr.typ in ["strasse","allee","gasse"]:continue
+				for k in range(0,rr.P.size(),4):
+					var d=rr.P[k].distance_to(orte[i])
+					if d<bd:bd=d;best=[rr,k]
+			var pp:Vector2=best[0].P[best[1]];var h=best[0].h[best[1]]
+			spiel.spieler.global_position=Vector3(pp.x,h+0.6,pp.y);spiel.spieler.velocity=Vector3.ZERO
+			spiel.strom.sofort(spiel.spieler.global_position,300.0)
+		spiel.kam.yaw=j*PI*0.5
+		shot("ort%d_%d"%[i,j])
+		ui_schritt+=1
+		return
 	if spiel.test_modus=="mission":
 		if t<1.0:return
 		t=0

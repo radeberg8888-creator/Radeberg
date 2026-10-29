@@ -299,6 +299,7 @@ func _physics_process(dt):
 			if spieler.steuern(st,dt):hud.zeige("Du bist ins Wasser gefallen")
 	var hind=verkehr.duplicate();hind.append(spieler if auto==null else auto)
 	for c in verkehr:c.ki_schritt(dt,hind)
+	if auto==null and not _entert:_anfahren_pruefen()
 
 func _process(dt):
 	if not bereit:st.end_frame();return
@@ -466,14 +467,40 @@ func aussteigen():
 	if taxi_aktiv:taxi_umschalten()
 	auto=null
 
+# Verkehr gegen Spieler zu Fuß: von Hand geprüft (keine Physik zwischen beiden)
+var _angefahren_zeit:=0.0
+func _anfahren_pruefen():
+	if kampf.tot:return
+	var p=spieler.global_position
+	for c in verkehr:
+		if not is_instance_valid(c):continue
+		var lok=c.global_transform.affine_inverse()*p
+		var ab:AABB=c.ab
+		if lok.y>ab.end.y+0.5 or lok.y<ab.position.y-1.5:continue
+		var dx=lok.x-clamp(lok.x,ab.position.x,ab.end.x);var dz=lok.z-clamp(lok.z,ab.position.z,ab.end.z)
+		if Vector2(dx,dz).length()>0.35:continue
+		# im Auto drin oder davor: wegschieben, bei Fahrt umwerfen
+		var weg=c.global_transform.basis*Vector3(sign(lok.x) if abs(lok.x)>0.01 else 1.0,0,0)
+		var vor=c.global_transform.basis.z*float(c.ki_dir if false else 1)
+		if c.ki_speed>2.5 and Time.get_ticks_msec()/1000.0-_angefahren_zeit>1.5:
+			_angefahren_zeit=Time.get_ticks_msec()/1000.0
+			ereignis("angefahren "+c.kind)
+			kampf.spieler_treffer(clamp(c.ki_speed*4.0,10.0,70.0),c)
+			spieler.velocity=vor*c.ki_speed*0.7+weg*3.0+Vector3(0,4.0,0)
+			hud.zeige("Angefahren!",1.5)
+			c.ki_speed=0.0;c.ki_ziel=0.0
+			get_tree().create_timer(2.5).timeout.connect(func():if is_instance_valid(c):c.ki_ziel=9.0)
+		spieler.global_position+=weg*0.15
+
 func _rempler(b):
 	if auto!=null and auto.kmh()>25.0 and st.e.vibration:Input.vibrate_handheld(int(clamp(auto.kmh(),40,250)))
 	if b!=null and b.get_script()==AUTO and b.modus=="ki":
 		verkehr.erase(b);b.parken();b.freeze=false;geparkt.append(b)
 
 # ---------------- Verkehr ----------------
-const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
-	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","trabant","rtw","hudson","mercedes","hoonicorn","bugatti","armored"]
+# Verkehr: nur Fahrzeuge mit Scheiben (Trabant, Geldtransporter ohne Glas sind nicht mehr dabei)
+const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
+	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","audi_rs7","rtw","hudson","mercedes","hoonicorn","bugatti","taxi"]
 func _ziel_anzahl()->int:return [8,14,22][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
 	var p2=Vector2(p.x,p.z)
@@ -498,8 +525,8 @@ func _spawn_auto(p2:Vector2):
 		if not frei:continue
 		var c=AUTO.new();add_child(c)
 		var k=FARB[rng.randi()%FARB.size()]
-		if r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","bus","lkw_blau"][rng.randi()%3]
-		elif rng.randf()<0.03:k=["feuerwehr","bus"][rng.randi()%2]
+		if r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","lkw_blau"][rng.randi()%2]
+		elif rng.randf()<0.02:k="feuerwehr"
 		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="taxi"
 		if wirt and r.typ=="autobahn" and rng.randf()<int(wirt.personal.get("logistik",{}).get("lkw",0))*0.04:k="lkw_blau"
 		c.setup(k)
