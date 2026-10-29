@@ -106,10 +106,21 @@ jobs:
           $GODOT --headless --path . --export-debug "Android" build/radeberg.apk > build/export.log 2>&1 || true
           tail -60 build/export.log
           ls -la build/
+          # Ausdrücklich ausrichten und signieren (Godots eigenes Signieren klappt bei sehr großen APKs nicht zuverlässig)
+          BT=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -1)
+          echo "Build-Tools: $BT"
+          $BT/zipalign -p -f 4 build/radeberg.apk build/aligned.apk
+          $BT/apksigner sign --ks ~/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out build/signed.apk build/aligned.apk
+          $BT/apksigner verify --verbose build/signed.apk | head -8
+          mv build/signed.apk build/radeberg.apk && rm -f build/aligned.apk
+          ls -la build/
           {
             echo "Automatisch gebaute Testversion. APK aufs Handy laden und installieren (Installation aus unbekannten Quellen erlauben)."
             echo ""
             echo "APK-Größe: $(du -h build/radeberg.apk | cut -f1)"
+            echo ""
+            echo "Signatur: $($(ls -d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -1)/apksigner verify build/radeberg.apk >/dev/null 2>&1 && echo OK || echo FEHLT)"
             echo '```'
             grep -E "ERROR|SCRIPT ERROR|WARNING" build/import.log build/export.log | sed 's/\x1b\[[0-9;]*m//g' | sort | uniq -c | sort -rn | head -40
             echo '```'
