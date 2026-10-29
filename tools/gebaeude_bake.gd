@@ -61,6 +61,9 @@ func _init():
 			if d is BaseMaterial3D:
 				d.cull_mode=BaseMaterial3D.CULL_DISABLED
 				d.vertex_color_use_as_albedo=true   # Instanzfarbe = Tönung/Schmutz
+			var ks=lods.keys();var kp=VE.kompakt(arr,[I]+ks.map(func(x):return lods[x]))
+			arr=kp[0];lods={}
+			for j in ks.size():lods[ks[j]]=kp[1][j+1]
 			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr,[],lods)
 			am.surface_set_material(am.get_surface_count()-1,d)
 		var e=ResourceSaver.save(am,ZIEL+name+".res",ResourceSaver.FLAG_COMPRESS)

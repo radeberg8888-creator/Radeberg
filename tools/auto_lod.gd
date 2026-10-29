@@ -95,6 +95,9 @@ func _verschmelzen(quelle:Node3D,ziel:Node3D,behalten:Array,max_tris:int,name:St
 			var L=VE.cluster(arr,I,c,32.0)
 			if L.size()<3 or L.size()>vor*0.8:continue
 			lods[c]=L;vor=L.size()
+		var ks=lods.keys();var kp=VE.kompakt(arr,[I]+ks.map(func(x):return lods[x]))
+		arr=kp[0];lods={}
+		for j in ks.size():lods[ks[j]]=kp[1][j+1]
 		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr,[],lods)
 		am.surface_set_material(am.get_surface_count()-1,f[0])
 	weg.sort_custom(func(a,b):return a.get_path().get_name_count()>b.get_path().get_name_count() if a.is_inside_tree() else false)

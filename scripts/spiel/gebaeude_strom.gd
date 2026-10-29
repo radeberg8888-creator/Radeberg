@@ -34,20 +34,30 @@ func setup(w):
 
 func _pfad(t:String)->String:return GEB+t+".res"
 
-# Modell anfordern (Hintergrund); true, wenn schon da
+# Modell anfordern (Hintergrund); true, wenn schon da.
+# Immer nur EIN Ladeauftrag gleichzeitig und ohne Unter-Threads: viele parallele Aufträge mit gemeinsamen
+# Texturen können sich auf dem Handy gegenseitig blockieren (Spiel hängt).
+var _laed:="";var _laed_seit:=0
+var _warte:=[]
 func _bereit(t:String)->bool:
 	if meshes.has(t):return true
-	var p=_pfad(t)
-	if not _angefragt.has(t):
-		_angefragt[t]=p
-		if ResourceLoader.load_threaded_request(p,"",true)!=OK:meshes[t]=null;return true
-		return false
-	var s=ResourceLoader.load_threaded_get_status(p)
-	if s==ResourceLoader.THREAD_LOAD_LOADED:
-		meshes[t]=ResourceLoader.load_threaded_get(p);return true
-	if s==ResourceLoader.THREAD_LOAD_FAILED or s==ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-		meshes[t]=null;return true
-	return false
+	if not t in _warte and t!=_laed:_warte.append(t)
+	_pumpe()
+	return meshes.has(t)
+func _pumpe():
+	if _laed!="":
+		var p=_pfad(_laed)
+		var s=ResourceLoader.load_threaded_get_status(p)
+		if s==ResourceLoader.THREAD_LOAD_LOADED:meshes[_laed]=ResourceLoader.load_threaded_get(p);_laed=""
+		elif s==ResourceLoader.THREAD_LOAD_FAILED or s==ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:meshes[_laed]=null;_laed=""
+		elif Time.get_ticks_msec()-_laed_seit>30000:push_warning("Gebäude lädt zu lange: "+_laed);meshes[_laed]=null;_laed=""
+		else:return
+	while _laed=="" and not _warte.is_empty():
+		var t=_warte.pop_front()
+		if meshes.has(t):continue
+		if not ResourceLoader.exists(_pfad(t)):meshes[t]=null;continue
+		if ResourceLoader.load_threaded_request(_pfad(t),"",false)!=OK:meshes[t]=null;continue
+		_laed=t;_laed_seit=Time.get_ticks_msec()
 
 func _zelle_bereit(k:Vector2i)->bool:
 	var ok=true
@@ -93,16 +103,20 @@ func sichtweite_anwenden():
 		for mi in zellen[k].get_children():
 			if mi.has_meta("vr"):mi.visibility_range_end=mi.get_meta("vr")*sicht_f
 
-# alles im Umkreis sofort (beim Start, Ladebildschirm): Modelle parallel im Hintergrund laden, dann bauen
-func sofort(p:Vector3,r:float):
+# alles im Umkreis sofort (Ladebildschirm): Modelle der Reihe nach direkt laden, Fortschritt melden
+func sofort(p:Vector3,r:float,fortschritt:Callable=Callable()):
 	var ks=_zellen_um(p,r)
 	if not _alt:
-		var t0=Time.get_ticks_msec()
-		while Time.get_ticks_msec()-t0<60000:
-			var ok=true
-			for k in ks:
-				if not _zelle_bereit(k):ok=false
-			if ok:break
+		var namen=[]
+		for k in ks:
+			for i in gitter[k]:
+				var t=welt.B.placed[i].t
+				if not t in namen:namen.append(t)
+		for j in namen.size():
+			var t=namen[j]
+			if not meshes.has(t):
+				meshes[t]=load(_pfad(t)) if ResourceLoader.exists(_pfad(t)) else null
+			if fortschritt.is_valid():fortschritt.call(j+1,namen.size())
 			await get_tree().process_frame
 	for k in ks:
 		if not zellen.has(k):_bauen(k)

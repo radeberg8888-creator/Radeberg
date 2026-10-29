@@ -60,6 +60,7 @@ func _ready():
 	ui=CanvasLayer.new();ui.layer=10;add_child(ui)
 	_theme()
 	_ladebildschirm()
+	_letzter_start=_alter_log()
 	if test_modus=="":await _hauptmenue()
 	elif _arg("--admin")!="":admin=true
 	if admin:geld=99999999
@@ -95,7 +96,8 @@ func _ready():
 	await _schritt("Spieler …",0.9)
 	_spieler()
 	await _schritt("Häuser in der Nähe …",0.92)
-	await strom.sofort(spieler.global_position,320.0)
+	await strom.sofort(spieler.global_position,320.0,func(a,b):_lade("Häuser in der Nähe … %d/%d"%[a,b],0.92+0.03*a/b))
+	_log("haeuser ok")
 	await _schritt("Orte und Passanten …",0.95)
 	_zonen();_log("zonen ok")
 	wirt.setup();_log("wirtschaft ok")
@@ -109,6 +111,7 @@ func _ready():
 	einstellungen_anwenden()
 	lade.queue_free()
 	bereit=true
+	_log("SPIEL LAEUFT")
 	hud.zeige("Willkommen in Radeberg!",4.0)
 	if test_modus!="":_testlauf()
 
@@ -151,6 +154,9 @@ func _hauptmenue():
 	lade_bar.visible=false;lade_text.visible=false
 	var b1=Button.new();b1.text="START";b1.custom_minimum_size=Vector2(420,96);b1.add_theme_font_size_override("font_size",42);box.add_child(b1)
 	var b2=Button.new();b2.text="ADMIN";b2.custom_minimum_size=Vector2(420,96);b2.add_theme_font_size_override("font_size",42);box.add_child(b2)
+	if _letzter_start!="":
+		var hl=Label.new();hl.text="Letzter Start ist nicht fertig geworden – bitte Screenshot davon schicken:\n"+_letzter_start
+		hl.add_theme_font_size_override("font_size",15);hl.add_theme_color_override("font_color",Color(1,0.75,0.5));box.add_child(hl)
 	b1.pressed.connect(func():admin=false;_gewaehlt.emit())
 	b2.pressed.connect(func():admin=true;_gewaehlt.emit())
 	await _gewaehlt
@@ -173,6 +179,13 @@ func _log(t:String):
 	f.seek_end();f.store_line("%7.2f s  %s"%[(Time.get_ticks_msec()-_t_start)/1000.0,t]);f.close();_log_n+=1
 	print("[start] ",t)
 var _log_n:=0
+var _letzter_start:=""
+# Protokoll des vorigen Starts: wenn er nicht bis ins Spiel kam, die letzten Zeilen zurückgeben
+func _alter_log()->String:
+	var t=FileAccess.get_file_as_string("user://start_log.txt")
+	if t=="" or t.contains("SPIEL LAEUFT"):return ""
+	var z=t.strip_edges().split("\n")
+	return "\n".join(z.slice(max(0,z.size()-8)))
 
 # ---------------- Kollision ----------------
 # Namen können von Godot mit @…@Nummer eindeutig gemacht werden -> enthält statt beginnt

@@ -88,3 +88,31 @@ static func _finde(e:Array,x:int)->int:
 	while e[x]!=x:
 		e[x]=e[e[x]];x=e[x]
 	return x
+
+# Unbenutzte Ecken entfernen (nach dem Vereinfachen). listen: [Basis-Indizes, LOD-Indizes …] – werden umgerechnet.
+static func kompakt(arr:Array,listen:Array)->Array:
+	var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
+	var neu=PackedInt32Array();neu.resize(V.size());neu.fill(-1)
+	var alt_idx=PackedInt32Array()
+	for L in listen:
+		for i in L:
+			if neu[i]<0:neu[i]=alt_idx.size();alt_idx.append(i)
+	if alt_idx.size()==V.size():return [arr,listen]
+	var out=arr.duplicate()
+	for k in out.size():
+		var a=out[k]
+		if a==null or k==Mesh.ARRAY_INDEX:continue
+		var per=1
+		if k==Mesh.ARRAY_TANGENT and a.size()==V.size()*4:per=4
+		elif a.size()!=V.size():continue
+		var b=a.duplicate();b.resize(alt_idx.size()*per)
+		for j in alt_idx.size():
+			for q in per:b[j*per+q]=a[alt_idx[j]*per+q]
+		out[k]=b
+	var neue_listen=[]
+	for L in listen:
+		var m=PackedInt32Array();m.resize(L.size())
+		for j in L.size():m[j]=neu[L[j]]
+		neue_listen.append(m)
+	out[Mesh.ARRAY_INDEX]=neue_listen[0]
+	return [out,neue_listen]
