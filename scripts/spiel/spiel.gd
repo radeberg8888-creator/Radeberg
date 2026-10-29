@@ -61,6 +61,7 @@ func _ready():
 	_theme()
 	_ladebildschirm()
 	_letzter_start=_alter_log()
+	_letzte_sitzung=FileAccess.get_file_as_string("user://lauf_log.txt").strip_edges()
 	if test_modus=="":await _hauptmenue()
 	elif _arg("--admin")!="":admin=true
 	if admin:geld=99999999
@@ -154,6 +155,10 @@ func _hauptmenue():
 	lade_bar.visible=false;lade_text.visible=false
 	var b1=Button.new();b1.text="START";b1.custom_minimum_size=Vector2(420,96);b1.add_theme_font_size_override("font_size",42);box.add_child(b1)
 	var b2=Button.new();b2.text="ADMIN";b2.custom_minimum_size=Vector2(420,96);b2.add_theme_font_size_override("font_size",42);box.add_child(b2)
+	if _letzter_start=="" and _letzte_sitzung!="":
+		var z=_letzte_sitzung.split("\n");var sl=Label.new()
+		sl.text="Letzte Sitzung (bei Problemen Screenshot schicken):\n"+"\n".join(z.slice(max(0,z.size()-6)))
+		sl.add_theme_font_size_override("font_size",14);sl.add_theme_color_override("font_color",Color(0.8,0.8,0.8));box.add_child(sl)
 	if _letzter_start!="":
 		var hl=Label.new();hl.text="Letzter Start ist nicht fertig geworden – bitte Screenshot davon schicken:\n"+_letzter_start
 		hl.add_theme_font_size_override("font_size",15);hl.add_theme_color_override("font_color",Color(1,0.75,0.5));box.add_child(hl)
@@ -180,6 +185,26 @@ func _log(t:String):
 	print("[start] ",t)
 var _log_n:=0
 var _letzter_start:=""
+var _letzte_sitzung:=""
+# Lauf-Protokoll: jede Sekunde Bildrate und Zustand, damit sich Hänger auf dem Handy nachvollziehen lassen
+var _lauf:=[];var _lauf_t:=0.0;var _lauf_max_ms:=0.0;var _ereignis:=""
+func ereignis(t:String):
+	_ereignis=t;_lauf_zeile()
+func _lauf_schritt(dt:float):
+	_lauf_max_ms=max(_lauf_max_ms,dt*1000.0)
+	_lauf_t+=dt
+	if _lauf_t>=1.0:_lauf_t=0.0;_lauf_zeile()
+func _lauf_zeile():
+	var z=welt.get_node_or_null("Gebaeude") if welt else null
+	var p=(auto.global_position if auto else spieler.global_position) if spieler else Vector3.ZERO
+	_lauf.append("%s %dfps max%dms L%.0f P%.0f DC%d %.1fM %s %s %s"%[Time.get_time_string_from_system(),Engine.get_frames_per_second(),int(_lauf_max_ms),
+		Performance.get_monitor(Performance.TIME_PROCESS)*1000.0,Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000.0,
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)/1e6,
+		("Auto "+auto.kind) if auto else "zuFuss",str(Vector2i(int(p.x),int(p.z))),_ereignis])
+	_lauf_max_ms=0.0;_ereignis=""
+	if _lauf.size()>40:_lauf=_lauf.slice(_lauf.size()-40)
+	var f=FileAccess.open("user://lauf_log.txt",FileAccess.WRITE)
+	if f:f.store_string("\n".join(_lauf));f.close()
 # Protokoll des vorigen Starts: wenn er nicht bis ins Spiel kam, die letzten Zeilen zurückgeben
 func _alter_log()->String:
 	var t=FileAccess.get_file_as_string("user://start_log.txt")
@@ -276,6 +301,7 @@ func _physics_process(dt):
 
 func _process(dt):
 	if not bereit:st.end_frame();return
+	_lauf_schritt(dt)
 	zeit+=dt*1.0   # 1 Spielminute je Sekunde
 	if zeit>=1440.0:zeit-=1440.0
 	if Engine.get_process_frames()%3==0:_tageszeit()
@@ -384,6 +410,7 @@ var _entert:=false
 var _fahrer_ped:Node3D=null
 func entern(c):
 	if _entert or c==null:return
+	ereignis("entern "+str(c.kind))
 	_entert=true
 	var hatte_fahrer=c in verkehr
 	if hatte_fahrer:
@@ -412,6 +439,7 @@ func entern(c):
 	if is_instance_valid(c):einsteigen(c)
 
 func einsteigen(c):
+	ereignis("einsteigen "+str(c.kind))
 	verkehr.erase(c);if not geparkt.has(c):geparkt.append(c)
 	auto=c;c.uebernehmen();c.contact_monitor=true;c.max_contacts_reported=4
 	if not c.body_entered.is_connected(_rempler):c.body_entered.connect(_rempler)
@@ -419,6 +447,7 @@ func einsteigen(c):
 	kampf.halter.entfernen();kam.zielen=false;kam.scope=false
 	kam.setze_ziel(c,true,[c]);hud.modus="auto";hud.reset_touch()
 	if c.kind=="taxi":hud.zeige("Taxi: Tippe TAXI für den Taxi-Job",3.5)
+	ereignis("eingestiegen")
 
 func aussteigen_sofort():
 	if auto==null:return

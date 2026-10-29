@@ -45,8 +45,7 @@ func _init():
 			tris+=I.size()/3
 			# Grundstufe begrenzen: extrem fein modellierte Häuser werden schon in der Nähe vereinfacht
 			var basis_c=0.0
-			if I.size()/3>60000:basis_c=0.12
-			if I.size()/3>200000:basis_c=0.25
+			if I.size()/3>250000:basis_c=0.05   # nur extrem feine Modelle; sonst verschwinden Fensternischen
 			if basis_c>0.0:I=_cluster(arr,I,basis_c);arr[Mesh.ARRAY_INDEX]=I
 			tris_neu+=I.size()/3
 			var lods={};var vor=I.size()

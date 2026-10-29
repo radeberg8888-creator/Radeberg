@@ -56,6 +56,7 @@ static func library(base:String,ch:Node3D,sk:Skeleton3D)->AnimationLibrary:
 		if nm=="" or not ap.has_animation(nm):nm=ap.get_animation_list()[0]
 		var a=U.retarget_world(ap.get_animation(nm),s[1],s[0],sk,ch)
 		a.loop_mode=Animation.LOOP_LINEAR
+		if k in ["run","walk"]:_fuesse_planen(a,sk,ch)
 		lib.add_animation(k,a)
 	_lib_cache[base]=lib
 	return lib
@@ -170,3 +171,50 @@ static func _median_color(t:Texture2D)->Color:
 		var fw=FileAccess.open("res://assets/cache/median_farben.json",FileAccess.WRITE)
 		if fw:fw.store_string(JSON.stringify(_medfile));fw.close()
 	return c
+
+
+# Bodenkontakt: Die Bewegungen übertragen nur Drehungen – beim Rennen schwebten die Füße dadurch über dem Boden.
+# Hier wird pro Bild die Hüfte so weit abgesenkt, dass der tiefste Fuß wieder auf dem Boden steht.
+static func _fuesse_planen(a:Animation,sk:Skeleton3D,ch:Node3D):
+	var hips=-1;var fuesse=[]
+	for i in sk.get_bone_count():
+		var k=U.human_key(sk.get_bone_name(i))
+		if k=="Hips" and hips<0:hips=i
+		if k in ["LeftFoot","RightFoot","LeftToeBase","RightToeBase"]:fuesse.append(i)
+	if hips<0 or fuesse.is_empty():return
+	var sx=F.rel_xf(sk,ch)
+	var up=(sx.basis.inverse()*Vector3.UP).normalized()
+	var spur={}
+	for t in a.get_track_count():
+		if a.track_get_type(t)!=Animation.TYPE_ROTATION_3D:continue
+		var bn=str(a.track_get_path(t)).get_slice(":",1)
+		var bi=sk.find_bone(bn)
+		if bi>=0:spur[bi]=t
+	var n=sk.get_bone_count()
+	var fk=func(zeit:float,mit_anim:bool)->Array:
+		var g=[];g.resize(n)
+		for i in n:
+			var r:Transform3D=sk.get_bone_rest(i)
+			var q:Quaternion=r.basis.orthonormalized().get_rotation_quaternion()
+			if mit_anim and spur.has(i):q=a.rotation_track_interpolate(spur[i],zeit)
+			var lok=Transform3D(Basis(q).scaled(r.basis.get_scale()),r.origin)
+			var p=sk.get_bone_parent(i)
+			g[i]=lok if p<0 else g[p]*lok
+		return g
+	# Eltern liegen bei glTF-Skeletten immer vor den Kindern
+	var ruhe=fk.call(0.0,false)
+	var h0=INF
+	for f in fuesse:h0=min(h0,ruhe[f].origin.dot(up))
+	var pt=a.add_track(Animation.TYPE_POSITION_3D)
+	a.track_set_path(pt,str(ch.get_path_to(sk))+":"+sk.get_bone_name(hips))
+	var schritte=int(ceil(a.length*30.0))
+	var hp=sk.get_bone_parent(hips)
+	for f in schritte+1:
+		var zeit=min(f/30.0,a.length)
+		var g=fk.call(zeit,true)
+		var h=INF
+		for fu in fuesse:h=min(h,g[fu].origin.dot(up))
+		var d=up*(h-h0)
+		var lokal=d
+		if hp>=0:lokal=g[hp].basis.inverse()*d
+		a.position_track_insert_key(pt,zeit,sk.get_bone_rest(hips).origin-lokal)

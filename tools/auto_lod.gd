@@ -64,16 +64,26 @@ func _verschmelzen(quelle:Node3D,ziel:Node3D,behalten:Array,max_tris:int,name:St
 			if m.mesh is ArrayMesh and m.mesh.surface_get_primitive_type(si)!=Mesh.PRIMITIVE_TRIANGLES:continue
 			var mat=m.get_active_material(si)
 			if m.material_override:mat=m.material_override
-			if not gruppen.has(mat):
-				var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);gruppen[mat]=st
-			gruppen[mat].append_from(m.mesh,si,xf)
+			# gespiegelte Teile (negative Skalierung): Dreiecke umdrehen, sonst erscheinen sie von innen (schwarz)
+			var spiegel=xf.basis.determinant()<0.0
+			var key=[mat,spiegel]
+			if not gruppen.has(key):
+				var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);gruppen[key]=st
+			gruppen[key].append_from(m.mesh,si,xf)
 	if gruppen.is_empty():return
 	var flaechen=[];var gesamt=0
-	for mat in gruppen:
-		var arr=gruppen[mat].commit_to_arrays()
+	var flip={}
+	for key in gruppen:
+		var arr=gruppen[key].commit_to_arrays()
+		var mat=key[0]
 		for k in [Mesh.ARRAY_CUSTOM0,Mesh.ARRAY_CUSTOM1,Mesh.ARRAY_CUSTOM2,Mesh.ARRAY_CUSTOM3,Mesh.ARRAY_BONES,Mesh.ARRAY_WEIGHTS]:arr[k]=null
 		if arr[Mesh.ARRAY_VERTEX]==null or arr[Mesh.ARRAY_VERTEX].size()==0:continue
 		if arr[Mesh.ARRAY_INDEX]==null:arr[Mesh.ARRAY_INDEX]=PackedInt32Array(range(arr[Mesh.ARRAY_VERTEX].size()))
+		if key[1]:
+			var J:PackedInt32Array=arr[Mesh.ARRAY_INDEX]
+			for t in range(0,J.size(),3):
+				var tmp=J[t+1];J[t+1]=J[t+2];J[t+2]=tmp
+			arr[Mesh.ARRAY_INDEX]=J
 		gesamt+=arr[Mesh.ARRAY_INDEX].size()/3
 		flaechen.append([mat,arr])
 	# Grundstufe begrenzen
