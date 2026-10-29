@@ -255,7 +255,7 @@ func _physics_process(dt):
 	if not bereit:return
 	if panel==null:
 		if auto!=null:auto.fahren(st,dt)
-		else:
+		elif not _entert:
 			spieler.cam_yaw=kam.blick_yaw()
 			if spieler.steuern(st,dt):hud.zeige("Du bist ins Wasser gefallen")
 	var hind=verkehr.duplicate();hind.append(spieler if auto==null else auto)
@@ -298,7 +298,8 @@ func _tageszeit():
 	var tag=clamp(e*3.0+0.15,0.0,1.0)
 	var abend=clamp(1.0-abs(e)*4.0,0.0,1.0)
 	if e>-0.05:
-		sun.rotation_degrees=Vector3(-max(e,0.03)*68.0-4.0,-125.0+(t-0.5)*160.0,0)
+		var ziel=Vector3(-max(e,0.03)*68.0-4.0,-125.0+(t-0.5)*160.0,0)
+		if ziel.distance_to(sun.rotation_degrees)>2.5:sun.rotation_degrees=ziel
 		sun.light_color=Color(1.0,0.93,0.82).lerp(Color(1.0,0.62,0.38),abend)
 		sun.light_energy=lerp(0.35,2.6,tag)
 	else:
@@ -334,10 +335,11 @@ func _interaktion():
 	hud.prompt="";hud.prompt_knopf=""
 	if panel!=null:return
 	if auto==null:
+		if _entert:return
 		var c=_naechstes_auto(4.5)
 		if c!=null:
-			hud.prompt="Einsteigen";hud.prompt_knopf="einsteigen"
-			if st.pressed("einsteigen"):einsteigen(c)
+			hud.prompt="Einsteigen" if not c in verkehr else "Auto klauen";hud.prompt_knopf="einsteigen"
+			if st.pressed("einsteigen"):entern(c)
 			return
 		for z in zonen:
 			if z.typ=="werkstatt" or (z.typ=="story" and z.text==""):continue
@@ -363,6 +365,38 @@ func _interaktion():
 					if not z.get("offen",false):z.offen=true;werkstatt_menue()
 				return
 			if z.typ in ["werkstatt","lack"]:z.offen=false
+
+# Wie in GTA: zur Fahrertür gehen, bei Verkehrsautos den Fahrer rausziehen (er rennt weg), dann einsteigen
+var _entert:=false
+var _fahrer_ped:Node3D=null
+func entern(c):
+	if _entert or c==null:return
+	_entert=true
+	var hatte_fahrer=c in verkehr
+	if hatte_fahrer:
+		verkehr.erase(c);c.engine_force=0.0;c.brake=60.0;c.linear_velocity*=0.3
+	var tuer:Vector3=c.aussteig_punkt()
+	var start=spieler.global_position
+	spieler.velocity=Vector3.ZERO
+	var dauer=clamp(start.distance_to(tuer)/4.0,0.2,1.2)
+	var blick=(c.global_position-tuer);spieler.rotation.y=atan2(blick.x,blick.z)
+	var tw=create_tween();tw.tween_property(spieler,"global_position",tuer,dauer)
+	await tw.finished
+	if hatte_fahrer and is_instance_valid(c):
+		if _fahrer_ped==null:
+			var r2=RandomNumberGenerator.new();r2.randomize()
+			_fahrer_ped=PE.make(PE.CIVIL[r2.randi()%PE.CIVIL.size()],r2);add_child(_fahrer_ped)
+		var p=_fahrer_ped;p.visible=true
+		var weg=(tuer-c.global_position);weg.y=0;weg=weg.normalized()
+		p.global_position=tuer+weg*0.6;p.rotation.y=atan2(weg.x,weg.z)
+		PE.play(p,"run")
+		hud.zeige("Fahrer rausgezogen!",1.5)
+		kampf.verbrechen(0.35)
+		var tw2=create_tween();tw2.tween_property(p,"global_position",tuer+weg*16.0+Vector3(0,0,0),3.5)
+		tw2.tween_callback(func():p.visible=false)
+		await get_tree().create_timer(0.35).timeout
+	_entert=false
+	if is_instance_valid(c):einsteigen(c)
 
 func einsteigen(c):
 	verkehr.erase(c);if not geparkt.has(c):geparkt.append(c)
@@ -397,7 +431,7 @@ func _rempler(b):
 # ---------------- Verkehr ----------------
 const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","trabant","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
 	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","trabant","rtw","hudson","mercedes","hoonicorn","bugatti","armored"]
-func _ziel_anzahl()->int:return [12,22,32][int(st.e.sichtweite)]
+func _ziel_anzahl()->int:return [8,14,22][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
 	var p2=Vector2(p.x,p.z)
 	for c in verkehr.duplicate():
@@ -744,6 +778,7 @@ func einstellungen_anwenden():
 	sun.directional_shadow_max_distance=[70.0,110.0,180.0][q]
 	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if q<2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	sun.shadow_blur=1.0;sun.light_angular_distance=0.0
+	sun.shadow_normal_bias=1.6;sun.shadow_bias=0.06;sun.directional_shadow_blend_splits=true
 	var vp=get_viewport()
 	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR
 	vp.scaling_3d_scale=[0.67,0.8,1.0][q]

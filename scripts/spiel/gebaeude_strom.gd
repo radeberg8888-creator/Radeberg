@@ -6,7 +6,7 @@ var zelle:=160.0
 var gitter:={}          # Vector2i -> [indizes]
 var fertig:={}          # index -> true
 var _wurzel:Node3D
-var radius:=1100.0
+var radius:=750.0
 var budget_ms:=5.0
 
 func setup(w):

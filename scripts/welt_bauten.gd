@@ -358,6 +358,6 @@ func einzeln(root:Node3D,i:int)->Node3D:
 	w.position=Vector3(pl.c.x,pl.y-0.12,pl.c.y);w.rotation.y=pl.yaw
 	var h=t.ab.size.y
 	for m in _meshes(w):
-		if spiel:m.visibility_range_end=1500.0 if h>40 else 700.0
+		if spiel:m.visibility_range_end=1100.0 if h>40 else 480.0
 		else:m.visibility_range_end=3200.0 if h>40 else 2400.0
 	return w

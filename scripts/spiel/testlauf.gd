@@ -163,7 +163,10 @@ func _process(dt):
 		3:
 			if t>1.5:
 				shot("auto_daneben");print("  DBG geparkt ",spiel.geparkt.size()," letzter ",spiel.geparkt[-1].kind," ",spiel.geparkt[-1].global_position)
-				spiel.einsteigen(spiel.geparkt[-1]);schritt=4;t=0
+				spiel.entern(spiel.geparkt[-1]);schritt=35;t=0
+		35:
+			if spiel.auto!=null:print("  DBG entern ok nach ",t);schritt=4;t=0
+			elif t>4.0:print("  DBG entern FEHLER");schritt=4;t=0
 		4:
 			st.t_gas=1.0
 			if t>1.0:st.t_move=Vector2(0.05,0)

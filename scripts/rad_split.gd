@@ -72,6 +72,10 @@ static func find(root:Node3D,override:={})->Array:
 		for w in res:w.p.y+=override.r-w.r;w.r=override.r
 	if override.has("z"):   # Achspositionen von Hand (vorne, hinten)
 		for w in res:w.p.z=override.z[0] if w.vorne else override.z[1]
+	if override.has("breite"):   # Reifenbreite begrenzen (Kotflügel/Verbreiterungen nicht mitdrehen)
+		for w in res:
+			var s2=1.0 if w.links else -1.0
+			w.breite=min(w.breite,override.breite);w.xi=w.xo-s2*w.breite;w.p.x=w.xo-s2*w.breite*0.5
 	if override.has("x"):
 		for w in res:
 			var s=1.0 if w.links else -1.0
