@@ -1,0 +1,788 @@
+extends SceneTree
+# Comic-Musterblock: Kreuzung, eigene Häuser (Ziegel, Putz, Läden), Straßenmöbel, Autos (Trabant, Wartburg,
+# Sportwagen), Figuren. Alles aus Code erzeugt, Toon-Licht + schwarze Konturen (Hülle mit Rückseiten).
+const OUT:="/tmp/claude-0/-home-claude/28bc4cd7-234a-5fda-badb-fa2be879c9df/scratchpad/comic/"
+const RW:=5.0      # halbe Fahrbahnbreite
+const SW:=4.0      # Gehwegbreite
+const KB:=0.15     # Bordsteinhöhe
+const ENDE:=105.0
+var rng:=RandomNumberGenerator.new()
+var st:={}         # Material -> SurfaceTool
+var mats:={}
+var ink:StandardMaterial3D
+var BOX:=BoxMesh.new()
+var SPH:SphereMesh
+var CYL:CylinderMesh
+var CAP:CapsuleMesh
+var welt:Node3D
+var M:={}          # benannte Materialien
+
+func _init():
+	rng.seed=7
+	await process_frame
+	DirAccess.make_dir_recursive_absolute(OUT)
+	SPH=SphereMesh.new();SPH.radial_segments=16;SPH.rings=8
+	CYL=CylinderMesh.new();CYL.radial_segments=14;CYL.rings=0
+	CAP=CapsuleMesh.new();CAP.radial_segments=12;CAP.rings=4
+	welt=Node3D.new();root.add_child(welt)
+	_materialien()
+	_umgebung()
+	_strassen()
+	_bebauung()
+	_moebel()
+	_autos()
+	var f1=_figur(Vector3(3.2,KB,-12.0),PI*0.05,{"shirt":Color(0.93,0.42,0.18),"hose":Color(0.2,0.3,0.55),"haar":Color(0.18,0.11,0.07),"haut":Color(0.87,0.66,0.5),"pose":"geh"})
+	_figur(Vector3(-7.4,KB,14.5),PI*0.6,{"shirt":Color(0.35,0.7,0.62),"hose":Color(0.25,0.22,0.2),"haar":Color(0.85,0.65,0.25),"haut":Color(0.95,0.78,0.65),"pose":"steh","frau":true})
+	_figur(Vector3(12.0,KB,7.4),-PI*0.5,{"shirt":Color(0.75,0.2,0.25),"hose":Color(0.15,0.15,0.18),"haar":Color(0.08,0.06,0.05),"haut":Color(0.55,0.38,0.27),"pose":"steh"})
+	_fertig()
+	await _bilder()
+	quit()
+
+# ---------------- Materialien ----------------
+func _toon(c:Color,rough:=0.8)->StandardMaterial3D:
+	var m=StandardMaterial3D.new();m.albedo_color=c;m.roughness=rough
+	m.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;m.specular_mode=BaseMaterial3D.SPECULAR_TOON
+	return m
+func _shader(code:String,params:={})->ShaderMaterial:
+	var s=Shader.new();s.code=code
+	var m=ShaderMaterial.new();m.shader=s
+	for k in params:m.set_shader_parameter(k,params[k])
+	return m
+
+const KOPF:="""
+shader_type spatial;
+render_mode diffuse_toon, specular_toon;
+varying vec3 wp; varying vec3 wn;
+void vertex(){ wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; wn=normalize((MODEL_MATRIX*vec4(NORMAL,0.0)).xyz); }
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
+	return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+vec2 flaeche(){ vec3 n=abs(wn); if(n.y>0.7) return wp.xz; if(n.x>n.z) return vec2(wp.z,wp.y); return vec2(wp.x,wp.y); }
+"""
+const ZIEGEL:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.66,0.3,0.2);
+uniform vec3 fuge:source_color=vec3(0.86,0.82,0.74);
+uniform float bw=0.42; uniform float bh=0.15;
+void fragment(){
+	vec2 uv=flaeche();
+	vec2 g=uv/vec2(bw,bh); float row=floor(g.y); g.x+=mod(row,2.0)*0.5;
+	vec2 id=floor(g); vec2 f=fract(g);
+	vec2 d=min(f,1.0-f)*vec2(bw,bh);
+	float e=min(d.x,d.y);
+	float mortar=1.0-smoothstep(0.014,0.024,e);
+	float r=h21(id);
+	vec3 c=farbe*(0.82+0.32*r);
+	if(h21(id+3.7)>0.86) c*=vec3(0.78,0.74,0.72);
+	if(h21(id+9.1)>0.93) c=mix(c,vec3(0.9,0.75,0.6),0.35);
+	// gemalte Kante: oben hell, unten/rechts dunkel -> Ziegel wirken plastisch
+	float oben=1.0-smoothstep(0.02,0.045,(1.0-f.y)*bh);
+	float unten=1.0-smoothstep(0.02,0.04,f.y*bh);
+	float rechts=1.0-smoothstep(0.02,0.04,(1.0-f.x)*bw);
+	c*=1.0+0.22*oben-0.28*unten-0.12*rechts;
+	vec3 fg=fuge*0.92;
+	ALBEDO=mix(c,fg,mortar);
+	ROUGHNESS=0.95;
+}
+"""
+const PUTZ:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.9,0.8,0.6);
+void fragment(){
+	vec2 uv=flaeche();
+	float n=vn(uv*2.0)*0.5+vn(uv*6.0)*0.5;
+	vec3 c=farbe*(0.95+0.08*n);
+	// leichte Verschmutzung unten
+	c*=mix(0.88,1.0,smoothstep(0.0,2.5,wp.y));
+	ALBEDO=c; ROUGHNESS=0.9;
+}
+"""
+const PFLASTER:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.74,0.72,0.68);
+uniform float gr=0.6;
+void fragment(){
+	vec2 g=wp.xz/gr; vec2 id=floor(g); vec2 f=fract(g);
+	float e=min(min(f.x,1.0-f.x),min(f.y,1.0-f.y))*gr;
+	float fuge=1.0-smoothstep(0.012,0.022,e);
+	vec3 c=farbe*(0.9+0.16*h21(id));
+	c*=1.0+0.12*(1.0-smoothstep(0.02,0.05,(1.0-f.y)*gr))-0.12*(1.0-smoothstep(0.02,0.05,f.y*gr));
+	ALBEDO=mix(c,farbe*0.62,fuge); ROUGHNESS=0.9;
+}
+"""
+const ASPHALT:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.3,0.31,0.33);
+void fragment(){
+	vec2 p=wp.xz;
+	float k=vn(p*6.0); float g=vn(p*0.8);
+	vec3 c=farbe*(0.94+0.1*k)*(0.96+0.06*g);
+	// Flickstellen
+	if(vn(p/4.0)>0.78) c*=0.9;
+	ALBEDO=c; ROUGHNESS=0.95;
+}
+"""
+const GLAS:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.16,0.3,0.42);
+uniform float licht=0.0;
+void fragment(){
+	vec3 c=farbe;
+	// gemalte Spiegelung: heller Schrägstreifen + Himmel oben
+	float s=fract((wp.x+wp.z)*0.35+wp.y*0.5);
+	float streif=smoothstep(0.0,0.05,s)*(1.0-smoothstep(0.12,0.17,s));
+	c=mix(c,vec3(0.75,0.88,0.98),streif*0.55);
+	c=mix(c,vec3(0.55,0.75,0.92),smoothstep(0.55,1.0,fract(wp.y/3.1))*0.35);
+	ALBEDO=c; ROUGHNESS=0.15; SPECULAR=0.8;
+	EMISSION=farbe*licht;
+}
+"""
+const GRAS:=KOPF+"""
+uniform vec3 farbe:source_color=vec3(0.32,0.52,0.24);
+void fragment(){
+	vec2 p=wp.xz;
+	float k=vn(p*1.5)*0.6+vn(p*0.25)*0.4;
+	ALBEDO=farbe*(0.85+0.25*k); ROUGHNESS=1.0;
+}
+"""
+
+func _materialien():
+	ink=StandardMaterial3D.new();ink.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	ink.albedo_color=Color(0.07,0.05,0.06);ink.cull_mode=BaseMaterial3D.CULL_FRONT
+	M.ziegel=[_shader(ZIEGEL,{"farbe":Color(0.68,0.3,0.2)}),_shader(ZIEGEL,{"farbe":Color(0.55,0.24,0.18)}),
+		_shader(ZIEGEL,{"farbe":Color(0.78,0.45,0.28)}),_shader(ZIEGEL,{"farbe":Color(0.62,0.52,0.45),"fuge":Color(0.9,0.88,0.82)}),
+		_shader(ZIEGEL,{"farbe":Color(0.45,0.2,0.2)})]
+	M.putz=[]
+	for c in [Color(0.95,0.85,0.6),Color(0.62,0.8,0.82),Color(0.95,0.72,0.62),Color(0.82,0.88,0.7),Color(0.93,0.93,0.88),Color(0.78,0.7,0.88),Color(0.98,0.8,0.45)]:
+		M.putz.append(_shader(PUTZ,{"farbe":c}))
+	M.pflaster=_shader(PFLASTER,{})
+	M.hof=_shader(PFLASTER,{"farbe":Color(0.6,0.58,0.55),"gr":0.35})
+	M.asphalt=_shader(ASPHALT,{})
+	M.glas=[_shader(GLAS,{}),_shader(GLAS,{"farbe":Color(0.12,0.24,0.32)}),_shader(GLAS,{"farbe":Color(0.95,0.78,0.42),"licht":0.25}),_shader(GLAS,{"farbe":Color(0.2,0.36,0.4)})]
+	M.gras=_shader(GRAS,{})
+	M.stein=_toon(Color(0.86,0.83,0.76))
+	M.stein_d=_toon(Color(0.62,0.6,0.56))
+	M.weiss=_toon(Color(0.96,0.95,0.92))
+	M.dunkel=_toon(Color(0.17,0.17,0.19),0.5)
+	M.metall=_toon(Color(0.25,0.27,0.3),0.4)
+	M.dach=_toon(Color(0.3,0.29,0.3))
+	M.holz=_toon(Color(0.55,0.36,0.2))
+	M.erde=_toon(Color(0.4,0.28,0.18))
+	M.laub=[_toon(Color(0.3,0.58,0.22)),_toon(Color(0.4,0.66,0.25)),_toon(Color(0.24,0.5,0.24))]
+	M.rinde=_toon(Color(0.4,0.27,0.17))
+	M.markierung=_toon(Color(0.97,0.97,0.94))
+	M.gelb=_toon(Color(0.98,0.8,0.15))
+	M.rot=_toon(Color(0.85,0.15,0.12))
+	M.gruen_l=_toon(Color(0.2,0.95,0.4));M.gruen_l.emission_enabled=true;M.gruen_l.emission=Color(0.1,0.8,0.3)
+	M.rot_l=_toon(Color(0.95,0.2,0.1));M.rot_l.emission_enabled=true;M.rot_l.emission=Color(0.8,0.1,0.05)
+	M.lampe=_toon(Color(1,0.95,0.75));M.lampe.emission_enabled=true;M.lampe.emission=Color(0.6,0.55,0.35)
+	M.chrom=_toon(Color(0.78,0.8,0.82),0.2);M.chrom.metallic=0.6
+	M.reifen=_toon(Color(0.1,0.1,0.11))
+	M.tuer=[_toon(Color(0.2,0.35,0.55)),_toon(Color(0.55,0.15,0.15)),_toon(Color(0.2,0.45,0.3)),_toon(Color(0.35,0.22,0.12)),_toon(Color(0.15,0.15,0.18))]
+	M.markise=[[_toon(Color(0.85,0.18,0.15)),M.weiss],[_toon(Color(0.15,0.5,0.35)),M.weiss],[_toon(Color(0.2,0.35,0.7)),_toon(Color(0.95,0.85,0.4))],[_toon(Color(0.95,0.55,0.15)),M.weiss]]
+	M.blume=[_toon(Color(0.95,0.3,0.4)),_toon(Color(0.98,0.85,0.2)),_toon(Color(0.8,0.4,0.9))]
+
+# ---------------- Geometrie-Sammler ----------------
+func _st(m:Material,eigen:=false)->SurfaceTool:
+	# eigen: von Hand gebaute Flächen getrennt halten (SurfaceTool mischt append_from und add_vertex nicht sauber)
+	var k=str(m.get_instance_id())+("h" if eigen else "")
+	if not st.has(k):
+		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m
+	return st[k]
+# Kasten: Mitte, Größe, Drehung; Kontur als etwas größerer Kasten mit Rückseiten
+func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
+	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
+	_st(m).append_from(BOX,0,Transform3D(b*Basis().scaled(s),c))
+	if kontur>0.0 and (int(s.x>0.25)+int(s.y>0.25)+int(s.z>0.25))>=2:
+		_st(ink).append_from(BOX,0,Transform3D(b*Basis().scaled(s+Vector3.ONE*kontur*2.0),c))
+func mesh(m:Material,me:Mesh,xf:Transform3D,kontur:=1.06):
+	_st(m).append_from(me,0,xf)
+	if kontur>1.0:_st(ink).append_from(me,0,Transform3D(xf.basis*Basis().scaled(Vector3.ONE*kontur),xf.origin))
+func kugel(m:Material,c:Vector3,r:Vector3,kontur:=1.07):
+	var xf=Transform3D(Basis().scaled(r*2.0),c)
+	mesh(m,SPH,xf,kontur)
+func zyl(m:Material,a:Vector3,b:Vector3,r:float,kontur:=1.0):
+	var d=b-a;var L=d.length();if L<0.001:return
+	var q=Quaternion(Vector3.UP,d/L) if abs((d/L).dot(Vector3.UP))<0.9999 else (Quaternion() if d.y>0 else Quaternion(Vector3.RIGHT,PI))
+	var xf=Transform3D(Basis(q)*Basis().scaled(Vector3(r*2.0,L*0.5,r*2.0)),(a+b)*0.5)
+	_st(m).append_from(CYL,0,xf)
+	if kontur>1.0:_st(ink).append_from(CYL,0,Transform3D(Basis(q)*Basis().scaled(Vector3(r*2.0*kontur+0.05,L*0.5+0.025,r*2.0*kontur+0.05)),(a+b)*0.5))
+func kapsel(m:Material,a:Vector3,b:Vector3,r:float,kontur:=true):
+	var d=b-a;var L=d.length()
+	var q=Quaternion(Vector3.UP,d/L) if abs((d/L).dot(Vector3.UP))<0.9999 else Quaternion()
+	var me=CapsuleMesh.new();me.radius=r;me.height=L+2.0*r;me.radial_segments=12;me.rings=4
+	_st(m).append_from(me,0,Transform3D(Basis(q),(a+b)*0.5))
+	if kontur:
+		var mi=CapsuleMesh.new();mi.radius=r+0.018;mi.height=L+2.0*r+0.036;mi.radial_segments=12;mi.rings=4
+		_st(ink).append_from(mi,0,Transform3D(Basis(q),(a+b)*0.5))
+# Körper aus 8 Eckpunkten (unten 4, oben 4, gleiche Reihenfolge) – für Autos, Torso
+func hex(m:Material,p:Array,kontur:=0.03):
+	_hex_in(_st(m,true),p)
+	if kontur>0.0:
+		var c=Vector3.ZERO
+		for v in p:c+=v
+		c/=8.0
+		var q=[]
+		for v in p:q.append(v+(v-c).normalized()*kontur*1.4)
+		_hex_in(_st(ink,true),q,true)
+func _hex_in(s:SurfaceTool,p:Array,innen:=false):
+	var c=Vector3.ZERO
+	for v in p:c+=v
+	c/=8.0
+	var faces=[[0,1,2,3],[7,6,5,4],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]]
+	for f in faces:
+		var a=p[f[0]];var b=p[f[1]];var cc=p[f[2]];var d=p[f[3]]
+		var n=(b-a).cross(d-a)
+		if n.length()<1e-6:n=(cc-b).cross(a-b)
+		n=n.normalized()
+		var fm=(a+b+cc+d)*0.25
+		var aussen=n.dot(fm-c)>0
+		if not aussen:
+			var t=b;b=d;d=t;n=-n
+		# Godot: Vorderseite = im Uhrzeigersinn (von außen gesehen)
+		for v in [a,cc,b,a,d,cc]:s.set_normal(n);s.add_vertex(v)
+func _fertig():
+	for k in st:
+		var s:SurfaceTool=st[k]
+		var mi=MeshInstance3D.new();mi.mesh=s.commit();mi.material_override=mats[k];welt.add_child(mi)
+		if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+# ---------------- Umgebung ----------------
+func _umgebung():
+	var we=WorldEnvironment.new();var e=Environment.new();we.environment=e;welt.add_child(we)
+	var sky=Sky.new();var sm=ProceduralSkyMaterial.new()
+	sm.sky_top_color=Color(0.22,0.5,0.92);sm.sky_horizon_color=Color(0.72,0.86,0.98);sm.ground_horizon_color=Color(0.72,0.86,0.98);sm.ground_bottom_color=Color(0.4,0.45,0.4)
+	sm.sun_angle_max=8.0;sky.sky_material=sm;e.sky=sky;e.background_mode=Environment.BG_SKY
+	e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color(0.72,0.78,0.9);e.ambient_light_energy=0.55
+	e.tonemap_mode=Environment.TONE_MAPPER_LINEAR;e.tonemap_exposure=1.0
+	e.fog_enabled=true;e.fog_light_color=Color(0.75,0.85,0.97);e.fog_density=0.0035;e.fog_aerial_perspective=0.5
+	var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-48,-35,0);sun.light_color=Color(1.0,0.95,0.86);sun.light_energy=1.15
+	RenderingServer.directional_shadow_atlas_set_size(8192,true)
+	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.shadow_enabled=true;sun.directional_shadow_max_distance=90.0;sun.shadow_bias=0.04;sun.shadow_normal_bias=1.0;sun.shadow_blur=0.5
+	welt.add_child(sun)
+	# Wolken: dicke Comic-Wolken aus Kugeln
+	for i in 9:
+		var c=Vector3(rng.randf_range(-200,200),rng.randf_range(55,80),rng.randf_range(-200,200))
+		for k in 5:
+			kugel(M.weiss,c+Vector3(k*6.0-12.0,rng.randf_range(-1,2),rng.randf_range(-3,3)),Vector3(7,4.5,6)*rng.randf_range(0.8,1.3),1.0)
+
+# ---------------- Straßen ----------------
+func _strassen():
+	box(M.gras,Vector3(0,-0.06,0),Vector3(600,0.1,600),Basis(),0.0)
+	# Fahrbahn: Kreuz aus zwei Bändern (massiv, kein Hohlraum)
+	box(M.asphalt,Vector3(0,-0.05,0),Vector3(ENDE*2,0.1,RW*2),Basis(),0.0)
+	box(M.asphalt,Vector3(0,-0.05,0),Vector3(RW*2,0.1,ENDE*2),Basis(),0.0)
+	# Gehwege je Viertel: massive Blöcke bis Bordsteinhöhe, Bordstein als eigener Stein
+	for sx in [-1,1]:
+		for sz in [-1,1]:
+			var x0=RW;var x1=ENDE;var z0=RW;var z1=RW+SW
+			box(M.pflaster,Vector3(sx*(x0+x1)*0.5,KB*0.5-0.05,sz*(z0+z1)*0.5),Vector3(x1-x0,KB+0.1,z1-z0),Basis(),0.0)
+			box(M.pflaster,Vector3(sx*(z0+z1)*0.5,KB*0.5-0.05,sz*(x0+x1+SW)*0.5),Vector3(z1-z0,KB+0.1,x1-x0-SW),Basis(),0.0)
+			# Bordsteine
+			box(M.stein,Vector3(sx*(RW+x1)*0.5,KB*0.5-0.04,sz*(RW+0.15)),Vector3(x1-RW,KB+0.1,0.3),Basis(),0.02)
+			box(M.stein,Vector3(sx*(RW+0.15),KB*0.5-0.04,sz*(RW+x1)*0.5),Vector3(0.3,KB+0.1,x1-RW),Basis(),0.02)
+			# Hinterhof-Fläche hinter den Häusern
+			box(M.gras,Vector3(sx*(RW+SW+ENDE)*0.5,0.05,sz*(RW+SW+ENDE)*0.5),Vector3(ENDE-RW-SW,0.1,ENDE-RW-SW),Basis(),0.0)
+	# Markierungen: Mittellinie gestrichelt, Zebrastreifen, Haltelinien
+	for arm in [Vector2(1,0),Vector2(-1,0),Vector2(0,1),Vector2(0,-1)]:
+		var a=Vector3(arm.x,0,arm.y);var quer=Vector3(-arm.y,0,arm.x)
+		var b=Basis(Vector3.UP,atan2(a.x,a.z))
+		var s=RW+SW+5.5
+		while s<ENDE:
+			box(M.markierung,a*(s+1.5)+Vector3(0,0.006,0),Vector3(0.15,0.012,3.0),b,0.0);s+=6.0
+		for k in range(-4,5):
+			box(M.markierung,a*(RW+2.6)+quer*(k*1.05)+Vector3(0,0.006,0),Vector3(0.55,0.012,3.2),b,0.0)
+		box(M.markierung,a*(RW+4.7)+quer*(RW*0.5)+Vector3(0,0.006,0),Vector3(RW,0.012,0.4),b,0.0)
+		for sd in [-1,1]:box(M.markierung,a*((RW+ENDE)*0.5)+quer*(sd*(RW-0.35))+Vector3(0,0.006,0),Vector3(0.14,0.012,ENDE-RW),b,0.0)
+	# Gullydeckel
+	for p in [Vector3(RW-0.6,0.01,12),Vector3(-RW+0.6,0.01,-18),Vector3(20,0.01,RW-0.6),Vector3(-26,0.01,-RW+0.6)]:
+		zyl(M.dunkel,p,p+Vector3(0,0.02,0),0.32)
+
+# ---------------- Häuser ----------------
+var _laeden:=["BÄCKEREI","KIOSK","DÖNER","FRISEUR","APOTHEKE","BLUMEN","PFANDLEIHE","WASCHSALON","BUCHLADEN","IMBISS","ELEKTRO","CAFÉ"]
+func _bebauung():
+	var C=15.0;var T=12.0;var vorn=RW+SW
+	for sx in [-1,1]:
+		for sz in [-1,1]:
+			# Eckhaus: Fassaden zu beiden Straßen
+			var o1=Vector3(0,0,-sz);var o2=Vector3(-sx,0,0)
+			var mitte=Vector3(sx*(vorn+C*0.5),KB,sz*(vorn+C*0.5))
+			_haus(mitte+o1*(C*0.5),C,C,o1,{"eck":o2,"stock":rng.randi_range(4,5),"laden":true})
+			# Reihen entlang beider Straßen
+			for reihe in [[Vector3(sx,0,0),o1,sz],[Vector3(0,0,sz),o2,sx]]:
+				var lauf:Vector3=reihe[0];var o:Vector3=reihe[1]
+				var s=vorn+C
+				while s<ENDE-6.0:
+					var w=[7.5,8.5,9.5,11.0,12.5][rng.randi()%5]
+					if s+w>ENDE:break
+					var p=lauf*(s+w*0.5)-o*vorn+Vector3(0,KB,0)
+					# Fassadenlinie liegt genau an der Gehweg-Hinterkante
+					_haus(p,w,T,o,{"stock":rng.randi_range(2,5),"laden":rng.randf()<0.45})
+					s+=w
+
+func _haus(front:Vector3,w:float,d:float,aussen:Vector3,opt:Dictionary):
+	var oben=Vector3.UP;var rechts=oben.cross(aussen)
+	var stock:int=opt.stock;var eg=3.7;var oh=3.15
+	var H=eg+(stock-1)*oh
+	var ziegel=rng.randf()<0.55
+	var wand:Material=M.ziegel[rng.randi()%M.ziegel.size()] if ziegel else M.putz[rng.randi()%M.putz.size()]
+	var b=Basis(rechts,oben,aussen)
+	var mitte=front-aussen*(d*0.5)+Vector3(0,H*0.5,0)
+	box(wand,mitte,Vector3(w,H,d),b,0.04)
+	# Dach: Teerdach, Attika
+	box(M.dach,mitte+Vector3(0,H*0.5+0.02,0),Vector3(w-0.5,0.06,d-0.5),b,0.0)
+	var stil={"ziegel":ziegel,"wand":wand,"glas":M.glas[rng.randi()%M.glas.size()],"tuer":M.tuer[rng.randi()%M.tuer.size()],
+		"trim":(M.stein if rng.randf()<0.7 else M.weiss),"laeden":(not ziegel and rng.randf()<0.4),"feuer":(ziegel and rng.randf()<0.45),
+		"balkon":(not ziegel and rng.randf()<0.5),"fenster":rng.randi_range(0,2)}
+	_fassade(front-rechts*(w*0.5),rechts,aussen,w,H,stock,eg,oh,stil,opt.get("laden",false),true)
+	if opt.has("eck"):
+		var o2:Vector3=opt.eck;var r2=oben.cross(o2)
+		var f2=mitte-Vector3(0,H*0.5,0)+o2*(w*0.5)
+		_fassade(f2-r2*(d*0.5),r2,o2,d,H,stock,eg,oh,stil,true,false)
+		# Ladeneingang schräg an der Ecke: Laterne + Schild darüber
+	# Rückseite: einfache Fenster
+	var hinten=-aussen;var rh=oben.cross(hinten)
+	var fh=mitte-Vector3(0,H*0.5,0)+hinten*(d*0.5)
+	for i in range(1,stock):
+		var y=eg+(i-1)*oh+0.9
+		var n=int((w-1.0)/2.6)
+		for k in n:
+			var x=(k+0.5)*w/n-w*0.5
+			box(M.glas[0],fh+rh*x+Vector3(0,y+0.75,0)+hinten*0.02,Vector3(1.0,1.4,0.04),Basis(rh,oben,hinten),0.0)
+			box(stil.trim,fh+rh*x+Vector3(0,y-0.05,0)+hinten*0.08,Vector3(1.2,0.1,0.16),Basis(rh,oben,hinten),0.0)
+	# Dachaufbauten
+	var dachy=H+KB
+	if stil.ziegel and rng.randf()<0.5:_wassertank(mitte+Vector3(0,H*0.5,0)-aussen*1.5+rechts*rng.randf_range(-w*0.2,w*0.2))
+	for k in rng.randi_range(0,2):
+		var p=mitte+Vector3(0,H*0.5,0)+rechts*rng.randf_range(-w*0.35,w*0.35)-aussen*rng.randf_range(0,d*0.35)
+		if rng.randf()<0.5:box(wand,p+Vector3(0,0.8,0),Vector3(0.7,1.6,0.7),b,0.035);box(M.stein_d,p+Vector3(0,1.65,0),Vector3(0.85,0.12,0.85),b,0.03)
+		else:box(M.metall,p+Vector3(0,0.4,0),Vector3(1.0,0.8,0.8),b,0.035)
+
+func _wassertank(p:Vector3):
+	for l in [Vector3(0.7,0,0.7),Vector3(-0.7,0,0.7),Vector3(0.7,0,-0.7),Vector3(-0.7,0,-0.7)]:
+		zyl(M.metall,p+l,p+l+Vector3(0,1.8,0),0.07)
+	zyl(M.holz,p+Vector3(0,1.8,0),p+Vector3(0,3.8,0),1.05,1.05)
+	for y in [2.2,3.0,3.6]:zyl(M.metall,p+Vector3(0,y,0),p+Vector3(0,y+0.06,0),1.08)
+	var dach=ConeHelper.kegel(1.15,0.7)
+	mesh(M.dach,dach,Transform3D(Basis(),p+Vector3(0,3.8,0)),1.05)
+
+class ConeHelper:
+	static func kegel(r:float,h:float)->CylinderMesh:
+		var c=CylinderMesh.new();c.top_radius=0.0;c.bottom_radius=r;c.height=h;c.radial_segments=14;c.rings=0
+		# Mittelpunkt des CylinderMesh liegt in der Mitte -> nach oben verschieben macht der Aufrufer nicht; ok für Optik
+		return c
+
+# Fassade: o = linke untere Ecke auf der Wandfläche, r = nach rechts, a = nach außen
+func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,oh:float,stil:Dictionary,laden:bool,vorne:bool):
+	var b=Basis(r,Vector3.UP,a)
+	var P=func(x:float,y:float,z:float)->Vector3:return o+r*x+Vector3.UP*y+a*z
+	var trim:Material=stil.trim
+	# Sockel
+	box(M.stein_d,P.call(w*0.5,0.35,0.05),Vector3(w,0.7,0.12),b,0.03)
+	# Ecksteine (Putzbauten): echte 3D-Quader, abwechselnd lang/kurz
+	if not stil.ziegel:
+		for x0 in [0.0,w]:
+			var y=0.7;var k=0
+			while y<H-0.4:
+				var lw=0.55 if k%2==0 else 0.35
+				var xx=x0+(lw*0.5 if x0==0.0 else -lw*0.5)
+				box(trim,P.call(xx,y+0.15,0.04),Vector3(lw,0.28,0.1),b,0.025);y+=0.32;k+=1
+	# Gesimsbänder je Stockwerk
+	for i in range(1,stock):
+		var y=eg+(i-1)*oh
+		box(trim,P.call(w*0.5,y-0.08,0.07),Vector3(w,0.16,0.16),b,0.03)
+	# Hauptgesims mit Konsolen + Attika
+	box(trim,P.call(w*0.5,H-0.2,0.22),Vector3(w+0.3,0.4,0.5),b,0.04)
+	var kx=0.4
+	while kx<w-0.2:
+		box(trim,P.call(kx,H-0.55,0.12),Vector3(0.18,0.3,0.26),b,0.02);kx+=0.9
+	box(stil.wand,P.call(w*0.5,H+0.35,-0.15),Vector3(w,0.7,0.3),b,0.035)
+	box(M.stein_d,P.call(w*0.5,H+0.74,-0.15),Vector3(w+0.1,0.1,0.42),b,0.03)
+	# Obergeschosse: Fenster
+	var n=max(1,int((w-0.8)/2.35))
+	var fw=1.1;var fhoch=1.65
+	for i in range(1,stock):
+		var y0=eg+(i-1)*oh+0.85
+		for k in n:
+			var x=(k+0.5)*w/n
+			_fenster(P,b,x,y0,fw,fhoch,stil,i)
+			if stil.balkon and i>=2 and k%2==0 and rng.randf()<0.6:_balkon(P,b,x,y0,stil)
+	# Feuertreppe (Ziegelbauten, vorne)
+	if stil.feuer and vorne and stock>=3:_feuertreppe(P,b,w,eg,oh,stock)
+	# Erdgeschoss
+	if laden:_laden(P,b,w,eg,stil)
+	else:_eingang(P,b,w,eg,stil)
+
+func _fenster(P:Callable,b:Basis,x:float,y0:float,fw:float,fh:float,stil:Dictionary,i:int):
+	var glas:Material=M.glas[rng.randi()%M.glas.size()] if rng.randf()<0.35 else stil.glas
+	var t=0.09
+	# Laibung (dunkler Rücksprung) + Glas leicht zurück
+	box(M.dunkel,P.call(x,y0+fh*0.5,0.005),Vector3(fw+0.08,fh+0.08,0.03),b,0.0)
+	box(glas,P.call(x,y0+fh*0.5,0.02),Vector3(fw-0.05,fh-0.05,0.03),b,0.0)
+	var rahmen:Material=M.weiss if stil.fenster!=1 else stil.tuer
+	box(rahmen,P.call(x-fw*0.5,y0+fh*0.5,0.07),Vector3(t,fh+t,0.12),b,0.02)
+	box(rahmen,P.call(x+fw*0.5,y0+fh*0.5,0.07),Vector3(t,fh+t,0.12),b,0.02)
+	box(rahmen,P.call(x,y0+fh,0.07),Vector3(fw+t,t,0.12),b,0.02)
+	box(rahmen,P.call(x,y0,0.07),Vector3(fw+t,t,0.12),b,0.02)
+	box(rahmen,P.call(x,y0+fh*0.5,0.06),Vector3(0.06,fh,0.06),b,0.0)
+	box(rahmen,P.call(x,y0+fh*0.62,0.06),Vector3(fw,0.06,0.06),b,0.0)
+	# Vorhang innen (halb zugezogen)
+	if rng.randf()<0.4:
+		var vc=[M.weiss,M.blume[0],M.gelb][rng.randi()%3]
+		box(vc,P.call(x-fw*0.25,y0+fh*0.55,0.03),Vector3(fw*0.42,fh*0.8,0.01),b,0.0)
+	# Fensterbank
+	box(M.stein,P.call(x,y0-0.07,0.13),Vector3(fw+0.35,0.12,0.26),b,0.025)
+	# Sturz: Ziegel = Rollschicht aus einzelnen 3D-Ziegeln, Putz = Verdachung
+	if stil.ziegel:
+		var nz=9;var bz=(fw+0.4)/nz
+		for k in nz:
+			var xx=x-(fw+0.4)*0.5+(k+0.5)*bz
+			box(M.ziegel[(k+i)%2] if k%3!=1 else M.stein,P.call(xx,y0+fh+0.2,0.035),Vector3(bz-0.025,0.32,0.08),b,0.0)
+		box(M.dunkel,P.call(x,y0+fh+0.03,0.03),Vector3(fw+0.4,0.025,0.05),b,0.0)
+	else:
+		box(stil.trim,P.call(x,y0+fh+0.18,0.1),Vector3(fw+0.45,0.14,0.22),b,0.025)
+		if i%2==1:
+			box(stil.trim,P.call(x,y0+fh+0.32,0.1),Vector3(fw*0.7,0.12,0.18),b,0.02)
+		if stil.laeden:
+			var lc:Material=stil.tuer
+			for sd in [-1,1]:
+				box(lc,P.call(x+sd*(fw*0.5+0.32),y0+fh*0.5,0.06),Vector3(0.52,fh+0.05,0.06),b,0.02)
+				for q in 6:box(M.dunkel,P.call(x+sd*(fw*0.5+0.32),y0+0.15+q*0.27,0.095),Vector3(0.44,0.02,0.01),b,0.0)
+	# Klimagerät / Blumenkasten
+	var z=rng.randf()
+	if z<0.12:
+		box(M.weiss,P.call(x+0.2,y0-0.45,0.3),Vector3(0.7,0.45,0.5),b,0.03)
+		for q in 4:box(M.stein_d,P.call(x+0.2,y0-0.6+q*0.1,0.56),Vector3(0.6,0.03,0.01),b,0.0)
+	elif z<0.3:
+		box(M.holz,P.call(x,y0+0.05,0.32),Vector3(fw,0.22,0.24),b,0.025)
+		for q in 6:kugel(M.blume[rng.randi()%3] if q%2==0 else M.laub[0],P.call(x-fw*0.4+q*fw*0.16,y0+0.22,0.32),Vector3(0.11,0.1,0.11),1.0)
+
+func _balkon(P:Callable,b:Basis,x:float,y0:float,stil:Dictionary):
+	box(M.stein,P.call(x,y0-0.05,0.55),Vector3(1.9,0.15,1.1),b,0.03)
+	box(M.metall,P.call(x,y0+0.85,1.08),Vector3(1.9,0.06,0.06),b,0.0)
+	for sd in [-1,1]:box(M.metall,P.call(x+sd*0.93,y0+0.85,0.55),Vector3(0.06,0.06,1.1),b,0.0)
+	var q=-0.9
+	while q<=0.91:
+		box(M.metall,P.call(x+q,y0+0.45,1.08),Vector3(0.035,0.8,0.035),b,0.0);q+=0.15
+	if rng.randf()<0.5:
+		for k in 3:kugel(M.laub[k%3],P.call(x-0.6+k*0.6,y0+0.3,0.9),Vector3(0.22,0.25,0.22),1.05)
+
+func _feuertreppe(P:Callable,b:Basis,w:float,eg:float,oh:float,stock:int):
+	var x0=w*0.25;var bw=w*0.45
+	for i in range(1,stock):
+		var y=eg+(i-1)*oh+0.75
+		box(M.metall,P.call(x0+bw*0.5,y,0.65),Vector3(bw,0.07,1.25),b,0.02)
+		box(M.metall,P.call(x0+bw*0.5,y+0.95,1.28),Vector3(bw,0.05,0.05),b,0.0)
+		box(M.metall,P.call(x0+bw*0.5,y+0.5,1.28),Vector3(bw,0.04,0.04),b,0.0)
+		var q=0.0
+		while q<=bw:
+			box(M.metall,P.call(x0+q,y+0.48,1.28),Vector3(0.035,0.95,0.035),b,0.0);q+=0.25
+		for sd in [0.0,bw]:box(M.metall,P.call(x0+sd,y+0.95,0.65),Vector3(0.05,0.05,1.25),b,0.0)
+		# schräge Leiter zum nächsten Podest
+		if i<stock-1:
+			var lb=Basis(b.x,b.y,b.z)*Basis(Vector3.FORWARD,0.0)
+			var a=P.call(x0+0.4,y+0.05,0.75);var e=P.call(x0+bw-0.4,y+oh,0.75)
+			var d=e-a
+			var lr=Basis(d.normalized(),b.z.cross(d.normalized()).normalized()*-1.0,b.z)
+			box(M.metall,(a+e)*0.5,Vector3(d.length(),0.05,0.6),Basis(d.normalized(),b.z.cross(d.normalized()).normalized(),b.z) if false else _rich(d,b.z),0.0)
+	# Hängeleiter unten
+	box(M.metall,P.call(x0+bw-0.3,eg-0.4,1.2),Vector3(0.5,1.6,0.05),b,0.0)
+
+func _rich(d:Vector3,z:Vector3)->Basis:
+	var x=d.normalized();var y=z.cross(x).normalized();var zz=x.cross(y).normalized()
+	return Basis(x,y,zz)
+
+func _laden(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary):
+	var mk=M.markise[rng.randi()%M.markise.size()]
+	var schild:Material=mk[0]
+	# Pfeiler + große Schaufenster
+	var n=max(1,int(w/3.2))
+	box(M.dunkel,P.call(w*0.5,1.65,0.0),Vector3(w-0.4,2.5,0.04),b,0.0)
+	for k in n+1:
+		var x=0.2+k*(w-0.4)/n
+		box(stil.trim if not stil.ziegel else M.stein,P.call(x,1.6,0.1),Vector3(0.35,2.6,0.22),b,0.03)
+	for k in n:
+		var x=0.2+(k+0.5)*(w-0.4)/n;var bw=(w-0.4)/n-0.4
+		if k==n/2 and w>6.0:
+			box(stil.tuer,P.call(x,1.25,0.03),Vector3(1.2,2.3,0.06),b,0.02)
+			box(M.glas[2],P.call(x,1.6,0.07),Vector3(0.8,1.2,0.03),b,0.0)
+			box(M.chrom,P.call(x+0.4,1.2,0.12),Vector3(0.05,0.4,0.05),b,0.0)
+			box(M.stein,P.call(x,0.07,0.35),Vector3(1.5,0.14,0.7),b,0.02)
+		else:
+			box(M.glas[2] if rng.randf()<0.5 else M.glas[0],P.call(x,1.65,0.04),Vector3(bw,2.0,0.04),b,0.0)
+			box(M.weiss,P.call(x,0.62,0.12),Vector3(bw+0.1,0.08,0.22),b,0.02)
+			# Auslage: bunte Kisten/Regale hinter dem Glas
+			for q in 4:box([M.blume[0],M.gelb,M.blume[2],M.laub[1]][q],P.call(x-bw*0.35+q*bw*0.23,0.85,-0.15),Vector3(bw*0.18,0.35,0.2),b,0.0)
+	# Schildband mit Schrift
+	box(schild,P.call(w*0.5,3.15,0.18),Vector3(w-0.2,0.7,0.12),b,0.035)
+	box(M.weiss,P.call(w*0.5,3.15,0.25),Vector3(w-0.5,0.5,0.02),b,0.0)
+	var lb=Label3D.new();lb.text=_laeden[rng.randi()%_laeden.size()];lb.font_size=96;lb.pixel_size=0.0045
+	lb.modulate=Color(0.12,0.1,0.12);lb.outline_size=0;lb.shaded=false;lb.double_sided=false
+	lb.transform=Transform3D(b,P.call(w*0.5,3.15,0.27));welt.add_child(lb)
+	# Markise: gestreift, schräg (an den Hausenden etwas eingerückt, damit sich Markisen an der Ecke nicht schneiden)
+	var tief=1.6;var y0=2.85;var m0=0.6;var mw=w-1.2
+	var streifen=int(mw/0.55)
+	var tb=b*Basis(Vector3.RIGHT,deg_to_rad(28))
+	for k in streifen:
+		var x=m0+(k+0.5)*mw/streifen
+		box(mk[k%2],P.call(x,y0-tief*0.25,tief*0.5+0.1),Vector3(mw/streifen+0.003,0.05,tief),tb,0.0)
+		box(mk[k%2],P.call(x,y0-tief*0.48-0.18,tief*0.93+0.1),Vector3(mw/streifen,0.3,0.04),b,0.0)
+	_st(ink).append_from(BOX,0,Transform3D(tb*Basis().scaled(Vector3(mw+0.07,0.12,tief+0.07)),P.call(w*0.5,y0-tief*0.25,tief*0.5+0.1)))
+	for sd in [0.0,1.0]:box(mk[0],P.call(m0+sd*mw,y0-tief*0.3,tief*0.5+0.1),Vector3(0.04,0.6,tief),b,0.0)
+
+func _eingang(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary):
+	var x=w*0.5 if w<9.0 else w*0.3
+	# Haustür mit Oberlicht, Rahmen, Stufen, Lampe, Klingelschild
+	box(M.dunkel,P.call(x,1.55,0.0),Vector3(1.5,3.0,0.04),b,0.0)
+	box(stil.tuer,P.call(x,1.3,0.04),Vector3(1.25,2.4,0.06),b,0.02)
+	for q in 2:box(stil.tuer,P.call(x,0.75+q*1.05,0.08),Vector3(0.95,0.85,0.03),b,0.0)
+	box(M.glas[2],P.call(x,2.8,0.04),Vector3(1.25,0.5,0.03),b,0.0)
+	box(stil.trim,P.call(x,1.55,0.1),Vector3(1.75,3.2,0.08),b,0.03) if false else null
+	for sd in [-1,1]:box(stil.trim,P.call(x+sd*0.75,1.55,0.1),Vector3(0.18,3.1,0.16),b,0.025)
+	box(stil.trim,P.call(x,3.15,0.15),Vector3(1.9,0.22,0.3),b,0.03)
+	box(M.chrom,P.call(x+0.45,1.2,0.12),Vector3(0.05,0.3,0.05),b,0.0)
+	box(M.stein,P.call(x,0.08,0.45),Vector3(1.8,0.16,0.9),b,0.025)
+	box(M.stein,P.call(x,0.24,0.25),Vector3(1.6,0.16,0.5),b,0.025)
+	box(M.metall,P.call(x+1.0,2.2,0.12),Vector3(0.12,0.3,0.12),b,0.02)
+	kugel(M.lampe,P.call(x+1.0,2.45,0.2),Vector3(0.12,0.14,0.12),1.08)
+	box(M.chrom,P.call(x-1.0,1.3,0.06),Vector3(0.22,0.45,0.04),b,0.0)
+	# EG-Fenster neben der Tür (mit Gitter)
+	var xs=[]
+	if w<9.0:xs=[w*0.15,w*0.85]
+	else:xs=[w*0.62,w*0.85]
+	for xx in xs:
+		if abs(xx-x)<1.4:continue
+		_fenster(P,b,xx,1.0,1.0,1.55,stil,0)
+		var q=-0.4
+		while q<=0.41:box(M.metall,P.call(xx+q,1.78,0.2),Vector3(0.035,1.6,0.035),b,0.0);q+=0.2
+
+# ---------------- Straßenmöbel ----------------
+func _moebel():
+	var vorn=RW+SW
+	# Ampeln an den vier Ecken
+	for sx in [-1,1]:
+		for sz in [-1,1]:
+			_ampel(Vector3(sx*(RW+0.7),KB,sz*(RW+0.7)),Vector3(0,0,-sz) if sx*sz>0 else Vector3(-sx,0,0),(sx*sz>0))
+	# Laternen, Bäume, Bänke, Mülleimer, Hydranten entlang der Gehwege
+	for arm in [Vector3(1,0,0),Vector3(-1,0,0),Vector3(0,0,1),Vector3(0,0,-1)]:
+		var quer=Vector3(-arm.z,0,arm.x)
+		for sd in [-1,1]:
+			var kante=quer*sd*(RW+0.7)
+			var s=vorn+4.0;var k=0
+			while s<ENDE-4.0:
+				var p=arm*s+kante+Vector3(0,KB,0)
+				if k%2==0:_laterne(p,-quer*sd)
+				else:_baum(p+quer*sd*0.6)
+				if k%3==1:_bank(arm*(s+3.0)+quer*sd*(RW+SW-0.8)+Vector3(0,KB,0),-quer*sd)
+				if k%4==2:_muell(arm*(s-2.5)+quer*sd*(RW+1.0)+Vector3(0,KB,0))
+				if k%5==3:_hydrant(arm*(s+2.0)+quer*sd*(RW+0.6)+Vector3(0,KB,0))
+				s+=9.0;k+=1
+	# Briefkasten + Litfaßsäule an der Ecke
+	_litfass(Vector3(RW+2.4,KB,-(RW+2.6)))
+	box(M.gelb,Vector3(-(RW+1.0),KB+0.55,RW+2.2),Vector3(0.5,0.8,0.4),Basis(),0.03)
+	box(M.dunkel,Vector3(-(RW+1.0),KB+0.75,RW+2.42),Vector3(0.3,0.04,0.02),Basis(),0.0)
+	zyl(M.dunkel,Vector3(-(RW+1.0),KB,RW+2.2),Vector3(-(RW+1.0),KB+0.15,RW+2.2),0.08)
+
+func _ampel(p:Vector3,blick:Vector3,gruen:bool):
+	zyl(M.metall,p,p+Vector3(0,3.4,0),0.07,1.3)
+	var b=Basis(Vector3.UP,atan2(blick.x,blick.z))
+	var k=p+Vector3(0,2.9,0)+blick*0.18
+	box(M.dunkel,k,Vector3(0.38,1.05,0.3),b,0.035)
+	box(M.gelb,k+blick*0.02,Vector3(0.48,1.15,0.24),b,0.0)
+	for i in 3:
+		var c=[M.rot_l if not gruen else M.dunkel,M.dunkel,M.gruen_l if gruen else M.dunkel][i]
+		var lp=k+Vector3(0,0.32-i*0.32,0)+blick*0.16
+		mesh(c,CYL,Transform3D(b*Basis(Vector3.RIGHT,PI*0.5)*Basis().scaled(Vector3(0.22,0.02,0.22)),lp),1.0)
+		box(M.dunkel,lp+Vector3(0,0.11,0)+blick*0.06,Vector3(0.26,0.03,0.14),b,0.0)
+	box(M.gelb,p+Vector3(0,1.1,0)-blick*0.1,Vector3(0.14,0.22,0.12),b,0.02)
+
+func _laterne(p:Vector3,zur_strasse:Vector3):
+	zyl(M.metall,p,p+Vector3(0,0.5,0),0.14,1.2)
+	zyl(M.metall,p,p+Vector3(0,5.2,0),0.07,1.3)
+	var a=p+Vector3(0,5.0,0)
+	var e=a+zur_strasse*1.3+Vector3(0,0.25,0)
+	zyl(M.metall,a,e,0.05,1.3)
+	var b=Basis(Vector3.UP,atan2(zur_strasse.x,zur_strasse.z))
+	box(M.metall,e+Vector3(0,-0.05,0),Vector3(0.45,0.18,0.7),b,0.03)
+	box(M.lampe,e+Vector3(0,-0.17,0),Vector3(0.35,0.06,0.55),b,0.0)
+
+func _baum(p:Vector3):
+	# runder Erdfleck mit Steinring
+	zyl(M.erde,p+Vector3(0,0.0,0),p+Vector3(0,0.03,0),0.9)
+	for k in 12:
+		var a=TAU*k/12.0
+		box(M.stein,p+Vector3(cos(a)*0.98,0.06,sin(a)*0.98),Vector3(0.18,0.12,0.5),Basis(Vector3.UP,-a),0.015)
+	var h=rng.randf_range(3.2,4.2)
+	zyl(M.rinde,p,p+Vector3(0.1,h,0.05),0.17,1.25)
+	zyl(M.rinde,p+Vector3(0,h*0.65,0),p+Vector3(0.9,h+0.6,0.3),0.08,1.3)
+	zyl(M.rinde,p+Vector3(0,h*0.7,0),p+Vector3(-0.7,h+0.7,-0.5),0.08,1.3)
+	var lm:Material=M.laub[rng.randi()%M.laub.size()]
+	var c=p+Vector3(0.1,h+1.3,0.05)
+	kugel(lm,c,Vector3(1.9,1.6,1.9),1.06)
+	for k in 6:
+		var a=TAU*k/6.0+rng.randf()
+		kugel(M.laub[(k+1)%3] if k%2==0 else lm,c+Vector3(cos(a)*1.4,rng.randf_range(-0.6,0.7),sin(a)*1.4),Vector3(1.0,0.85,1.0)*rng.randf_range(0.8,1.15),1.07)
+	kugel(lm,c+Vector3(0,1.2,0),Vector3(1.2,1.0,1.2),1.07)
+
+func _bank(p:Vector3,blick:Vector3):
+	var b=Basis(Vector3.UP,atan2(blick.x,blick.z))
+	for sd in [-0.8,0.8]:
+		box(M.metall,p+b*Vector3(sd,0.22,0),Vector3(0.08,0.44,0.5),b,0.02)
+		box(M.metall,p+b*Vector3(sd,0.65,-0.22),Vector3(0.08,0.5,0.06),b,0.0)
+	for q in 3:box(M.holz,p+b*Vector3(0,0.46,-0.18+q*0.16),Vector3(1.9,0.05,0.13),b,0.02)
+	for q in 2:box(M.holz,p+b*Vector3(0,0.68+q*0.17,-0.27),Vector3(1.9,0.13,0.05),b,0.02)
+
+func _muell(p:Vector3):
+	zyl(M.laub[2],p,p+Vector3(0,0.85,0),0.27,1.15)
+	zyl(M.dunkel,p+Vector3(0,0.85,0),p+Vector3(0,0.92,0),0.3,1.1)
+
+func _hydrant(p:Vector3):
+	zyl(M.rot,p,p+Vector3(0,0.65,0),0.13,1.2)
+	kugel(M.rot,p+Vector3(0,0.68,0),Vector3(0.14,0.12,0.14),1.1)
+	for sd in [-1,1]:zyl(M.rot,p+Vector3(0,0.45,0),p+Vector3(sd*0.24,0.45,0),0.06,1.2)
+
+func _litfass(p:Vector3):
+	zyl(M.weiss,p,p+Vector3(0,2.8,0),0.6,1.08)
+	for k in 5:
+		var a=TAU*k/5.0
+		box([M.rot,M.gelb,M.markise[2][0],M.blume[2],M.laub[1]][k],p+Vector3(cos(a)*0.6,1.6,sin(a)*0.6),Vector3(0.62,1.5,0.05),Basis(Vector3.UP,-a+PI*0.5),0.0)
+	zyl(M.laub[2],p+Vector3(0,2.8,0),p+Vector3(0,3.0,0),0.72,1.08)
+	mesh(M.laub[2],ConeHelper.kegel(0.6,0.5),Transform3D(Basis(),p+Vector3(0,3.25,0)),1.06)
+
+# ---------------- Autos ----------------
+func _autos():
+	_auto("trabant",Vector3(RW-1.4,0,-20.0),PI,Color(0.36,0.62,0.72))
+	_auto("trabant",Vector3(-(RW-1.4),0,24.0),0.0,Color(0.85,0.7,0.42))
+	_auto("wartburg",Vector3(18.0,0,RW-1.4),PI*0.5,Color(0.82,0.32,0.24))
+	_auto("sport",Vector3(-2.6,0,-1.5),PI*0.5+0.12,Color(0.98,0.75,0.12))
+	_auto("trabant",Vector3(-30.0,0,-(RW-1.4)),-PI*0.5,Color(0.5,0.7,0.4))
+	_auto("wartburg",Vector3(2.4,0,34.0),PI,Color(0.3,0.45,0.7))
+
+func _auto(typ:String,pos:Vector3,yaw:float,farbe:Color):
+	var lack=_toon(farbe,0.55);lack.metallic_specular=0.35
+	var B=Basis(Vector3.UP,yaw)
+	var T=func(v:Vector3)->Vector3:return pos+B*v
+	var L;var W;var r;var unten;var gurt;var dach;var hauben;var kab
+	match typ:
+		"trabant":L=3.55;W=1.5;r=0.29;unten=0.32;gurt=0.86;dach=1.42;kab=[-1.35,0.55,-1.05,0.12];hauben=[0.78,0.84]
+		"wartburg":L=4.22;W=1.64;r=0.32;unten=0.34;gurt=0.9;dach=1.46;kab=[-1.15,0.75,-0.9,0.35];hauben=[0.86,0.88]
+		_:L=4.4;W=1.92;r=0.34;unten=0.26;gurt=0.72;dach=1.15;kab=[-1.1,0.75,-0.65,0.1];hauben=[0.55,0.7]
+	var hl=L*0.5;var hw=W*0.5
+	# Unterteil (Front Haube niedriger)
+	hex(lack,[T.call(Vector3(-hw,unten,-hl)),T.call(Vector3(hw,unten,-hl)),T.call(Vector3(hw,unten,hl)),T.call(Vector3(-hw,unten,hl)),
+		T.call(Vector3(-hw+0.04,hauben[1],-hl+0.06)),T.call(Vector3(hw-0.04,hauben[1],-hl+0.06)),T.call(Vector3(hw-0.04,hauben[0],hl-0.12)),T.call(Vector3(-hw+0.04,hauben[0],hl-0.12))],0.03)
+	# Kabine: Glas, Dachplatte in Lack, Säulen
+	var glas=_shader(GLAS,{"farbe":Color(0.18,0.32,0.42)})
+	var kb0=max(hauben[0],hauben[1])-0.02
+	hex(glas,[T.call(Vector3(-hw+0.06,kb0,kab[0])),T.call(Vector3(hw-0.06,kb0,kab[0])),T.call(Vector3(hw-0.06,kb0,kab[1])),T.call(Vector3(-hw+0.06,kb0,kab[1])),
+		T.call(Vector3(-hw+0.16,dach-0.06,kab[2])),T.call(Vector3(hw-0.16,dach-0.06,kab[2])),T.call(Vector3(hw-0.16,dach-0.06,kab[3])),T.call(Vector3(-hw+0.16,dach-0.06,kab[3]))],0.03)
+	hex(lack,[T.call(Vector3(-hw+0.14,dach-0.07,kab[2]-0.04)),T.call(Vector3(hw-0.14,dach-0.07,kab[2]-0.04)),T.call(Vector3(hw-0.14,dach-0.07,kab[3]+0.04)),T.call(Vector3(-hw+0.14,dach-0.07,kab[3]+0.04)),
+		T.call(Vector3(-hw+0.18,dach,kab[2]+0.02)),T.call(Vector3(hw-0.18,dach,kab[2]+0.02)),T.call(Vector3(hw-0.18,dach,kab[3]-0.02)),T.call(Vector3(-hw+0.18,dach,kab[3]-0.02))],0.0)
+	# B-Säule
+	var bm=(kab[0]+kab[1])*0.5;var bo=(kab[2]+kab[3])*0.5
+	for sd in [-1,1]:
+		var a=T.call(Vector3(sd*(hw-0.08),kb0,bm));var e=T.call(Vector3(sd*(hw-0.17),dach-0.05,bo))
+		box(lack,(a+e)*0.5,Vector3(0.05,(e-a).length(),0.12),B*Basis(Vector3.RIGHT,atan2(bo-bm,dach-kb0))*Basis(),0.0)
+	# Räder mit Radkappe
+	for sx in [-1,1]:
+		for sz in [-1,1]:
+			var c=T.call(Vector3(sx*(hw-0.12),r,sz*(hl-L*0.2)))
+			var ax=B*Vector3(1,0,0)
+			zyl(M.reifen,c-ax*0.11,c+ax*0.11,r,1.08)
+			zyl(M.chrom,c+ax*sx*0.11,c+ax*sx*0.125,r*0.55,1.0)
+			# Radkasten dunkel
+			box(M.dunkel,T.call(Vector3(sx*(hw-0.01),r+0.12,sz*(hl-L*0.2))),Vector3(0.03,0.32,r*2.3),B,0.0)
+	# Stoßstangen, Lichter, Grill
+	for sz in [-1,1]:
+		box(M.chrom if typ!="sport" else M.dunkel,T.call(Vector3(0,unten+0.08,sz*(hl+0.04))),Vector3(W-0.05,0.14,0.12),B,0.025)
+	box(M.dunkel,T.call(Vector3(0,unten+0.32,hl+0.005)),Vector3(W*0.45,0.18 if typ!="sport" else 0.1,0.03),B,0.0)
+	for sd in [-1,1]:
+		var hp=T.call(Vector3(sd*(hw-0.27),unten+0.3 if typ!="sport" else unten+0.35,hl+0.01))
+		if typ=="trabant":mesh(M.lampe,CYL,Transform3D(B*Basis(Vector3.RIGHT,PI*0.5)*Basis().scaled(Vector3(0.24,0.02,0.24)),hp),1.15)
+		else:box(M.lampe,hp,Vector3(0.36,0.14,0.04),B,0.02)
+		box(M.rot_l,T.call(Vector3(sd*(hw-0.2),unten+0.33,-hl-0.01)),Vector3(0.26,0.14,0.04),B,0.02)
+	# Türgriffe, Spiegel, Kennzeichen
+	for sd in [-1,1]:
+		box(M.chrom,T.call(Vector3(sd*(hw+0.005),gurt-0.12,bm+0.25)),Vector3(0.02,0.04,0.16),B,0.0)
+		box(lack,T.call(Vector3(sd*(hw+0.08),kb0+0.12,kab[1]-0.05)),Vector3(0.12,0.08,0.05),B,0.015)
+	box(M.weiss,T.call(Vector3(0,unten+0.12,hl+0.11)),Vector3(0.5,0.12,0.01),B,0.0)
+	box(M.weiss,T.call(Vector3(0,unten+0.12,-hl-0.11)),Vector3(0.5,0.12,0.01),B,0.0)
+	if typ=="sport":
+		# Heckflügel + Seitenschweller
+		box(M.dunkel,T.call(Vector3(0,hauben[1]+0.22,-hl+0.2)),Vector3(W-0.2,0.05,0.35),B,0.02)
+		for sd in [-1,1]:box(M.dunkel,T.call(Vector3(sd*(hw-0.4),hauben[1]+0.1,-hl+0.2)),Vector3(0.05,0.2,0.2),B,0.0)
+	# Schattenfleck unter dem Auto (weicher Kontakt)
+	box(M.dunkel,T.call(Vector3(0,0.006,0)),Vector3(W*0.95,0.005,L*0.9),B,0.0)
+
+# ---------------- Figuren ----------------
+func _figur(pos:Vector3,yaw:float,o:Dictionary):
+	var B=Basis(Vector3.UP,yaw)
+	var T=func(v:Vector3)->Vector3:return pos+B*v
+	var haut=_toon(o.haut);var shirt=_toon(o.shirt);var hose=_toon(o.hose);var haar=_toon(o.haar,0.6)
+	var schuh=_toon(Color(0.95,0.95,0.95) if not o.get("frau",false) else Color(0.6,0.2,0.25))
+	var geh=o.pose=="geh"
+	var sw=0.28 if geh else 0.0
+	# Beine (Knie leicht gebeugt beim Gehen)
+	for sd in [-1,1]:
+		var ph=sd*sw
+		var huefte=T.call(Vector3(sd*0.1,0.95,0))
+		var knie=T.call(Vector3(sd*0.105,0.52,ph*0.55+0.03))
+		var fuss=T.call(Vector3(sd*0.11,0.1,ph*0.9-(0.06 if ph<0 else 0.0)))
+		kapsel(hose,huefte,knie,0.085)
+		kapsel(hose,knie,fuss+Vector3(0,0.05,0),0.07)
+		hex(schuh,[T.call(Vector3(sd*0.11-0.065,0.0,ph*0.9-0.1)),T.call(Vector3(sd*0.11+0.065,0.0,ph*0.9-0.1)),T.call(Vector3(sd*0.11+0.065,0.0,ph*0.9+0.2)),T.call(Vector3(sd*0.11-0.065,0.0,ph*0.9+0.2)),
+			T.call(Vector3(sd*0.11-0.06,0.13,ph*0.9-0.09)),T.call(Vector3(sd*0.11+0.06,0.13,ph*0.9-0.09)),T.call(Vector3(sd*0.11+0.055,0.08,ph*0.9+0.17)),T.call(Vector3(sd*0.11-0.055,0.08,ph*0.9+0.17))],0.02)
+	# Becken + Torso aus runden Formen (Comic: breite Brust, schmale Taille)
+	var bb=0.2 if o.get("frau",false) else 0.24
+	kugel(hose,T.call(Vector3(0,0.95,0)),Vector3(0.19,0.13,0.12),1.06)
+	kugel(shirt,T.call(Vector3(0,1.1,0.0)),Vector3(0.175,0.17,0.115),1.06)
+	kugel(shirt,T.call(Vector3(0,1.32,0.01)),Vector3(bb,0.17,0.135),1.06)
+	for sd in [-1,1]:kugel(shirt,T.call(Vector3(sd*(bb-0.04),1.4,0.0)),Vector3(0.085,0.075,0.085),1.05)
+	box(_toon(Color(0.25,0.18,0.12)),T.call(Vector3(0,0.995,0)),Vector3(0.36,0.05,0.235),B,0.0)
+	# Hals, Kopf
+	kapsel(haut,T.call(Vector3(0,1.44,0)),T.call(Vector3(0,1.58,0.01)),0.05)
+	var kc=T.call(Vector3(0,1.7,0.02))
+	kugel(haut,kc,Vector3(0.125,0.145,0.135),1.06)
+	kugel(haut,T.call(Vector3(0,1.63,0.06)),Vector3(0.1,0.08,0.1),1.0)   # Kinn/Kiefer
+	for sd in [-1,1]:
+		kugel(haut,T.call(Vector3(sd*0.125,1.69,0.0)),Vector3(0.025,0.04,0.025),1.0)
+		kugel(M.weiss,T.call(Vector3(sd*0.05,1.725,0.138)),Vector3(0.034,0.038,0.018),1.0)
+		kugel(M.dunkel,T.call(Vector3(sd*0.048,1.722,0.152)),Vector3(0.018,0.022,0.008),1.0)
+		box(haar,T.call(Vector3(sd*0.052,1.775,0.148)),Vector3(0.065,0.016,0.02),B*Basis(Vector3.FORWARD,sd*0.15),0.0)
+	kugel(haut,T.call(Vector3(0,1.69,0.16)),Vector3(0.024,0.034,0.028),1.0)
+	box(_toon(Color(0.55,0.25,0.22)),T.call(Vector3(0,1.64,0.148)),Vector3(0.055,0.014,0.012),B,0.0)
+	# Haare
+	if o.get("frau",false):
+		kugel(haar,kc+B*Vector3(0,0.04,-0.025),Vector3(0.14,0.13,0.15),1.05)
+		kapsel(haar,T.call(Vector3(0,1.72,-0.1)),T.call(Vector3(0,1.4,-0.13)),0.09)
+	else:
+		kugel(haar,kc+B*Vector3(0,0.06,-0.02),Vector3(0.132,0.1,0.14),1.05)
+		box(haar,T.call(Vector3(0,1.79,0.1)),Vector3(0.2,0.05,0.06),B*Basis(Vector3.RIGHT,-0.4),0.0)
+	# Arme mit Ellbogen: Oberarm (Ärmel), Unterarm, Hand
+	for sd in [-1,1]:
+		var sch=T.call(Vector3(sd*(bb-0.02),1.4,0.0))
+		var schwung=-sd*sw*0.9
+		var ell=T.call(Vector3(sd*(bb+0.02),1.13,schwung*0.35-0.04))
+		var hand=T.call(Vector3(sd*(bb-0.01),0.9,schwung*0.7+0.1))
+		kapsel(shirt,sch,sch.lerp(ell,0.55),0.072)
+		kapsel(haut,sch.lerp(ell,0.45),ell,0.058)
+		kapsel(haut,ell,hand,0.05)
+		kugel(haut,hand+B*Vector3(0,-0.035,0.01),Vector3(0.045,0.06,0.04),1.08)
+
+
+# ---------------- Bilder ----------------
+func _bilder():
+	var vp=root.get_viewport()
+	vp.msaa_3d=Viewport.MSAA_4X
+	var cam=Camera3D.new();cam.fov=58;cam.far=600;welt.add_child(cam);cam.current=true
+	var views=[
+		["01_strasse_figur",Vector3(4.6,2.3,-17.5),Vector3(1.0,1.6,-2.0),58],
+		["02_kreuzung",Vector3(-2.5,3.2,-26.0),Vector3(4.0,3.0,6.0),62],
+		["03_eckhaus",Vector3(-3.0,1.8,-4.0),Vector3(-14.0,6.0,-14.0),60],
+		["04_fassade_nah",Vector3(-16.0,4.8,0.5),Vector3(-25.0,6.0,-9.5),50],
+		["05_trabant",Vector3(0.8,1.6,-16.0),Vector3(RW-1.4,0.7,-20.0),50],
+		["06_figur_nah",Vector3(3.7,1.6,-9.0),Vector3(3.2,1.05,-12.0),38],
+		["07_luft",Vector3(42.0,45.0,42.0),Vector3(0,0,0),50],
+		["08_strassenzug",Vector3(-6.5,1.7,-45.0),Vector3(-4.0,5.0,0.0),60],
+	]
+	for v in views:
+		cam.fov=v[3];cam.position=v[1];cam.look_at(v[2])
+		for k in 8:await process_frame
+		vp.get_texture().get_image().save_png(OUT+v[0]+".png")
+		print("BILD ",v[0])
