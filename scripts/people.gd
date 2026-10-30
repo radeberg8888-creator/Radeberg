@@ -57,6 +57,7 @@ static func library(base:String,ch:Node3D,sk:Skeleton3D)->AnimationLibrary:
 		var a=U.retarget_world(ap.get_animation(nm),s[1],s[0],sk,ch)
 		a.loop_mode=Animation.LOOP_LINEAR
 		if k in ["run","walk"]:_fuesse_planen(a,sk,ch)
+		if k=="run":_arme_laufen(a,sk,ch,38.0,95.0)
 		lib.add_animation(k,a)
 	_lib_cache[base]=lib
 	return lib
@@ -218,3 +219,73 @@ static func _fuesse_planen(a:Animation,sk:Skeleton3D,ch:Node3D):
 		var lokal=d
 		if hp>=0:lokal=g[hp].basis.inverse()*d
 		a.position_track_insert_key(pt,zeit,sk.get_bone_rest(hips).origin-lokal)
+
+
+# Arme beim Rennen neu setzen: Oberarm hängt nah am Körper und schwingt gegengleich zu den Beinen,
+# Ellbogen etwa rechtwinklig angewinkelt (die übertragene Bewegung hielt beide Arme starr vor die Brust).
+static func _arme_laufen(a:Animation,sk:Skeleton3D,ch:Node3D,amp:float,ellbogen:float):
+	var idx={}
+	for i in sk.get_bone_count():
+		var k=U.human_key(sk.get_bone_name(i))
+		if not idx.has(k):idx[k]=i
+	for k in ["LeftArm","RightArm","LeftForeArm","RightForeArm","LeftHand","RightHand","LeftFoot","RightFoot"]:
+		if not idx.has(k):return
+	# Richtungen im Skelettraum
+	var top:Node=sk
+	while top.get_parent()!=null:top=top.get_parent()
+	var cd:Quaternion=U._skel_rot(sk,top)
+	var unten:Vector3=(cd.inverse()*Vector3.DOWN).normalized()
+	var vorn:Vector3=(cd.inverse()*Vector3.BACK).normalized()   # Figur schaut nach +Z
+	var links:Vector3=(cd.inverse()*Vector3.RIGHT).normalized()  # +X = linke Körperseite
+	var n=sk.get_bone_count()
+	var gr=[];gr.resize(n)
+	for i in n:gr[i]=sk.get_bone_global_rest(i)
+	# Beinphase aus der Animation: Fuß links vor/zurück
+	var spur={}
+	for t in a.get_track_count():
+		if a.track_get_type(t)!=Animation.TYPE_ROTATION_3D:continue
+		var bi=sk.find_bone(str(a.track_get_path(t)).get_slice(":",1))
+		if bi>=0:spur[bi]=t
+	var fk=func(zeit:float)->Array:
+		var g=[];g.resize(n)
+		for i in n:
+			var r:Transform3D=sk.get_bone_rest(i);var q:Quaternion=r.basis.orthonormalized().get_rotation_quaternion()
+			if spur.has(i):q=a.rotation_track_interpolate(spur[i],zeit)
+			var lok=Transform3D(Basis(q),r.origin);var p=sk.get_bone_parent(i)
+			g[i]=lok if p<0 else g[p]*lok
+		return g
+	var S=0.0;var C=0.0;var N=24
+	for k in N:
+		var zt=a.length*k/N;var g=fk.call(zt)
+		var f=(g[idx.LeftFoot].origin-g[idx.RightFoot].origin).dot(vorn)
+		var w=TAU*k/N;S+=f*sin(w);C+=f*cos(w)
+	var phi=atan2(C,S)
+	var setze=func(name:String,richtung:Vector3,eltern_neu:Basis)->Basis:
+		var i=idx[name];var kind=idx[{"LeftArm":"LeftForeArm","RightArm":"RightForeArm","LeftForeArm":"LeftHand","RightForeArm":"RightHand"}[name]]
+		var d0:Vector3=(gr[kind].origin-gr[i].origin).normalized()
+		var q=Quaternion(d0,richtung.normalized())
+		return Basis(q)*gr[i].basis.orthonormalized()
+	var tracks={}
+	for name in ["LeftArm","RightArm","LeftForeArm","RightForeArm"]:
+		var bn=sk.get_bone_name(idx[name]);var tr=-1
+		for t in a.get_track_count():
+			if a.track_get_type(t)==Animation.TYPE_ROTATION_3D and str(a.track_get_path(t)).get_slice(":",1)==bn:tr=t
+		if tr<0:tr=a.add_track(Animation.TYPE_ROTATION_3D);a.track_set_path(tr,str(ch.get_path_to(sk))+":"+bn)
+		while a.track_get_key_count(tr)>0:a.track_remove_key(tr,0)
+		tracks[name]=tr
+	var schritte=int(ceil(a.length*30.0))
+	for f in schritte+1:
+		var zt=min(f/30.0,a.length);var s_=sin(TAU*zt/a.length+phi)
+		var gz=fk.call(zt)
+		for seite in [["Left",1.0],["Right",-1.0]]:
+			var th=deg_to_rad(-amp*s_*seite[1])   # linker Arm vor, wenn linker Fuß hinten
+			var aussen=links*seite[1]
+			var d_ob=unten*cos(th)+vorn*sin(th)+aussen*0.12
+			var th2=th+deg_to_rad(ellbogen)
+			var d_un=unten*cos(th2)+vorn*sin(th2)-aussen*0.25
+			var arm=seite[0]+"Arm";var fore=seite[0]+"ForeArm"
+			var g_arm=setze.call(arm,d_ob,Basis());var g_fore=setze.call(fore,d_un,Basis())
+			var par=sk.get_bone_parent(idx[arm])
+			var pg:Basis=gz[par].basis.orthonormalized() if par>=0 else Basis()
+			a.rotation_track_insert_key(tracks[arm],zt,(pg.inverse()*g_arm).get_rotation_quaternion())
+			a.rotation_track_insert_key(tracks[fore],zt,(g_arm.inverse()*g_fore).get_rotation_quaternion())

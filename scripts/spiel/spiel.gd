@@ -101,7 +101,7 @@ func _ready():
 	await strom.sofort(spieler.global_position,320.0,func(a,b):_lade("Häuser in der Nähe … %d/%d"%[a,b],0.92+0.03*a/b))
 	_log("haeuser ok")
 	await _schritt("Orte und Passanten …",0.95)
-	_zonen();_log("zonen ok")
+	_zonen();_geldautomaten();_log("zonen ok")
 	wirt.setup();_log("wirtschaft ok")
 	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup();_log("story ok")
 	_passanten_pool(22)
@@ -284,6 +284,11 @@ func _zonen():
 		zonen.append({"typ":s.typ,"p":p,"r":3.5 if reinfahren else 1.6,"text":txt})
 		_marker(p,1.2 if not reinfahren else 2.6)
 
+func _geldautomaten():
+	for g in get_tree().get_nodes_in_group("geldautomat"):
+		var t:Transform3D=g.global_transform
+		zonen.append({"typ":"geldautomat","p":t*Vector3(0,0,1.0),"r":1.4,"text":"Geldautomat – Geld abheben"})
+
 func _marker(p:Vector3,r:float):
 	var m=MeshInstance3D.new();var cy=CylinderMesh.new();cy.top_radius=r;cy.bottom_radius=r;cy.height=1.2;cy.cap_top=false;cy.cap_bottom=false;m.mesh=cy
 	var mt=StandardMaterial3D.new();mt.albedo_color=Color(1,0.8,0.1,0.28);mt.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;mt.emission_enabled=true;mt.emission=Color(1,0.75,0.1);mt.emission_energy_multiplier=1.5;mt.cull_mode=BaseMaterial3D.CULL_DISABLED;mt.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -301,11 +306,13 @@ func _physics_process(dt):
 	for c in verkehr:c.ki_schritt(dt,hind)
 	if auto==null and not _entert:_anfahren_pruefen()
 
+var prof:={}
+func _pz(n,t):prof[n]=max(prof.get(n,0.0)*0.98,(Time.get_ticks_usec()-t)/1000.0)
 func _process(dt):
 	if not bereit:st.end_frame();return
-	_lauf_schritt(dt)
+	var _t7=Time.get_ticks_usec();_lauf_schritt(dt);_pz('_lauf_schritt(dt)',_t7)
 	zeit+=dt*1.0   # 1 Spielminute je Sekunde
-	if zeit>=1440.0:zeit-=1440.0
+	if zeit>=1440.0:zeit-=1440.0;_tage+=1.0
 	if Engine.get_process_frames()%3==0:_tageszeit()
 	if panel==null:kam.drehen(st.look)
 	var ziel=auto if auto!=null else spieler
@@ -315,20 +322,20 @@ func _process(dt):
 	hud.geld=geld
 	if auto!=null:hud.tacho=auto.kmh();hud.nos=auto.nos_vorrat
 	motor.setze(auto.kmh() if auto else 0.0,st.gas if auto else 0.0,auto!=null and panel==null)
-	_verkehr_pflege(p)
-	strom.schritt(p)
+	var _t0=Time.get_ticks_usec();_verkehr_pflege(p);_pz('_verkehr_pflege(p)',_t0)
+	var _t1=Time.get_ticks_usec();strom.schritt(p);_pz('strom.schritt(p)',_t1)
 	if Engine.get_process_frames()%8==0:gras.aktualisieren(p,st.e.get("gras",true) and (auto==null or auto.kmh()<70.0))
-	_passanten_pflege(p,dt)
-	_interaktion()
-	_taxi(dt)
+	var _t2=Time.get_ticks_usec();_passanten_pflege(p,dt);_pz('_passanten_pflege(p,dt)',_t2)
+	var _t3=Time.get_ticks_usec();_interaktion();_pz('_interaktion()',_t3)
+	var _t4=Time.get_ticks_usec();_taxi(dt);_pz('_taxi(dt)',_t4)
 	if st.pressed("pause") and panel==null:pausenmenue()
 	elif st.pressed("karte"):
 		if panel==null:karte_oeffnen()
 	if st.pressed("kamera"):kam.nah=not kam.nah;kam.setze_ziel(ziel,auto!=null,[ziel])
 	if st.pressed("hupe") and auto!=null:motor.hupe=0.5
 	if auto==null and panel==null:kampf.spieler_schritt(dt)
-	kampf.welt_schritt(dt)
-	wirt.schritt(dt)
+	var _t5=Time.get_ticks_usec();kampf.welt_schritt(dt);_pz('kampf.welt_schritt(dt)',_t5)
+	var _t6=Time.get_ticks_usec();wirt.schritt(dt);_pz('wirt.schritt(dt)',_t6)
 	st.end_frame()
 
 # Tag und Nacht: Sonnenstand, Licht, Himmel, Straßenlaternen, Scheinwerfer
@@ -423,7 +430,8 @@ func entern(c):
 	var dauer=clamp(start.distance_to(tuer)/4.0,0.2,1.2)
 	var blick=(c.global_position-tuer);spieler.rotation.y=atan2(blick.x,blick.z)
 	var tw=create_tween();tw.tween_property(spieler,"global_position",tuer,dauer)
-	await tw.finished
+	await get_tree().create_timer(dauer+0.05).timeout   # Zeitgeber feuert immer (Tween-Signal kann ausbleiben)
+	if tw.is_valid():tw.kill()
 	if hatte_fahrer and is_instance_valid(c):
 		if _fahrer_ped==null:
 			var r2=RandomNumberGenerator.new();r2.randomize()
@@ -439,6 +447,7 @@ func entern(c):
 		await get_tree().create_timer(0.35).timeout
 	_entert=false
 	if is_instance_valid(c):einsteigen(c)
+	else:ereignis("entern: Auto weg")
 
 func einsteigen(c):
 	ereignis("einsteigen "+str(c.kind))
@@ -595,9 +604,18 @@ func passant_treffer(e,von):
 			o.flucht=12.0;o.dir=-o.dir;PE.play(o.n,"run")
 
 # ---------------- Läden / Zonen ----------------
+var _tage:=0.0
+func spielzeit_tage()->float:return _tage
 func zone_betreten(z:Dictionary):
 	match z.typ:
 		"zuhause":kampf.hp=100.0;speichern();hud.zeige("Spiel gespeichert. Gesundheit aufgefüllt.",3.0)
+		"geldautomat":
+			# einmal pro Spieltag: Gehalt/Zinsen abheben (je nach Anzahl der Geschäfte)
+			var tag=int(spielzeit_tage())
+			if z.get("tag",-1)==tag:hud.zeige("Heute schon abgehoben – komm morgen wieder.",2.5)
+			else:
+				z.tag=tag;var b=250+int(wirt.personal.size())*150 if wirt else 250
+				geld+=b;hud.zeige("Geldautomat: %d $ abgehoben"%b,3.0)
 		"kleider":kleider_menue()
 		"waffen":waffen_menue(false)
 		"wueste":waffen_menue(true)

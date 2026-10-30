@@ -64,7 +64,9 @@ func _bauen(k:Vector2i):
 	var sb=StaticBody3D.new();n.add_child(sb)
 	for i in gitter[k]:
 		var pl=welt.B.placed[i];var t=welt.B.get_tpl(pl.t)
-		var xf=Transform3D(Basis(Vector3.UP,pl.yaw),Vector3(pl.c.x,pl.y-0.12,pl.c.y))
+		var bas=Basis(Vector3.UP,pl.yaw)
+		if pl.has("sk"):bas=bas*Basis.from_scale(Vector3(pl.sk[0],1.0,pl.sk[1]))
+		var xf=Transform3D(bas,Vector3(pl.c.x,pl.y-0.12,pl.c.y))
 		if _alt:
 			welt.B.einzeln(n,i)
 		else:

@@ -89,7 +89,10 @@ func rect_free(c:Vector2,a:Vector2,hx:float,hz:float)->bool:
 	for idx in _rect_cells(c,a,hx,hz):
 		if occ[idx]!=0:return false
 	return true
+var reserviert:=[]   # [mitte, richtung, hx, hz] – von Anlagen freigehaltene Flächen (für die Blockbebauung)
+var reservieren_mitschreiben:=true
 func rect_mark(c:Vector2,a:Vector2,hx:float,hz:float,v:=2):
+	if reservieren_mitschreiben and v==2:reserviert.append([c,a,hx,hz])
 	for idx in _rect_cells(c,a,hx,hz):occ[idx]=v
 
 func mark_roads():
@@ -115,6 +118,8 @@ func _path(name:String)->Array:
 
 func _meshes(n:Node)->Array:return n.find_children("*","MeshInstance3D",true,false)
 
+# Viertel der Hauptstadt mit Blockrandbebauung (scripts/welt_bloecke.gd)
+const BLOCK_VIERTEL:=["downtown","ghetto","ost","altstadt","stern","suedstadt","oststadt","stadt","industrie"]
 var spiel:=false
 var ohne_dach:=false   # Spiel mit vorbereiteten Gebäudemodellen: Dach steckt schon im Mesh
 const CACHE:="res://assets/cache/"
@@ -300,6 +305,7 @@ func place_along():
 				if r.tunnel_flags[i] or r.elev[i]:s+=8;continue
 				var d=district(p)
 				if d==null:s+=15.0;continue
+				if d.n in BLOCK_VIERTEL:s+=15.0;continue   # dort baut welt_bloecke.gd geschlossene Blöcke
 				var ok=false
 				for attempt in 3:
 					var name=_pick(d);var t=get_tpl(name)

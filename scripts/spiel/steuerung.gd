@@ -123,7 +123,7 @@ func _process(dt):
 	brake=clamp(t_brake+lt+Input.get_action_strength("zurueck"),0.0,1.0)
 	handbrake=t_hand or Input.is_action_pressed("handbremse")
 	nos=t_nos or Input.is_action_pressed("nos")
-	sprint=t_sprint or Input.is_action_pressed("sprinten") or move.length()>0.92
+	sprint=t_sprint or Input.is_action_pressed("sprinten") or move.length()>0.85
 	var maus=Input.mouse_mode==Input.MOUSE_MODE_CAPTURED
 	feuer=t_feuer or rt>0.5 or (maus and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	zielen=t_zielen or lt>0.5 or (maus and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))

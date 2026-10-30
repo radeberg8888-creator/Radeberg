@@ -39,7 +39,7 @@ func knopf_layout():
 			k.append({"n":"nachladen","t":"LADEN","p":Vector2(s.x-55,s.y-300),"r":R.call(36)})
 		k.append({"n":"waffe","t":"WAFFE","p":Vector2(s.x-165,s.y-320),"r":R.call(42)})
 		k.append({"n":"springen","t":"SPRUNG","p":Vector2(s.x-300,s.y-75),"r":R.call(46)})
-		k.append({"n":"sprinten","t":"RENNEN","p":Vector2(s.x-420,s.y-75),"r":R.call(44),"hold":true})
+		pass   # Rennen: Joystick weit auslenken (kein eigener Knopf mehr)
 		if prompt_knopf!="":k.append({"n":prompt_knopf,"t":"E" if prompt_knopf=="interagieren" else "AUTO","p":Vector2(s.x-330,s.y-360),"r":R.call(54),"hi":true})
 	elif modus=="auto":
 		k.append({"n":"gas","t":"GAS","p":Vector2(s.x-105,s.y-115),"r":R.call(72),"hold":true})

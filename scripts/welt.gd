@@ -728,6 +728,7 @@ func militaer_strassen():
 		S.add("taxi",[v3(m+Vector2(x,0)),v3(m+Vector2(x,75)),v3(m+Vector2(x,150))],{"wear":0.5})
 	named.mil_tor=S.add("strasse",[v3(m+Vector2(600,150)),v3(m+Vector2(700,190)),Vector3(-1900,0,-5250)],{"name":"Kasernenstraße","wear":0.3})
 
+var BL=null
 var spiel:=false          # true: vom Spiel erzeugt (keine Testbilder, keine statischen Autos/Passanten)
 func _ready():
 	args=OS.get_cmdline_user_args();rng.seed=4711
@@ -754,7 +755,11 @@ func generate(progress:Callable):
 	await step.call("Häuser werden verteilt …",0.14)
 	B=BAU.new(G,S);B.spiel=spiel;B.mark_roads()
 	A=ANL.new(G,S,B);A.reserve()
+	B.reservieren_mitschreiben=false
 	B.place_along();mark.call("platzieren")
+	BL=load("res://scripts/welt_bloecke.gd").new(G,S,B);BL.bauen(self)
+	for l in BL.log:print("BLOECKE ",l)
+	mark.call("bloecke")
 	G.apply_cut()
 	S.clamp_terrain()
 	S.portal_fix();mark.call("cut/clamp/portal")
@@ -779,6 +784,7 @@ func generate(progress:Callable):
 		var lr=Node3D.new();lr.name="Leben";add_child(lr)
 		await step.call("Wälder …",0.72)
 		LV.forests(lr);mark.call("wald")
+		if BL:LV._strassenbaeume.append_array(BL.baeume)
 		await step.call("Laternen und Straßenbäume …",0.82)
 		LV.streets(lr);LV.ghetto_props(lr);LV.moebel(lr);mark.call("laternen")
 		if not spiel and not "nocars" in args:LV.cars(lr);LV.people(lr,90);mark.call("autos/leute")

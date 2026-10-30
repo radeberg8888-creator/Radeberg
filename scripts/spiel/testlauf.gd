@@ -12,7 +12,7 @@ func shot(name:String):
 	print("  verkehr=",spiel.verkehr.size()," geparkt=",spiel.geparkt.size()," passanten sichtbar=",spiel.passanten.filter(func(e):return e.n.visible).size())
 	for c in spiel.verkehr.slice(0,3):print("   ki ",c.kind," ",c.global_position.snapped(Vector3.ONE*0.1)," v=",snapped(c.ki_speed,0.1))
 	if spiel.auto:print("  AUTO ",spiel.auto.global_position.snapped(Vector3.ONE*0.1)," kmh ",snapped(spiel.auto.kmh(),0.1))
-	print("LEISTUNG ",name," Aufrufe=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," Knoten=",Performance.get_monitor(Performance.OBJECT_NODE_COUNT)," Logik_ms=",snapped(Performance.get_monitor(Performance.TIME_PROCESS)*1000,0.1)," Physik_ms=",snapped(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000,0.1))
+	print("LEISTUNG ",name," Aufrufe=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," Knoten=",Performance.get_monitor(Performance.OBJECT_NODE_COUNT)," Logik_ms=",snapped(Performance.get_monitor(Performance.TIME_PROCESS)*1000,0.1)," Physik_ms=",snapped(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000,0.1)," PROF ",spiel.prof if "prof" in spiel else "")
 	print("TESTBILD ",name," fps=",Engine.get_frames_per_second()," pos=",spiel.spieler.global_position," auto=",spiel.auto!=null," kmh=",spiel.auto.kmh() if spiel.auto else 0)
 
 var ui_schritt:=0
@@ -25,7 +25,7 @@ func _process(dt):
 		if t<1.2:return
 		t=0
 		var orte=[Vector2(-211,571),Vector2(-330,700),Vector2(-120,820),Vector2(200,-330),Vector2(-150,120),Vector2(300,1400)]
-		var i=ui_schritt/4;var j=ui_schritt%4
+		var i=ui_schritt/7;var j=ui_schritt%7
 		if i>=orte.size():get_tree().quit();return
 		if j==0:
 			var r=spiel.welt.S.roads;var best=null;var bd=1e9
@@ -37,8 +37,12 @@ func _process(dt):
 			var pp:Vector2=best[0].P[best[1]];var h=best[0].h[best[1]]
 			spiel.spieler.global_position=Vector3(pp.x,h+0.6,pp.y);spiel.spieler.velocity=Vector3.ZERO
 			spiel.strom.sofort(spiel.spieler.global_position,300.0)
-		spiel.kam.yaw=j*PI*0.5
-		shot("ort%d_%d"%[i,j])
+			t=-2.0
+		elif j<=4:
+			spiel.kam.yaw=j*PI*0.5;spiel.kam.pitch=-8.0
+			shot("ort%d_%d"%[i,j])
+		elif j==5:spiel.kam.pitch=-55.0;spiel.kam.dist=70.0
+		else:shot("ort%d_luft"%i);spiel.kam.dist=4.2;spiel.kam.pitch=-12.0
 		ui_schritt+=1
 		return
 	if spiel.test_modus=="mission":
