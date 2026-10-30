@@ -158,16 +158,22 @@ func profiles():
 				if not nb2.is_empty() and nb2[2]<bn[2]:bi=j;bn=nb2
 				j+=1
 			var o=roads[bn[0]];var oh=o.h[bn[1]]
-			var self_ab=r.typ=="autobahn";var o_ab=o.typ=="autobahn"
+			var self_ab=r.typ=="autobahn";var o_ab=o.typ=="autobahn";var n_vor=cons.size()
 			if (o_ab and not r.ab_join) or (o.typ=="schiene" and r.typ=="autobahn"):
 				# höhenfreie Kreuzung: Überführung über die Autobahn (oder Bahn über Autobahn)
 				if o.tunnel_flags[bn[1]]:pass   # Autobahn liegt im Tunnel -> nichts zu tun
 				elif abs(h[bi]-oh)<8.0:cons.append([bi,oh+8.2,14.0,170.0 if r.typ=="schiene" else 120.0,false])
 			elif o.typ=="schiene" and r.typ!="schiene":
-				cons.append([bi,oh+0.05,6.0,40.0,true])     # Bahnübergang
+				if h[bi]-oh>3.0:
+					# Bahn liegt tief im Einschnitt: Straße überquert sie auf einer Brücke statt hinabzutauchen
+					if h[bi]<oh+7.5:cons.append([bi,oh+7.5,10.0,60.0,false])
+				elif oh-h[bi]>3.0:
+					if h[bi]>oh-7.5:cons.append([bi,oh-7.5,10.0,60.0,false])   # Bahn auf dem Damm: Unterführung
+				else:
+					cons.append([bi,oh+0.05,6.0,40.0,true])     # Bahnübergang
 			elif not self_ab:
 				cons.append([bi,oh,max(o.w,r.w)+2.0,45.0,true])
-			if cons.size()>0 and cons[-1][4]:
+			if cons.size()>n_vor and cons[-1][4]:
 				junctions.append({"p":o.P[bn[1]],"h":oh,"r":max(o.w+o.sw,r.w+r.sw)+1.0,"a":ri,"b":bn[0],"rail":o.typ=="schiene"})
 			i=bi+8
 		for it in 3:
@@ -229,6 +235,36 @@ func _clean_runs(f:Array,minlen:int):
 				for k in range(i,j):f[k]=false
 			i=j
 		else:i+=1
+
+# Liegt p auf der Fahrbahn (oder dem Gehweg-Innenrand) einer anderen Straße? Raster der Mittellinienpunkte.
+var _fb_raster:={}
+func _auf_fremder_fahrbahn(p:Vector2,eigen)->bool:
+	if _fb_raster.is_empty():
+		for rr in roads:
+			if rr.typ=="schiene":continue
+			for i in rr.P.size():
+				var k=Vector2i(floor(rr.P[i].x/16.0),floor(rr.P[i].y/16.0))
+				if not _fb_raster.has(k):_fb_raster[k]=[]
+				_fb_raster[k].append([rr.P[i],rr.w-0.3,rr,rr.elev[i] or rr.tunnel_flags[i],rr.h[i]])
+	var k0=Vector2i(floor(p.x/16.0),floor(p.y/16.0))
+	for dz in [-2,-1,0,1,2]:
+		for dx in [-2,-1,0,1,2]:
+			for e in _fb_raster.get(k0+Vector2i(dx,dz),[]):
+				if e[2]==eigen or e[3]:continue
+				if p.distance_to(e[0])<e[1]:return true
+	return false
+
+const _RANG={"autobahn":5,"allee":4,"strasse":3,"land":2,"rampe":3,"gasse":1,"piste":0}
+func _hoehe_fremd(p:Vector2,eigen)->float:
+	if _fb_raster.is_empty():_auf_fremder_fahrbahn(p,eigen)
+	var rg=_RANG.get(eigen.typ,0);var best=INF
+	var k0=Vector2i(floor(p.x/16.0),floor(p.y/16.0))
+	for dz in [-1,0,1]:
+		for dx in [-1,0,1]:
+			for e in _fb_raster.get(k0+Vector2i(dx,dz),[]):
+				if e[2]==eigen or e[3] or _RANG.get(e[2].typ,0)<=rg:continue
+				if p.distance_to(e[0])<e[1]+0.3:best=min(best,e[4]+0.04-0.03)
+	return best
 
 func near_junction(p:Vector2,extra:=0.0)->float:
 	var best=1e9
@@ -336,7 +372,10 @@ func build(parent:Node3D):
 			var m0=0.0 if near_junction(p0)<0 else 1.0;var m1=0.0 if near_junction(p1)<0 else 1.0
 			var c0=Color(r.wear,0,0,m0);var c1=Color(r.wear,0,0,m1)
 			var s0=i*DS;var s1=(i+1)*DS
-			st.quad(_v(p0+n0*w,y0),_v(p0-n0*w,y0),_v(p1-n1*w,y1),_v(p1+n1*w,y1),Vector2(-w,s0),Vector2(w,s0),Vector2(w,s1),Vector2(-w,s1),c0,c1)
+			# Einmündung in eine größere Straße: nie über deren Fahrbahn liegen (sonst Stufe/Platte auf der Straße)
+			var qa=p0+n0*w;var qb=p0-n0*w;var qc=p1-n1*w;var qd=p1+n1*w
+			var ya=min(y0,_hoehe_fremd(qa,r));var yb=min(y0,_hoehe_fremd(qb,r));var yc=min(y1,_hoehe_fremd(qc,r));var yd=min(y1,_hoehe_fremd(qd,r))
+			st.quad(_v(qa,ya),_v(qb,yb),_v(qc,yc),_v(qd,yd),Vector2(-w,s0),Vector2(w,s0),Vector2(w,s1),Vector2(-w,s1),c0,c1)
 			var tun=r.tunnel_flags[i] or r.tunnel_flags[i+1]
 			var el=r.elev[i] or r.elev[i+1]
 			# Seitenschürzen (verdecken Spalten zum Gelände)
@@ -348,9 +387,12 @@ func build(parent:Node3D):
 			# Gehwege mit Bordstein
 			if r.sw>0.0:
 				var jn0=near_junction(p0,1.0)<0;var jn1=near_junction(p1,1.0)<0
+				var kreuz_nah=near_junction(p0,35.0)<0
 				for sd in [1,-1]:
 					if jn0 or jn1:continue
 					var a0=p0+n0*w*sd;var a1=p1+n1*w*sd;var b0=p0+n0*(w+r.sw)*sd;var b1=p1+n1*(w+r.sw)*sd
+					# Gehweg, der in die Fahrbahn einer anderen Straße ragt (schräge Einmündung), weglassen
+					if (_auf_fremder_fahrbahn(b0,r) or _auf_fremder_fahrbahn(b1,r) or _auf_fremder_fahrbahn((a0+b0)*0.5,r) or _auf_fremder_fahrbahn((a1+b1)*0.5,r)):continue
 					var hy0=y0+0.14;var hy1=y1+0.14
 					ps.quad(_v(a0,hy0),_v(b0,hy0),_v(b1,hy1),_v(a1,hy1),a0/2.0,b0/2.0,b1/2.0,a1/2.0)
 					ks.quad(_v(a0,hy0),_v(a1,hy1),_v(a1,y1-0.05),_v(a0,y0-0.05),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
@@ -403,13 +445,29 @@ func build(parent:Node3D):
 						var lp=p0+n0*(w*0.55)*sd
 						lm.quad(_v(lp+n0*0.25+t0*1.2,y0+6.95),_v(lp-n0*0.25+t0*1.2,y0+6.95),_v(lp-n0*0.25-t0*1.2,y0+6.95),_v(lp+n0*0.25-t0*1.2,y0+6.95),Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1))
 		_portals(cs,ps,r)
-	# Kreuzungsflächen (Pflaster unter den Fahrbahnen, füllt die Ecken)
+	# Kreuzungsflächen (Asphalt unter den Fahrbahnen, füllt die Ecken). Höhe je Punkt von der nächsten
+	# Fahrbahn, knapp darunter – am Hang ragte eine flache Pflasterscheibe sonst über die Fahrspuren.
+	var js=Kacheln.new();js.weite=1500.0
 	for j in junctions:
 		if j.rail:continue
-		var c=Vector3(j.p.x,j.h-0.02,j.p.y);var rr=j.r+1.0
+		var rr=j.r+1.0
+		var hf=func(q:Vector2)->float:
+			var best=INF;var hb=j.h
+			for ri in [j.a,j.b]:
+				var rd=roads[ri]
+				for i in rd.P.size():
+					var dd=rd.P[i].distance_squared_to(q)
+					if dd<best:best=dd;hb=rd.h[i]
+			return hb-0.05
+		var ringe=[0.0,0.5,1.0]
 		for k in 20:
 			var a1=TAU*k/20.0;var a2=TAU*(k+1)/20.0
-			ps.quad(c,c,c+Vector3(cos(a2),0,sin(a2))*rr,c+Vector3(cos(a1),0,sin(a1))*rr,Vector2(j.p.x,j.p.y)/2.0,Vector2(j.p.x,j.p.y)/2.0,Vector2(j.p.x+cos(a2)*rr,j.p.y+sin(a2)*rr)/2.0,Vector2(j.p.x+cos(a1)*rr,j.p.y+sin(a1)*rr)/2.0)
+			for ri in 2:
+				var f0=ringe[ri];var f1=ringe[ri+1]
+				var q=[j.p+Vector2(cos(a1),sin(a1))*rr*f0,j.p+Vector2(cos(a2),sin(a2))*rr*f0,j.p+Vector2(cos(a2),sin(a2))*rr*f1,j.p+Vector2(cos(a1),sin(a1))*rr*f1]
+				js.quad(_v(q[0],hf.call(q[0])),_v(q[1],hf.call(q[1])),_v(q[2],hf.call(q[2])),_v(q[3],hf.call(q[3])),q[0]/4.0,q[1]/4.0,q[2]/4.0,q[3]/4.0)
+	js.commit(parent,Mats.pbr("asphalt",0.15,Color(0.5,0.5,0.52)),"Kreuzung",false)
+	_fb_raster.clear()
 	for rm in fahrbahn:fahrbahn[rm].commit(parent,rm,"Strasse",false)
 	cs.commit(parent,conc,"Beton");ps.commit(parent,paver,"Gehweg",false);ks.commit(parent,curbm,"Bordstein",false);ss.commit(parent,steel,"Leitplanke");gs.commit(parent,grass,"Mittelstreifen",false)
 	bs.commit(parent,ballast,"Schotter",false);rs.commit(parent,rail_m,"Schienen",false);lm.commit(parent,lamp_m,"Tunnellicht",false)
@@ -453,7 +511,20 @@ func _trench(s,r:Dictionary,i:int):
 # Nach dem Formen des Geländes: über dem Tunnelmund das Gelände auf Deckenhöhe anheben, die Zellen, die den Mund
 # kreuzen würden, entfernen und die Röhre bis dorthin verlängern. Davor steht eine Stirnwand, deren Oberkante dem Gelände folgt.
 var portals:=[]
+var _strassen_zellen:={}
 func portal_fix():
+	# Rasterpunkte unter offenen Fahrbahnen: dort nie Tunneldecke aufschütten (Straße liefe sonst in den Berg)
+	_strassen_zellen.clear()
+	for r in roads:
+		if r.typ=="schiene":continue
+		var edge=r.w+r.sw+G.STEP*0.75
+		for i in r.P.size():
+			if r.tunnel_flags[i] or r.elev[i]:continue
+			var p=r.P[i]
+			var i0=int((p.x-edge-G.X0)/G.STEP);var i1=int((p.x+edge-G.X0)/G.STEP)+1;var k0=int((p.y-edge-G.Z0)/G.STEP);var k1=int((p.y+edge-G.Z0)/G.STEP)+1
+			for kk in range(max(k0,0),min(k1,G.nz-1)+1):
+				for ii in range(max(i0,0),min(i1,G.nx-1)+1):
+					if Vector2(G.X0+ii*G.STEP,G.Z0+kk*G.STEP).distance_to(p)<=edge:_strassen_zellen[G.idx(ii,kk)]=[r.h[i],r]
 	for r in roads:
 		if not r.has("tunnel_flags"):continue
 		var n=r.P.size();var starts=[]
@@ -481,6 +552,7 @@ func _fix_one(r:Dictionary,k:int,dir:int):
 			var q=Vector2(G.X0+ii*G.STEP,G.Z0+kk*G.STEP);var L=_local(r,k,dir,q)
 			if L[1]<cw and L[0]>=0.0 and L[0]<70.0:
 				var key=G.idx(ii,kk);var lim=r.h[L[2]]+roof+1.2
+				if _strassen_zellen.has(key) and _strassen_zellen[key][0]<lim-2.0:continue
 				if G.heights[key]<lim:G.heights[key]=lim;inside[Vector2i(ii,kk)]=true
 	# Zellen mit gemischten Ecken -> Loch
 	var smin=0.0;var cells=[]
@@ -585,6 +657,8 @@ func clamp_terrain():
 				for ii in range(max(i0,0),min(i1,G.nx-1)+1):
 					var q=Vector2(G.X0+ii*G.STEP,G.Z0+k*G.STEP);var d=q.distance_to(p)
 					if d>rr:continue
-					var lim=h-0.12+max(0.0,d-edge)*0.6
+					# Geländeraster ist grob (G.STEP): erst eine Rasterweite neben dem Fahrbahnrand ansteigen lassen,
+					# sonst ragt das zwischen den Rasterpunkten interpolierte Gelände durch die Fahrbahn
+					var lim=h-0.12+max(0.0,d-edge-G.STEP)*0.6
 					var key=G.idx(ii,k)
 					if G.heights[key]>lim:G.heights[key]=lim

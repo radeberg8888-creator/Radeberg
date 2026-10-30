@@ -36,5 +36,5 @@ func _init():
 			if cnt[j]>=0.15*max(tot,1):seiten.append(["+z","-z","+x","-x"][j])
 		erg[name]={"seiten":seiten,"vorn":["+z","-z","+x","-x"][k],"anteil":snapped(float(cnt[k])/max(tot,1),0.01),"boden":snapped(boden,0.01),"b":snapped(ab.size.x,0.1),"t":snapped(ab.size.z,0.1),"h":snapped(ab.size.y,0.1)}
 		print("FRONT ",name," ",erg[name])
-	var f=FileAccess.open("res://assets/cache/geb/fronten.json",FileAccess.WRITE);f.store_string(JSON.stringify(erg));f.close()
+	var f=FileAccess.open("res://assets/daten/fronten.json",FileAccess.WRITE);f.store_string(JSON.stringify(erg));f.close()
 	quit()

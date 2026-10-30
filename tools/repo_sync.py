@@ -10,7 +10,7 @@ for n in ['project.godot','CREDITS.md','icon.png','icon.png.import']:
     if os.path.exists(os.path.join(SRC,n)): shutil.copy2(os.path.join(SRC,n),DST)
 for d in ['scripts','scenes','shaders','tools']:
     shutil.copytree(os.path.join(SRC,d),os.path.join(DST,d),ignore=shutil.ignore_patterns('__pycache__'))
-A=['buildings/einzeln','buildings/ghetto','buildings/house','buildings/stash','props/tree','props/polyhaven','textures','ui','data','cache','animations',
+A=['daten','buildings/einzeln','buildings/ghetto','buildings/house','buildings/stash','props/tree','props/polyhaven','textures','ui','data','cache','animations',
    'characters/joe','characters/biker','characters/daya','characters/female','characters/police','characters/woman','characters/aiman','characters/hqman',
    'weapons','props/neu/bank','props/neu/muelleimer','props/neu/container','props/neu/stapler','props/neu/hubwagen','props/neu/lagerhalle','props/neu/park','props/neu/bruecke','props/neu/harley','staedte/kowloon','staedte/canyon','staedte/citybuilding','staedte/realbuilding','staedte/marino']
 for d in A:

@@ -15,13 +15,13 @@ var b_deko:Batch
 var log:=[]
 
 func _init():
-	var f=FileAccess.get_file_as_string("res://assets/cache/geb/fronten.json")
+	var f=FileAccess.get_file_as_string("res://assets/daten/fronten.json")
 	if f!="":fronten=JSON.parse_string(f)
 	b_deko=Batch.new()
 
 const TINTS=[Color(1,1,1),Color(1.0,0.92,0.82),Color(0.86,0.9,0.95),Color(0.97,0.86,0.82),Color(0.9,0.93,0.85),Color(0.92,0.85,0.75)]
 # Häuser, die frei im Hof stehen dürfen (Fenster auf mehreren Seiten)
-const MITTELHAUS=["cityscene2_01","cityscene2_02","cityscene2_07","cityscene2_11","ghetto","stash","cityscene2_13","cityscene2_14"]
+const MITTELHAUS=["cityscene2_01","cityscene2_02","cityscene2_07","cityscene2_11","stash","cityscene2_13","cityscene2_14"]   # nur Häuser mit Fassaden ringsum (Hofhäuser sieht man von allen Seiten)
 const ACHSEN={"+z":Vector2(0,1),"-z":Vector2(0,-1),"+x":Vector2(1,0),"-x":Vector2(-1,0)}
 func mesh(name:String)->Mesh:
 	if not meshes.has(name):meshes[name]=load("res://assets/cache/geb/"+name+".res")
@@ -53,8 +53,8 @@ func haus(parent:Node3D,name:String,vorn:String,mitte:Vector2,n:Vector2,y:float,
 	var e=fronten[name]
 	if haus_cb.is_valid():
 		var hy=hoehe_cb.call(mitte+n*(masse(name,vorn).y*0.5)) if hoehe_cb.is_valid() else y
-		haus_cb.call(name,_yaw(vorn,n),mitte,hy,float(e.boden),dehnung,vorn in ["+z","-z"],masse(name,vorn),n)
-		return null
+		var ok=haus_cb.call(name,_yaw(vorn,n),mitte,hy,float(e.boden),dehnung,vorn in ["+z","-z"],masse(name,vorn),n)
+		return true if ok==null else ok   # false: Welt hat den Platz abgelehnt (Straße, Laden …)
 	# wie im Spiel: MultiMesh mit Instanzfarbe (Farbton + Verschmutzung je Haus)
 	var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.use_colors=true;mm.mesh=mesh(name);mm.instance_count=1
 	var mi=MultiMeshInstance3D.new();mi.multimesh=mm;parent.add_child(mi)
@@ -362,6 +362,7 @@ func _block_haeuser(parent:Node3D,poly:PackedVector2Array,innen:PackedVector2Arr
 			dehn=clamp((ende-start)/max(summe,1.0),1.0,1.2)
 			var lauf_s=start
 			for e in plan:e[1]=lauf_s;lauf_s+=(e[0][2].x+0.05)*dehn
+		var abgelehnt_k={}
 		for k in plan.size():
 			var wahl=plan[k][0];var s=plan[k][1]
 			var wbreite=wahl[2].x*dehn
@@ -372,6 +373,22 @@ func _block_haeuser(parent:Node3D,poly:PackedVector2Array,innen:PackedVector2Arr
 			var ns=Vector2(-tt.y,tt.x);if ns.dot(nn)<0:ns=-ns
 			var mitte=(p0+p1)*0.5-ns*(wahl[2].y*0.5)
 			var tq=Vector2(ns.y,-ns.x)*(wbreite*0.5+0.3);var dq=ns*(wahl[2].y*0.5+1.5)
+			if wahl[0]!="@sonder" and haus_cb.is_valid():
+				if not haus(parent,wahl[0],wahl[1],mitte,ns,gy,dehn):
+					# Platz nicht frei (meist ragt das Haus hinten in eine Straße): flachere Häuser gleicher Breite versuchen
+					var ersatz=false
+					var kand=(opt.liste+opt.eck).duplicate();kand.shuffle()
+					for e2 in kand:
+						var n2=e2[0]
+						if not fronten.has(n2):continue
+						var v2=fronten[n2].vorn;var m2=masse(n2,v2)
+						if m2.x>wbreite+0.5 or m2.x<wbreite/1.25 or m2.y>=wahl[2].y-2.0:continue
+						var mitte2=(p0+p1)*0.5-ns*(m2.y*0.5)
+						if haus(parent,n2,v2,mitte2,ns,gy,clamp(wbreite/m2.x,1.0,1.2)):
+							ersatz=true;wahl=[n2,v2,m2];mitte=mitte2;dq=ns*(m2.y*0.5+1.5);break
+					if not ersatz:abgelehnt_k[k]=true;continue
+				fussabdruecke.append(PackedVector2Array([mitte-tq-dq,mitte+tq-dq,mitte+tq+dq,mitte-tq+dq]))
+				anzahl_haeuser+=1;tiefen.append(wahl[2].y);continue
 			fussabdruecke.append(PackedVector2Array([mitte-tq-dq,mitte+tq-dq,mitte+tq+dq,mitte-tq+dq]))
 			if wahl[0]=="@sonder":
 				var node=wahl[1].bau.call()
@@ -383,7 +400,8 @@ func _block_haeuser(parent:Node3D,poly:PackedVector2Array,innen:PackedVector2Arr
 		if not opt.get("innenring",false):log.append("Lauf L=%.1f start=%.1f ende=%.1f häuser=%d w0=%d w1=%d"%[L,start,ende,plan.size(),int(w0),int(w1)])
 		# unbebaute Stücke der Bauflucht mit Ziegelmauer schließen (mit Tor oder Geldautomat)
 		var belegt_s=[]
-		for k in plan.size():belegt_s.append([plan[k][1],plan[k][1]+plan[k][0][2].x*dehn])
+		for k in plan.size():
+			if not abgelehnt_k.has(k):belegt_s.append([plan[k][1],plan[k][1]+plan[k][0][2].x*dehn])
 		if gap0>0:belegt_s.append([gap0,gap1])
 		belegt_s.sort_custom(func(x,y):return x[0]<y[0])
 		var cur=start
@@ -651,7 +669,7 @@ func hof_ausstatten(parent:Node3D,e:Dictionary,gy:float,baum:Mesh,autos:Array):
 	var weiss=Mats.flat(Color(0.92,0.92,0.88),0.6)
 	var plaetze=0
 	var spanne=(mx0-mn0).length()
-	for reihe in range(0,int(spanne/6.0)+1):
+	for reihe in range(0,mini(int(spanne/6.0)+1,2)):   # höchstens zwei Reihen an der langen Kante
 		var y0=3.0+reihe*6.0
 		var x=-spanne
 		while x<spanne:

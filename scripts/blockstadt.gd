@@ -10,7 +10,7 @@ var gehweg_breite:=3.6
 var bord_h:=0.15
 
 func _init():
-	var f=FileAccess.get_file_as_string("res://assets/cache/geb/fronten.json")
+	var f=FileAccess.get_file_as_string("res://assets/daten/fronten.json")
 	if f!="":fronten=JSON.parse_string(f)
 
 func _vorn_vec(v:String)->Vector2:

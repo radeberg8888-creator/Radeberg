@@ -25,15 +25,17 @@ func _process(dt):
 		# Rundgang durch die Hauptstadt: an mehreren Straßenpunkten in vier Richtungen fotografieren
 		if t<1.2:return
 		t=0
-		var orte=[Vector2(-211,571),Vector2(-330,700),Vector2(-120,820),Vector2(200,-330),Vector2(-150,120),Vector2(300,1400)]
-		var i=ui_schritt/7;var j=ui_schritt%7
-		if luft and j>=1 and j<=4:
-			if j==1:spiel.kam.yaw=0.6;spiel.kam.pitch=-60.0;spiel.kam.dist=90.0
-			if j==2:shot("ort%d_luftA"%i)
-			if j==3:spiel.kam.yaw=0.6+PI;spiel.kam.pitch=-35.0;spiel.kam.dist=60.0
-			if j==4:shot("ort%d_luftB"%i)
+		var orte=[Vector2(-120,820),Vector2(-330,700),Vector2(300,1400)]
+		var per=14 if luft else 7
+		var i=ui_schritt/per;var j=ui_schritt%per
+		if luft and j>=1:
+			# Prüfrundgang: 4 Blickrichtungen auf Augenhöhe, 2 Luftbilder
+			var bl=[[0.0,-8.0,4.2],[PI*0.5,-8.0,4.2],[PI,-8.0,4.2],[PI*1.5,-8.0,4.2],[0.6,-60.0,90.0],[0.6+PI,-35.0,60.0]]
+			var k=(j-1)/2
+			if k>=bl.size():ui_schritt=(i+1)*14;return
+			if (j-1)%2==0:spiel.kam.yaw=bl[k][0];spiel.kam.pitch=bl[k][1];spiel.kam.dist=bl[k][2]
+			else:shot("ort%d_%d"%[i,k])
 			ui_schritt+=1
-			if j==4:ui_schritt+=2
 			return
 		if i>=orte.size():get_tree().quit();return
 		if j==0:

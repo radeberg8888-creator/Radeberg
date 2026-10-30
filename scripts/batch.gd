@@ -3,7 +3,11 @@ extends RefCounted
 var tools:={}   # Material -> SurfaceTool
 var mats:={}
 static var BOX:=BoxMesh.new()
-static var CYL:=CylinderMesh.new()
+static var CYL:=_zylinder()
+# Standard-Zylinder hat 64 Segmente x 4 Ringe (~650 Punkte) – für Masten, Tonnen, Ampellichter reichen 10
+static func _zylinder()->CylinderMesh:
+	var c=CylinderMesh.new();c.radial_segments=10;c.rings=0
+	return c
 static var PRISM:=PrismMesh.new()
 
 func _st(m:Material)->SurfaceTool:

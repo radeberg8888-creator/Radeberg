@@ -10,9 +10,15 @@ var baeume:=[]   # Transform3D für Straßen-/Hofbäume (werden zu MultiMesh-Stu
 var log:=[]
 var _occ0:PackedByteArray
 var abgelehnt:=0
+var abgelehnt_strasse:=0
 var _baum_dummy:=BoxMesh.new()   # Bäume laufen über baum_cb (MultiMesh); Platzhalter nur, damit gestreut wird
 
 func _init(g,s,b):G=g;S=s;B=b
+
+func _keine_strasse(q:Vector2)->bool:
+	var c=B._c(q)
+	if c.x<0 or c.y<0 or c.x>=B.ox or c.y>=B.oz:return false
+	return _occ0[c.y*B.ox+c.x]!=1
 
 func bauen(parent:Node3D):
 	var t0=Time.get_ticks_msec()
@@ -23,9 +29,10 @@ func bauen(parent:Node3D):
 	sb.hoehe_cb=func(p:Vector2)->float:return G.h_at(p.x,p.y)
 	sb.baum_cb=func(p:Vector2,y:float,sk:float):baeume.append(Transform3D(Basis(Vector3.UP,sb.rng.randf()*TAU).scaled(Vector3.ONE*sk),Vector3(p.x,y+0.18,p.y)))
 	var aktuell={"d":null}
-	sb.haus_cb=func(name,yaw,mitte,hy,boden,dehn,laengs_x,m,n):_haus(name,yaw,mitte,hy,boden,dehn,laengs_x,m,n,aktuell.d,sb)
+	sb.haus_cb=func(name,yaw,mitte,hy,boden,dehn,laengs_x,m,n)->bool:return _haus(name,yaw,mitte,hy,boden,dehn,laengs_x,m,n,aktuell.d,sb)
 	# 1) Blöcke aus dem Straßennetz
 	var mn=Vector2(-2700,-1700);var mx=Vector2(3600,2700)
+	var loecher=[]
 	var stuecke=[[PackedVector2Array([mn,Vector2(mx.x,mn.y),mx,Vector2(mn.x,mx.y)]),Rect2(mn,mx-mn)]]
 	for r in S.roads:
 		if not r.typ in ["strasse","allee","gasse","autobahn","rampe","land","schiene"]:continue
@@ -49,6 +56,7 @@ func bauen(parent:Node3D):
 				for t in teile:
 					for x in Geometry2D.clip_polygons(t,band):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
+						else:loecher.append(x[0])   # Straße liegt ganz im Stück -> Loch im Umriss
 				teile=t2
 			for t in teile:neu.append([t,_rect(t)])
 		stuecke=neu
@@ -68,6 +76,7 @@ func bauen(parent:Node3D):
 			for t in teile:
 				for x in Geometry2D.clip_polygons(t,rp):
 					if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
+					else:loecher.append(x[0])
 			teile=t2
 		for t in teile:bloecke.append(t)
 	# 2b) zu große Flächen (keine Straße hindurch) mit Fußgängergassen in Blöcke von ~110 m teilen
@@ -100,6 +109,7 @@ func bauen(parent:Node3D):
 	bloecke=feiner
 	# 3) bebauen
 	var deko={}   # Kachel -> Batch
+	var n_loch=0
 	var n_bl=0;var grund={"klein":0,"gross":0,"viertel":0,"rand":0}
 	var gross_fl=0.0
 	for poly in bloecke:
@@ -128,7 +138,12 @@ func bauen(parent:Node3D):
 		opt.ohne_gehweg=true;opt.hofboden=false   # Hofboden war eine flache Platte auf schrägem Gelände (schwebte/versank); jetzt Gelände + Pflaster unter Parkplätzen
 		var gy=(hmin+hmax)*0.5+0.04
 		var e=sb.block(wurzel,poly,gy-sb.bord_h,opt)
-		if not steil and e.size()>0:sb.hof_ausstatten(wurzel,e,gy,_baum_dummy,[])
+		var hat_loch=false
+		for lp in loecher:
+			if Geometry2D.is_point_in_polygon(lp,poly):hat_loch=true;break
+		# Block mit Straße mittendrin: Hof nicht möblieren (Garagen/Parkplätze landeten sonst auf der Straße)
+		if not steil and not hat_loch and e.size()>0:sb.hof_ausstatten(wurzel,e,gy,_baum_dummy,[])
+		if hat_loch:n_loch+=1
 		n_bl+=1
 	log.append("übersprungen %s, große Fläche %.0f ha"%[str(grund),gross_fl/10000.0])
 	# 4) Ampeln an Kreuzungen in der Stadt
@@ -169,6 +184,7 @@ func bauen(parent:Node3D):
 			var p0=a.lerp(b,float(i)/n);var p1=a.lerp(b,float(i+1)/n)
 			var h0=G.h_at(p0.x,p0.y);var h1=G.h_at(p1.x,p1.y)
 			if min(h0,h1)<1.0:continue
+			if not _keine_strasse(p0) or not _keine_strasse(p1) or not _keine_strasse((p0+p1)*0.5):continue   # nicht über Straßen legen
 			var c=(p0+p1)*0.5;var dd=p1-p0;var l=dd.length()
 			var bas=Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,l))
 			sb.b_deko.box_rot(beton,Vector3(c.x,(h0+h1)*0.5-0.1,c.y),Vector3(6.6,0.3,l+0.3),bas)
@@ -178,9 +194,10 @@ func bauen(parent:Node3D):
 		var ms=deko[k].commit(wurzel,false)
 		for m in ms:m.visibility_range_end=450.0
 	log.append_array(sb.log.filter(func(x):return x.begins_with("Geldautomat")).slice(0,3))
-	log.append("abgelehnt %d"%abgelehnt)
+	log.append("abgelehnt Laden %d, Straße %d, Blöcke mit Straße innen %d, Löcher %d"%[abgelehnt,abgelehnt_strasse,n_loch,loecher.size()])
 	log.append("Blöcke %d, Häuser %d, Bäume %d, Ampeln %d, Geldautomaten %d, %d ms"%[n_bl,B.placed.size(),baeume.size(),n_amp,wurzel.get_tree().get_nodes_in_group("geldautomat").size() if wurzel.is_inside_tree() else -1,Time.get_ticks_msec()-t0])
 	B.reservieren_mitschreiben=false
+	_occ0=PackedByteArray()   # Speicher freigeben (Gitter ist ~100 MB)
 
 func _rect(p:PackedVector2Array)->Rect2:
 	var r=Rect2(p[0],Vector2.ZERO)
@@ -207,16 +224,23 @@ func _optionen(d:Dictionary,fl:float,sb)->Dictionary:
 	if fl<2500.0:opt.durchgang=false
 	return opt
 
-func _haus(name,yaw,mitte:Vector2,hy:float,boden:float,dehn:float,laengs_x:bool,m:Vector2,n:Vector2,d,sb):
+func _haus(name,yaw,mitte:Vector2,hy:float,boden:float,dehn:float,laengs_x:bool,m:Vector2,n:Vector2,d,sb)->bool:
 	# Platz frei? (Läden, Bahnhof … und andere Häuser)
 	var a=Vector2(n.y,-n.x)
 	for idx in B._rect_cells(mitte,a,m.x*0.5*dehn-1.0,m.y*0.5-1.0):
-		if _occ0[idx]==2:abgelehnt+=1;return
+		if _occ0[idx]==2:abgelehnt+=1;return false
+	# nie auf eine Straße (Straßen, die ganz im Block liegen, ergeben Löcher im Blockumriss)
+	for idx in B._rect_cells(mitte,a,max(m.x*0.5*dehn-2.5,0.5),max(m.y*0.5-2.5,0.5)):
+		if _occ0[idx]==1:
+			abgelehnt_strasse+=1
+			return false
 	B.rect_mark(mitte,a,m.x*0.5*dehn,m.y*0.5)
 	var y=hy+0.15-boden+0.02
 	B.placed.append({"t":name,"v":sb.rng.randi()%5,"dirt":float(d.dirt)*sb.rng.randf_range(0.6,1.1),"c":mitte,"y":y+0.12,"yaw":yaw,"d":d.n,
 		"sk":[dehn,1.0] if laengs_x else [1.0,dehn]})
-	G.flatten(mitte,hy,sqrt(m.x*m.x+m.y*m.y)*0.5+1.0,8.0)
+	# Gelände unter dem Haus angleichen – aber nie unter Straße/Gehweg (sonst knickt die Fahrbahn)
+	G.flatten(mitte,hy,sqrt(m.x*m.x+m.y*m.y)*0.5+1.0,6.0,_keine_strasse)
+	return true
 
 func _flaeche(p:PackedVector2Array)->float:
 	var a=0.0

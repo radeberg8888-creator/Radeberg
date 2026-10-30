@@ -104,7 +104,10 @@ jobs:
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
           mkdir -p build
           timeout 3600 xvfb-run -a -s "-screen 0 640x480x24" $GODOT --rendering-method gl_compatibility --rendering-driver opengl3 --path . -s tools/welt_bake.gd > build/bake.log 2>&1 || true
-          grep -E "ERZEUGT|GESPEICHERT|SCRIPT ERROR" build/bake.log | head -20
+          grep -E "ERZEUGT|GESPEICHERT|SCRIPT ERROR|BLOECKE" build/bake.log | head -30
+          # Prüfung: die Hauptstadt muss bebaut sein (Blockrandbebauung braucht assets/daten/fronten.json)
+          H=$(grep -oE "BLOECKE Blöcke [0-9]+, Häuser [0-9]+" build/bake.log | grep -oE "[0-9]+$" || echo 0)
+          echo "Häuser: $H"; test "$H" -gt 10000
           ls -la assets/cache/welt/
           test -f assets/cache/welt/welt.scn
 

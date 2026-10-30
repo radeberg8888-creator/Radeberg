@@ -95,13 +95,14 @@ func h_at(x:float,z:float)->float:
 	return lerp(lerp(a,b,tx),lerp(c,d,tx),tz)
 
 # Gelände an Straßen/Plätze anpassen: Gitterpunkte im Radius bekommen die Sollhöhe (weicher Übergang)
-func flatten(p:Vector2,y:float,r_core:float,r_fade:float):
+func flatten(p:Vector2,y:float,r_core:float,r_fade:float,maske:=Callable()):
 	var r=r_core+r_fade
 	var i0=int((p.x-r-X0)/STEP);var i1=int((p.x+r-X0)/STEP)+1;var k0=int((p.y-r-Z0)/STEP);var k1=int((p.y+r-Z0)/STEP)+1
 	for k in range(max(k0,0),min(k1,nz-1)+1):
 		for i in range(max(i0,0),min(i1,nx-1)+1):
 			var q=Vector2(X0+i*STEP,Z0+k*STEP);var d=q.distance_to(p)
 			if d>r:continue
+			if maske.is_valid() and not maske.call(q):continue
 			var w=1.0 if d<=r_core else 1.0-smoothstep(r_core,r,d)
 			var key=idx(i,k)
 			if not cut.has(key) or cut[key][1]<w:cut[key]=[y,w]

@@ -56,6 +56,11 @@ func _process(dt):
 	rotation=Vector3(deg_to_rad(pitch),yaw,0)
 	arm.spring_length=lerp(arm.spring_length,lerp(dist,1.9,_ziel_t),dt*8.0)
 	cam.fov=lerp(68.0,16.0 if scope else 52.0,_ziel_t)
+	# Kamera an der Wand ganz nah an die Figur gedrückt: Figur ausblenden statt durch den Kopf zu schauen
+	if not im_auto and ziel is Node3D:
+		var nah_dran=arm.get_hit_length()<1.0
+		if ziel.visible==nah_dran:ziel.visible=not nah_dran
+	elif ziel and not ziel.visible:ziel.visible=true
 
 # Blickrichtung (für die Laufsteuerung): Vorwärts der Kamera auf dem Boden
 func blick_yaw()->float:return yaw+PI

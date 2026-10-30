@@ -33,7 +33,10 @@ func _init():
 				gruppen[mat].append_from(m.mesh,si,xf)
 		if t.roof!=null:
 			var st2=SurfaceTool.new();st2.begin(Mesh.PRIMITIVE_TRIANGLES)
-			st2.append_from(t.roof,0,Transform3D(Basis(),off));gruppen[B.roof_mat()]=st2
+			# hohle Fassaden und Häuser mit Lichthof behalten ihr ergänztes Dach vollständig
+			var dach=t.roof if (HOHL.has(name) or name=="beautiful_02") else _dach_freistellen(t.roof,ms,w,t.ab)
+			if dach!=null:
+				st2.append_from(dach,0,Transform3D(Basis(),off));gruppen[B.roof_mat()]=st2
 		# Grundriss (konvexe Hülle von oben) für Fundament, Kollision und – bei hohlen Fassaden – den Gebäudekern
 		var pts=PackedVector2Array();var ys=PackedFloat32Array()
 		for m in ms:
@@ -170,3 +173,48 @@ func _rel(n:Node,root:Node)->Transform3D:
 		if c is Node3D:t=c.transform*t
 		c=c.get_parent()
 	return t
+
+# Ergänztes Flachdach nur dort, wo das Modell oben offen ist. Hat das Modell schon ein (Sattel-)Dach,
+# ragte die flache Platte an den Traufen als schwarze Zacken heraus.
+func _dach_freistellen(roof:Mesh,ms:Array,w:Node3D,ab:AABB)->Mesh:
+	var cs=0.5;var x0=ab.position.x-1.0;var z0=ab.position.z-1.0
+	var nx=int(ceil(ab.size.x/cs))+5;var nz=int(ceil(ab.size.z/cs))+5
+	var deckel=PackedByteArray();deckel.resize(nx*nz)
+	var y_ab=ab.position.y+ab.size.y*0.45
+	for m in ms:
+		if not m.visible or m.mesh==null:continue
+		var xf=_rel(m,w)
+		for si in m.mesh.get_surface_count():
+			var arr=m.mesh.surface_get_arrays(si);var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX];var I=arr[Mesh.ARRAY_INDEX]
+			var cnt=I.size() if I!=null and I.size()>0 else V.size()
+			var t=0
+			while t+2<cnt:
+				var a=xf*V[I[t] if I!=null and I.size()>0 else t];var b=xf*V[I[t+1] if I!=null and I.size()>0 else t+1];var c=xf*V[I[t+2] if I!=null and I.size()>0 else t+2]
+				t+=3
+				if max(a.y,max(b.y,c.y))<y_ab:continue
+				var nrm=(b-a).cross(c-a)
+				if nrm.length()<1e-6 or abs(nrm.normalized().y)<0.25:continue   # nur dachartige (liegende) Flächen
+				var L=max(a.distance_to(b),max(b.distance_to(c),c.distance_to(a)));var n=int(L/(cs*0.5))+1
+				for i in n+1:
+					for j in n+1-i:
+						var u=float(i)/n;var v=float(j)/n
+						var q=a+(b-a)*u+(c-a)*v
+						var ix=int((q.x-x0)/cs);var iz=int((q.z-z0)/cs)
+						if ix>=0 and iz>=0 and ix<nx and iz<nz:deckel[iz*nx+ix]=1
+	var arr=roof.surface_get_arrays(0);var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
+	var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);st.set_normal(Vector3.UP)
+	var behalten=0;var weg=0
+	for k in range(0,V.size(),3):
+		var c=(V[k]+V[k+1]+V[k+2])/3.0
+		var ix=int((c.x-x0)/cs);var iz=int((c.z-z0)/cs)
+		var zu=false
+		for dz in [-1,0,1]:
+			for dx in [-1,0,1]:
+				var px=ix+dx;var pz=iz+dz
+				if px>=0 and pz>=0 and px<nx and pz<nz and deckel[pz*nx+px]==1:zu=true
+		if zu:weg+=1;continue
+		for q in 3:st.set_uv(Vector2(V[k+q].x,V[k+q].z)*0.25);st.add_vertex(V[k+q])
+		behalten+=1
+	print("  Dach: %d Dreiecke behalten, %d unter vorhandenem Dach entfernt"%[behalten,weg])
+	if behalten==0:return null
+	return st.commit()
