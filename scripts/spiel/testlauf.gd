@@ -20,12 +20,21 @@ var _ab:=0
 func _process(dt):
 	t+=dt
 	var st=spiel.st
-	if spiel.test_modus=="rundgang":
+	if spiel.test_modus=="rundgang" or spiel.test_modus=="luft":
+		var luft=spiel.test_modus=="luft"
 		# Rundgang durch die Hauptstadt: an mehreren Straßenpunkten in vier Richtungen fotografieren
 		if t<1.2:return
 		t=0
 		var orte=[Vector2(-211,571),Vector2(-330,700),Vector2(-120,820),Vector2(200,-330),Vector2(-150,120),Vector2(300,1400)]
 		var i=ui_schritt/7;var j=ui_schritt%7
+		if luft and j>=1 and j<=4:
+			if j==1:spiel.kam.yaw=0.6;spiel.kam.pitch=-60.0;spiel.kam.dist=90.0
+			if j==2:shot("ort%d_luftA"%i)
+			if j==3:spiel.kam.yaw=0.6+PI;spiel.kam.pitch=-35.0;spiel.kam.dist=60.0
+			if j==4:shot("ort%d_luftB"%i)
+			ui_schritt+=1
+			if j==4:ui_schritt+=2
+			return
 		if i>=orte.size():get_tree().quit();return
 		if j==0:
 			var r=spiel.welt.S.roads;var best=null;var bd=1e9

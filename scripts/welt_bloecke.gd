@@ -125,7 +125,7 @@ func bauen(parent:Node3D):
 		if not deko.has(k):deko[k]=load("res://scripts/batch.gd").new()
 		sb.b_deko=deko[k]
 		var opt=_optionen(d,fl,sb)
-		opt.ohne_gehweg=true;opt.hofboden=not steil
+		opt.ohne_gehweg=true;opt.hofboden=false   # Hofboden war eine flache Platte auf schrägem Gelände (schwebte/versank); jetzt Gelände + Pflaster unter Parkplätzen
 		var gy=(hmin+hmax)*0.5+0.04
 		var e=sb.block(wurzel,poly,gy-sb.bord_h,opt)
 		if not steil and e.size()>0:sb.hof_ausstatten(wurzel,e,gy,_baum_dummy,[])

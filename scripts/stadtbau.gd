@@ -594,6 +594,7 @@ func hof_ausstatten(parent:Node3D,e:Dictionary,gy:float,baum:Mesh,autos:Array):
 	var c=_mitte(hof)
 	var gruen=Mats.flat(Color(0.12,0.3,0.18),0.7);var grau=Mats.flat(Color(0.32,0.33,0.34),0.6,0.4)
 	var holz=Mats.flat(Color(0.45,0.32,0.2),0.8);var blech=Mats.flat(Color(0.55,0.56,0.55),0.45,0.7)
+	var asph=Mats.pbr("asphalt",0.15,Color(0.5,0.5,0.52))
 	var tor_farben=[Color(0.75,0.74,0.7),Color(0.55,0.6,0.65),Color(0.7,0.62,0.5),Color(0.45,0.5,0.45)]
 	if typ=="gruen":
 		spielplatz(parent,hof,gy)
@@ -639,7 +640,8 @@ func hof_ausstatten(parent:Node3D,e:Dictionary,gy:float,baum:Mesh,autos:Array):
 		for k in anzahl:
 			var p=ka+ex*(2.0+k*3.2+1.6)+ey*3.2
 			if not frei.call(p,1.6,3.0,ex,ey,0.0):continue
-			var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,gy,p.y))
+			var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,_y(p,gy),p.y))
+			if hoehe_cb.is_valid():b_deko.box(asph,Vector3(-1.7,-0.6,-3.1),Vector3(1.7,0.03,6.5),xf)
 			b_deko.box(Mats.flat(Color(0.62,0.6,0.56),0.85),Vector3(-1.6,0,-3.0),Vector3(1.6,2.6,3.0),xf)
 			b_deko.box(Mats.flat(tor_farben[rng.randi()%tor_farben.size()],0.5,0.5),Vector3(-1.25,0.05,3.0),Vector3(1.25,2.2,3.06),xf)
 			for r in 6:b_deko.box(grau,Vector3(-1.25,0.25+r*0.33,3.06),Vector3(1.25,0.28+r*0.33,3.09),xf)
@@ -655,11 +657,12 @@ func hof_ausstatten(parent:Node3D,e:Dictionary,gy:float,baum:Mesh,autos:Array):
 		while x<spanne:
 			var p=ka+ex*x+ey*y0
 			if frei.call(p,1.3,2.5,ex,ey,0.6):
-				var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,gy+0.01,p.y))
+				var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,_y(p,gy)+0.01,p.y))
+				if hoehe_cb.is_valid():b_deko.box(asph,Vector3(-1.4,-0.6,-3.6),Vector3(1.4,0.0,2.6),xf)
 				b_deko.box(weiss,Vector3(-1.32,0,-2.5),Vector3(-1.22,0.01,2.5),xf);b_deko.box(weiss,Vector3(1.22,0,-2.5),Vector3(1.32,0.01,2.5),xf)
 				if rng.randf()<0.55 and not autos.is_empty():
 					var auto=load("res://assets/cache/autos/"+autos[rng.randi()%autos.size()]+".scn").instantiate();parent.add_child(auto)
-					auto.position=Vector3(p.x,gy,p.y);auto.rotation.y=atan2(ey.x,ey.y)+(PI if rng.randf()<0.5 else 0.0)
+					auto.position=Vector3(p.x,_y(p,gy),p.y);auto.rotation.y=atan2(ey.x,ey.y)+(PI if rng.randf()<0.5 else 0.0)
 				belegt.append([p,1.3,2.5,ex,ey]);plaetze+=1
 			x+=2.7
 		if plaetze>int(fl/60.0):break
@@ -673,7 +676,7 @@ func hof_ausstatten(parent:Node3D,e:Dictionary,gy:float,baum:Mesh,autos:Array):
 		var art=rng.randi()%4
 		var hx=[1.2,1.0,1.2,0.9][art];var hy=[1.2,0.7,0.6,0.6][art]
 		if not frei.call(p,hx,hy,ex,ey,0.4):continue
-		var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,gy,p.y))
+		var xf=Transform3D(Basis(Vector3.UP,atan2(ey.x,ey.y)),Vector3(p.x,_y(p,gy),p.y))
 		match art:
 			0:
 				b_deko.box(holz,Vector3(-1.0,0.42,-0.25),Vector3(1.0,0.5,0.25),xf);b_deko.box(holz,Vector3(-1.0,0.5,0.2),Vector3(1.0,0.95,0.28),xf)
@@ -705,5 +708,9 @@ func _streuen(parent:Node3D,hof:PackedVector2Array,gy:float,baum:Mesh,c:Vector2,
 			if Geometry2D.get_closest_point_to_segment(p,hof[i],hof[(i+1)%hof.size()]).distance_to(p)<3.0:ok=false
 		if not ok:continue
 		baum_setzen(parent,baum,p,gy,rng.randf_range(0.6,0.85))
+
+# Bodenhöhe an einem Punkt (in der Welt: Gelände, im Probestück: Blockhöhe)
+func _y(p:Vector2,gy:float)->float:
+	return hoehe_cb.call(p) if hoehe_cb.is_valid() else gy
 
 func fertig(parent:Node3D):b_deko.commit(parent)
