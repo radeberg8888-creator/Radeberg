@@ -163,6 +163,7 @@ func _materialien():
 	M.laub=[_toon(Color(0.3,0.58,0.22)),_toon(Color(0.4,0.66,0.25)),_toon(Color(0.24,0.5,0.24))]
 	M.rinde=_toon(Color(0.4,0.27,0.17))
 	M.markierung=_toon(Color(0.97,0.97,0.94))
+	M.mauer=_shader(ZIEGEL,{"farbe":Color(0.62,0.6,0.56),"fuge":Color(0.45,0.44,0.42),"bw":0.6,"bh":0.3})
 	M.linie=StandardMaterial3D.new();M.linie.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;M.linie.albedo_color=Color(0.07,0.05,0.06)
 	M.gelb=_toon(Color(0.98,0.8,0.15))
 	M.rot=_toon(Color(0.85,0.15,0.12))
@@ -178,12 +179,11 @@ func _materialien():
 # ---------------- Geometrie-Sammler ----------------
 func _st(m:Material,eigen:=false)->SurfaceTool:
 	# eigen: von Hand gebaute Flächen getrennt halten (SurfaceTool mischt append_from und add_vertex nicht sauber)
-	var k=str(m.get_instance_id())+("h" if eigen else "")
+	var k=str(m.get_instance_id())+("h" if eigen else "")+("s" if strassen_modus else "")
 	if st.has(k) and not eigen:
 		zaehler[k]=zaehler.get(k,0)+1
 		if zaehler[k]>5000:
-			var mi=MeshInstance3D.new();mi.mesh=st[k].commit();mi.material_override=mats[k];welt.add_child(mi)
-			if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_mesh_aus(k)
 			st.erase(k);zaehler[k]=0
 	if not st.has(k):
 		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m
@@ -241,12 +241,23 @@ func _hex_in(s:SurfaceTool,p:Array,innen:=false):
 			var t=b;b=d;d=t;n=-n
 		# Godot: Vorderseite = im Uhrzeigersinn (von außen gesehen)
 		for v in [a,cc,b,a,d,cc]:s.set_normal(n);s.add_vertex(v)
+var strassen_modus:=false   # Geometrie folgt nur dem Höhenfeld (Straßen, Autos), nicht den Blockstufen
+var hoehen_an:=false
+func _mesh_aus(k:String):
+	var mi=MeshInstance3D.new();mi.material_override=mats[k];welt.add_child(mi)
+	if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not hoehen_an:
+		mi.mesh=st[k].commit();return
+	var arr=st[k].commit_to_arrays()
+	var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
+	var nur_feld=k.ends_with("s")
+	for i in V.size():
+		var v=V[i];v.y+=(FY(v.x,v.z) if nur_feld else Y_at(v.x,v.z));V[i]=v
+	arr[Mesh.ARRAY_VERTEX]=V
+	var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);mi.mesh=am
 func _fertig():
-	for k in st:
-		var s:SurfaceTool=st[k]
-		var mi=MeshInstance3D.new();mi.mesh=s.commit();mi.material_override=mats[k];welt.add_child(mi)
-		if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
+	for k in st.keys():_mesh_aus(k)
+	st.clear()
 # ---------------- Umgebung ----------------
 func _umgebung():
 	var we=WorldEnvironment.new();var e=Environment.new();we.environment=e;welt.add_child(we)
@@ -1672,29 +1683,37 @@ func _stadt():
 	# Autobahn (Hochstraße, U-Form um die Stadt)
 	var hp=_kurve([Vector2(-460,-238),Vector2(-150,-238),Vector2(100,-236),Vector2(215,-222),Vector2(262,-165),Vector2(272,-60),Vector2(272,80),Vector2(262,170),Vector2(215,226),Vector2(100,238),Vector2(-150,240),Vector2(-460,242)],3.0)
 	HW={"P":hp,"S":_laengen(hp),"w":9.0}
-	# Rampen: [Punkte, h0, h1, flach_anfang, flach_ende]
-	var schleife=[Vector2(212,14),Vector2(230,19)]
-	for k in range(0,29):
-		var a=deg_to_rad(-80.0-k*11.0)
-		schleife.append(Vector2(238,46)+Vector2(cos(a),sin(a))*24.0)
-	schleife+= [Vector2(258,5),Vector2(260,-40),Vector2(260,-80),Vector2(260,-118)]
+	# Rampen: Straßenteil (Kontrollpunkte ab Straße) + Einfädelstreifen parallel zur Autobahn (aus der Autobahnlinie berechnet)
+	var kreis=[]
+	for k in range(0,19):
+		var a=deg_to_rad(-90.0+k*15.0);kreis.append(Vector2(307.5,38.0)+Vector2(cos(a),sin(a))*22.0)
 	var rdefs=[
-		[[Vector2(285,-140),Vector2(287,-80),Vector2(298,-35),Vector2(318,-4),Vector2(345,11),Vector2(375,12)],H_AB,0.0,30.0,25.0,"Abfahrt Ost"],
-		[schleife,0.0,H_AB,22.0,35.0,"Schleife"],
-		[[Vector2(-40,-167),Vector2(-38,-186),Vector2(-20,-210),Vector2(20,-223),Vector2(70,-226),Vector2(115,-225)],0.0,H_AB,14.0,32.0,"Auffahrt Nord"],
-		[[Vector2(-95,-226),Vector2(-150,-226),Vector2(-190,-216),Vector2(-210,-188),Vector2(-205,-150),Vector2(-197,-118)],H_AB,0.0,28.0,22.0,"Abfahrt West"],
-		[[Vector2(115,227),Vector2(60,227),Vector2(20,215),Vector2(2,192),Vector2(-3,166)],H_AB,0.0,28.0,14.0,"Abfahrt Süd"],
+		# [Name, Kontrollpunkte ab Straße, Referenz Start, Referenz Ende, Seite]
+		["Auffahrt Nord",[Vector2(-40,-163),Vector2(-40,-182),Vector2(-32,-202),Vector2(-12,-218)],Vector2(5,-224),Vector2(95,-224),1],
+		["Abfahrt Nord",[Vector2(-120,-163),Vector2(-120,-182),Vector2(-128,-202),Vector2(-146,-218)],Vector2(-165,-224),Vector2(-250,-224),1],
+		["Abfahrt Süd",[Vector2(0,163),Vector2(0,182),Vector2(10,202),Vector2(32,218)],Vector2(55,225),Vector2(135,222),1],
+		["Abfahrt Ost",[Vector2(193,-45),Vector2(214,-45),Vector2(236,-50),Vector2(252,-62)],Vector2(258,-80),Vector2(255,-140),1],
+		["Auffahrt Süd",[Vector2(240,13),Vector2(249,15),Vector2(255,22),Vector2(258,32)],Vector2(258,42),Vector2(258,112),1],
+		["Schleife",kreis,Vector2(285,28),Vector2(285,-45),-1],
 	]
 	for d in rdefs:
-		var P=_kurve(d[0],2.5);var S=_laengen(P);var L=S[S.size()-1]
+		var ctrl=Array(d[1])
+		var s0=_s_von(HW.P,HW.S,d[2]);var s1=_s_von(HW.P,HW.S,d[3])
+		var n=int(abs(s1-s0)/10.0)
+		var par0=ctrl.size()
+		for i in n+1:
+			var b=_bei_s(HW.P,HW.S,lerp(s0,s1,float(i)/n));var rn=_rn(b[1])
+			var tt=float(i)/n
+			ctrl.append(b[0]+rn*d[4]*lerp(HW.w+4.5-0.4,5.0,smoothstep(0.55,1.0,tt)))
+		var P=_kurve(ctrl,2.5);var S=_laengen(P);var L=S[S.size()-1]
+		var s_par=_s_von(P,S,ctrl[par0])
 		var H=PackedFloat32Array()
-		for i in P.size():H.append(lerp(d[1],d[2],smoothstep(d[3],L-d[4],S[i])))
-		RAMPEN.append({"P":P,"S":S,"H":H,"w":4.5,"n":d[5]})
-		# ebenerdiger Teil wird Straße (für Blöcke/Grünflächen)
+		for i in P.size():H.append(H_AB*smoothstep(6.0,max(s_par,12.0),S[i]))
+		RAMPEN.append({"P":P,"S":S,"H":H,"w":4.5,"n":d[0],"par":s_par})
 		var flach=PackedVector2Array()
 		for i in P.size():
 			if H[i]<0.45:flach.append(P[i])
-		if flach.size()>1:_strasse("rampe_"+d[5],flach,4.5,"rampe",false,true)
+		if flach.size()>1:_strasse("rampe_"+d[0],flach,4.5,"rampe",false,true)
 	_kreuzungen()
 	# ---------- Flächen ----------
 	var start=_groesstes(Geometry2D.offset_polygon(ring,-5.5))
@@ -1716,7 +1735,12 @@ func _stadt():
 	STADT_STUECKE=stuecke
 	# Asphalt der ganzen Stadtfläche (alles, was kein Block ist, ist Straße)
 	var asph=_groesstes(Geometry2D.offset_polygon(ring,5.5))
-	_platte(asph,-0.2,0.015,M.asphalt,M.stein_d)
+	# Fahrbahnen als Bänder je Straße (folgen dem Höhenfeld; alles zwischen den Blöcken ist so abgedeckt)
+	strassen_modus=true
+	for r in R:
+		if r.aussen:continue
+		for band in Geometry2D.offset_polyline(r.P,r.w+0.05,Geometry2D.JOIN_ROUND,Geometry2D.END_ROUND):_band(band)
+	strassen_modus=false
 	# Außenbereich (Grün) in Quadranten, ohne Ring und Außenstraßen
 	var ringaussen=asph
 	for q in [[-470,-300,0,0],[0,-300,470,0],[-470,0,0,300],[0,0,470,300]]:
@@ -1743,20 +1767,26 @@ func _stadt():
 	var n_haus=0
 	for pc in STADT_STUECKE:
 		var A=abs(_flaeche2(pc))
-		_platte(pc,-0.2,KB,M.pflaster,M.stein)
+		_platte(pc,-9.0,KB,M.pflaster,M.mauer)
 		_spitze_ecke_merken(pc)
 		if A<150:continue
 		n_haus+=_block(pc)
 	print("HAEUSER ",n_haus," BLOECKE ",STADT_STUECKE.size()," KREUZUNGEN ",JN.size())
+	strassen_modus=true
 	_markierungen()
+	strassen_modus=false
 	_ampeln()
 	_strassenmoebel()
+	strassen_modus=true
 	_autobahn()
 	_rampen()
 	_parken()
+	strassen_modus=false
+	_tunnel()
 	_aussen_baeume()
 	_fussgaenger()
 	_schaustueck()
+	_hoehenraster()
 
 func _bbox(P:PackedVector2Array)->Rect2:
 	var r=Rect2(P[0],Vector2.ZERO)
@@ -1773,7 +1803,7 @@ func _kreuzungen():
 					if x==null:continue
 					var neu=true
 					for k in JN:
-						if k.p.distance_to(x)<8.0:neu=false
+						if k.p.distance_to(x)<18.0:neu=false
 					if neu:JN.append({"p":x,"r":max(a.w,b.w)+SWB+1.0,"a":a,"b":b})
 	# Ein-/Ausmündungen ohne echten Schnitt (Endpunkt nahe an anderer Straße)
 	for a in R:
@@ -1788,7 +1818,7 @@ func _kreuzungen():
 			if nr and nd<nr.w+2.0:
 				var neu=true
 				for k in JN:
-					if k.p.distance_to(e)<10.0:neu=false
+					if k.p.distance_to(e)<18.0:neu=false
 				if neu:JN.append({"p":e,"r":max(a.w,nr.w)+SWB+1.0,"a":a,"b":nr})
 func _nah_kreuzung(p:Vector2,extra:=0.0)->bool:
 	for k in JN:
@@ -2107,6 +2137,7 @@ func _auto_farbe()->Color:return AUTOFARBEN[rng.randi()%AUTOFARBEN.size()]
 func _quer(p:Vector2,t:Vector2,lat:float,laengs:float,breite:float,lang:float,y:=0.022,m:Material=null):
 	var rn=_rn(t);var c=p+rn*lat+t*laengs
 	box(m if m else M.markierung,Vector3(c.x,y,c.y),Vector3(breite,0.012,lang),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
+var ZEBRAS:=[]
 func _markierungen():
 	for r in R:
 		if r.typ=="gasse" or r.typ=="rampe":continue
@@ -2119,7 +2150,7 @@ func _markierungen():
 					if fmod(s,8.0)<2.6:
 						for sd in [-1,1]:_quer(p,t,sd*3.5,0.0,0.12,3.0)
 				elif r.typ!="einbahn" and fmod(s,6.0)<2.6:_quer(p,t,0.0,0.0,0.14,3.0)
-				for sd in [-1,1]:_quer(p,t,sd*(r.w-0.35),0.0,0.12,2.6)
+				for sd in [-1,1]:_quer(p,t,sd*(r.w-0.6),0.0,0.12,2.6)
 			s+=2.5
 		if r.typ=="einbahn":
 			s=12.0
@@ -2141,6 +2172,13 @@ func _markierungen():
 				var s=s0+dir*(o.w+2.0)
 				if s<1.0 or s>L-1.0:continue
 				var b=_bei_s(r.P,r.S,s);var p:Vector2=b[0];var t:Vector2=b[1]
+				var andere=false
+				for k2 in JN:
+					if k2!=k and k2.p.distance_to(p)<k2.r+0.5:andere=true
+				for zc in ZEBRAS:
+					if zc.distance_to(p)<7.0:andere=true
+				if andere or o.typ in ["gasse","rampe"]:continue
+				ZEBRAS.append(p)
 				var lat=-r.w+0.7
 				while lat<r.w-0.6:
 					_quer(p,t,lat,0.0,0.5,3.0,0.023);lat+=1.0
@@ -2154,6 +2192,7 @@ func _ampeln():
 		if k.a.typ in ["gasse","rampe"] or k.b.typ in ["gasse","rampe"]:continue
 		var gruen=true
 		for pc in STADT_STUECKE:
+			if abs(_flaeche2(pc))<120.0:continue
 			var bd=INF;var bv=Vector2.ZERO
 			for v in pc:
 				var d=v.distance_to(k.p)
@@ -2197,7 +2236,17 @@ func _einbahnschild(p:Vector3,r,zur:Vector3):
 	_schrift("EINBAHN",p+Vector3(0,2.4,0)+zur*0.085,b,0.0018,Color(1,1,1))
 
 # ---------- Autobahn ----------
-func _deck(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:bool,leitplanke:bool):
+func _offen(p:Vector2,eigen)->bool:
+	# liegt neben dieser Kante (außen) eine andere Hochfahrbahn? Dann keine Leitplanke (Einfädelstreifen)
+	for rp in RAMPEN:
+		if rp==eigen:continue
+		for i in range(0,rp.P.size(),2):
+			if rp.H[i]>H_AB-0.6 and rp.P[i].distance_to(p)<rp.w+1.2:return true
+	if eigen!=null:
+		var s=_s_von(HW.P,HW.S,p)
+		if _bei_s(HW.P,HW.S,s)[0].distance_to(p)<HW.w+1.2:return true
+	return false
+func _deck(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:bool,leitplanke:bool,eigen=null):
 	var top=_st(M.asphalt,true);var seite=_st(M.stein_d,true);var unten=_st(M.stein_d,true)
 	var n=P.size()
 	var N=[]
@@ -2212,16 +2261,16 @@ func _deck(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:
 		for sd in [-1,1]:
 			var e0=P[i]+N[i]*w*sd;var e1=P[i+1]+N[i+1]*w*sd;var o=Vector3(N[i].x*sd,0,N[i].y*sd)
 			_tri(seite,Vector3(e0.x,u0,e0.y),Vector3(e1.x,u1,e1.y),Vector3(e1.x,h1,e1.y),o);_tri(seite,Vector3(e0.x,u0,e0.y),Vector3(e1.x,h1,e1.y),Vector3(e0.x,h0,e0.y),o)
-			if leitplanke and (h0>0.7 or h1>0.7):
+			if leitplanke and (h0>0.7 or h1>0.7) and not (h0>H_AB-0.6 and _offen(P[i]+N[i]*(w+0.8)*sd,eigen)):
 				var m0=P[i]+N[i]*(w-0.25)*sd;var m1=P[i+1]+N[i+1]*(w-0.25)*sd;var mm=(m0+m1)*0.5;var dd=m1-m0
-				box(M.stein,Vector3(mm.x,(h0+h1)*0.5+0.42,mm.y),Vector3(0.45,0.85,dd.length()+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y)),0.0)
-				box(M.linie,Vector3(mm.x,(h0+h1)*0.5+0.86,mm.y),Vector3(0.47,0.04,dd.length()+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y)),0.0)
+				box(M.stein,Vector3(mm.x,(h0+h1)*0.5+0.42,mm.y),Vector3(0.45,0.85,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
+				box(M.linie,Vector3(mm.x,(h0+h1)*0.5+0.86,mm.y),Vector3(0.47,0.04,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
 		if h0>1.5:
 			_tri(unten,Vector3(a.x,u0,a.y),Vector3(b.x,u0,b.y),Vector3(c.x,u1,c.y),Vector3.DOWN);_tri(unten,Vector3(a.x,u0,a.y),Vector3(c.x,u1,c.y),Vector3(d.x,u1,d.y),Vector3.DOWN)
 		if mittel:
 			var mm=(P[i]+P[i+1])*0.5;var dd=P[i+1]-P[i]
-			box(M.stein,Vector3(mm.x,(h0+h1)*0.5+0.42,mm.y),Vector3(0.6,0.85,dd.length()+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y)),0.0)
-			box(M.linie,Vector3(mm.x,(h0+h1)*0.5+0.86,mm.y),Vector3(0.62,0.04,dd.length()+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y)),0.0)
+			box(M.stein,Vector3(mm.x,(h0+h1)*0.5+0.42,mm.y),Vector3(0.6,0.85,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
+			box(M.linie,Vector3(mm.x,(h0+h1)*0.5+0.86,mm.y),Vector3(0.62,0.04,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
 
 func _ueber_strasse(p:Vector2,extra:float)->bool:
 	var nr=_naechste(p,30.0)
@@ -2278,7 +2327,7 @@ func _autobahn():
 
 func _rampen():
 	for rp in RAMPEN:
-		_deck(rp.P,rp.H,rp.w,0.9,false,true)
+		_deck(rp.P,rp.H,rp.w,0.9,false,true,rp)
 		var L=rp.S[rp.S.size()-1];var s=8.0
 		while s<L:
 			var i=rp.S.bsearch(s);i=clamp(i,0,rp.P.size()-1)
@@ -2329,7 +2378,7 @@ func _parken():
 		while s<L-10:
 			var b=_bei_s(r.P,r.S,s);var p:Vector2=b[0];var t:Vector2=b[1];var rn=_rn(t)
 			s+=rng.randf_range(35,70)
-			if _nah_kreuzung(p,2.0):continue
+			if _nah_kreuzung(p,10.0):continue
 			var sd=1 if rng.randf()<0.5 else -1
 			if r.typ=="einbahn":sd=0
 			var h=t if sd>=0 else -t
@@ -2357,6 +2406,8 @@ func _aussen_baeume():
 		var dh=INF
 		for i in range(0,HW.P.size()-1,3):dh=min(dh,HW.P[i].distance_to(p))
 		if dh<HW.w+4.0:continue
+		if p.x>195 and p.x<252 and p.y>-35 and p.y<55:continue
+		if p.x>195 and p.x<250 and p.y>-35 and p.y<55:continue
 		var drp=INF
 		for rp in RAMPEN:
 			for i in range(0,rp.P.size(),2):drp=min(drp,rp.P[i].distance_to(p))
@@ -2525,6 +2576,111 @@ func _skelett_mensch(pos:Vector3,yaw:float,o:Dictionary,anim:String,zeit:float):
 	if ap and ap.has_animation(anim):
 		ap.play(anim);ap.seek(zeit,true);ap.speed_scale=0.0
 
+# ================= Höhen: Terrassen =================
+# Höhenfeld: ein Hügelviertel im Nordwesten (Plateau), Straßen steigen weich an.
+# Jeder Block liegt auf EINER Höhe (in 2-m-Stufen) – zur tieferen Straße hin entsteht eine Stützmauer.
+const PLATEAU:=Vector2(-125,-100)
+func FY(x:float,z:float)->float:
+	var d=Vector2(x,z).distance_to(PLATEAU)
+	return 6.0*(1.0-smoothstep(40.0,92.0,d))
+var LG:PackedFloat32Array
+const LGX0:=-202.0
+const LGZ0:=-172.0
+const LGC:=0.5
+var LGN:=0;var LGM:=0
+func Y_at(x:float,z:float)->float:
+	var i=int((x-LGX0)/LGC);var k=int((z-LGZ0)/LGC)
+	if i>=0 and k>=0 and i<LGN and k<LGM:
+		var v=LG[k*LGN+i]
+		if v>-1000.0:return v
+	return FY(x,z)
+func _block_hoehe(pc:PackedVector2Array)->float:
+	var m=0.0
+	for v in pc:m=max(m,FY(v.x,v.y))
+	return ceil(m/2.0-0.15)*2.0
+func _hoehenraster():
+	LGN=int(404.0/LGC);LGM=int(344.0/LGC)
+	LG=PackedFloat32Array();LG.resize(LGN*LGM);LG.fill(-1e9)
+	var n_stufe=0
+	var liste=[]
+	for pc in STADT_STUECKE:
+		var hb=_block_hoehe(pc)
+		if hb>0.0:n_stufe+=1
+		var gross=_groesstes(Geometry2D.offset_polygon(pc,3.5))
+		if gross.size()>=3:liste.append([gross,hb])
+	for pc in STADT_STUECKE:liste.append([pc,_block_hoehe(pc)])
+	for e in liste:
+		var pc:PackedVector2Array=e[0];var hb:float=e[1]
+		var bb=_bbox(pc)
+		var k0=max(0,int((bb.position.y-LGZ0)/LGC));var k1=min(LGM-1,int((bb.end.y-LGZ0)/LGC))
+		for k in range(k0,k1+1):
+			var z=LGZ0+(k+0.5)*LGC;var xs=[]
+			for i in pc.size():
+				var a=pc[i];var b=pc[(i+1)%pc.size()]
+				if (a.y<=z)!=(b.y<=z):xs.append(a.x+(z-a.y)/(b.y-a.y)*(b.x-a.x))
+			xs.sort()
+			for j in range(0,xs.size()-1,2):
+				var i0=max(0,int((xs[j]-LGX0)/LGC)-1);var i1=min(LGN-1,int((xs[j+1]-LGX0)/LGC)+1)
+				for i in range(i0,i1+1):LG[k*LGN+i]=hb
+	hoehen_an=true
+	# einzelne Knoten (Schrift, Figuren) mitverschieben
+	for c in welt.get_children():
+		if c is Label3D:c.position.y+=Y_at(c.position.x,c.position.z)
+	for p in SKELETTE:p.position.y+=Y_at(p.position.x,p.position.z)
+	print("TERRASSEN Blöcke erhöht: ",n_stufe)
+
+# Fahrbahnband: Fläche fein unterteilt (damit sie dem Höhenfeld folgt)
+func _band(poly:PackedVector2Array):
+	if Geometry2D.is_polygon_clockwise(poly):return   # Innenrand eines Rings ist ein Loch, keine Fläche
+	var idx=Geometry2D.triangulate_polygon(poly)
+	if idx.is_empty():return
+	var so=_st(M.asphalt,true)
+	for i in range(0,idx.size(),3):
+		_tri_fein(so,poly[idx[i]],poly[idx[i+1]],poly[idx[i+2]],0.015,7)
+func _tri_fein(so:SurfaceTool,a:Vector2,b:Vector2,c:Vector2,y:float,tiefe:int):
+	var L=max(a.distance_to(b),max(b.distance_to(c),c.distance_to(a)))
+	if L>6.0 and tiefe>0:
+		var ab=(a+b)*0.5;var bc=(b+c)*0.5;var ca=(c+a)*0.5
+		_tri_fein(so,a,ab,ca,y,tiefe-1);_tri_fein(so,ab,b,bc,y,tiefe-1);_tri_fein(so,ca,bc,c,y,tiefe-1);_tri_fein(so,ab,bc,ca,y,tiefe-1)
+		return
+	_tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)
+
+# ================= Tunnel durch den Hügel an der Landstraße =================
+func _tunnel():
+	var x0=208.0;var x1=236.0;var zc=10.5;var hb=7.5;var th=6.2
+	var dunkel=_toon(Color(0.32,0.32,0.34));var beton=_toon(Color(0.78,0.76,0.72))
+	var gr=_shader(GRAS,{});var fels=_toon(Color(0.55,0.5,0.45))
+	# Röhre: Wände, Decke, Gehsteige, Lampen
+	for sd in [-1,1]:
+		box(dunkel,Vector3((x0+x1)*0.5,th*0.5,zc+sd*(hb+0.4)),Vector3(x1-x0,th,0.8),Basis(),0.0)
+		box(beton,Vector3((x0+x1)*0.5,0.3,zc+sd*(hb-0.4)),Vector3(x1-x0,0.6,0.8),Basis(),0.0)
+	box(dunkel,Vector3((x0+x1)*0.5,th+0.5,zc),Vector3(x1-x0,1.0,hb*2+1.6),Basis(),0.0)
+	var x=x0+3.0
+	while x<x1:
+		box(M.lampe,Vector3(x,th-0.05,zc),Vector3(1.6,0.08,0.4),Basis(),0.0);x+=6.0
+	# Portale: Betonrahmen mit Stirnwand
+	for xp in [x0,x1]:
+		var o=-1.0 if xp==x0 else 1.0
+		box(beton,Vector3(xp+o*0.3,th+0.9,zc),Vector3(1.0,1.8,hb*2+3.0),Basis(),0.04)
+		for sd in [-1,1]:box(beton,Vector3(xp+o*0.3,th*0.5,zc+sd*(hb+1.0)),Vector3(1.0,th,1.4),Basis(),0.04)
+		box(M.mauer,Vector3(xp+o*0.2,4.5,zc-hb-8.0),Vector3(0.8,9.0,13.0),Basis(),0.04)
+		box(M.mauer,Vector3(xp+o*0.2,4.5,zc+hb+8.0),Vector3(0.8,9.0,13.0),Basis(),0.04)
+		_schrift("TUNNEL RADEBERG",Vector3(xp+o*0.82,th+0.95,zc),Basis(Vector3.UP,o*PI*0.5),0.007,Color(0.1,0.1,0.12))
+	# Hügelkuppen links und rechts der Röhre, begrünte Decke dazwischen
+	var X=Vector3(1,0,0);var Z=Vector3(0,0,1)
+	box(gr,Vector3((x0+x1)*0.5,th+1.6,zc),Vector3(x1-x0-0.4,1.2,hb*2+3.0),Basis(),0.04)
+	for sd in [-1,1]:
+		var c=Vector3((x0+x1)*0.5,0,zc+sd*25.0)
+		var Rg=[]
+		for q in [[0.0,17.0,16.5],[3.5,15.0,14.0],[7.0,11.5,10.5],[9.5,7.5,7.0],[10.8,3.0,3.0]]:
+			Rg.append(ring_s(c+Vector3(0,q[0],0),X,Z,q[1],q[2],2.6,24))
+		loft(gr,Rg,true,0.04)
+		for k in 4:
+			var a=rng.randf()*TAU
+			kugel(fels,c+Vector3(cos(a)*9.0,5.5+rng.randf()*2.0,sin(a)*8.5),Vector3(1.6,1.2,1.4)*rng.randf_range(0.8,1.4),1.06)
+		_baum(c+Vector3(2.0,10.6,0.0))
+		_baum(c+Vector3(-5.0,8.8,sd*-3.0))
+
 # ================= Bilder =================
 func _bilder():
 	var vp=root.get_viewport()
@@ -2564,6 +2720,13 @@ func _bilder():
 	add.call("13_trabant_hinten",V.call(C.call(192.0,w-3.3),1.35),V.call(C.call(196.0,w-1.15),0.72),46)
 	add.call("14_taxi_polizei",V.call(C.call(209.0,w-5.6),1.4),V.call(C.call(217.0,w-1.15),0.8),52)
 	add.call("15_feuerwehr",V.call(C.call(244.0,w-4.2),2.0),V.call(C.call(237.2,w-1.15),1.6),56)
+	add.call("18_tunnel",Vector3(185.0,3.0,13.5),Vector3(215,3.0,10.5),55)
+	add.call("19_tunnel_ausfahrt",Vector3(232.0,1.9,8.5),Vector3(300,5.0,14.0),58)
+	add.call("20_schleife",Vector3(345,32,85),Vector3(290,4.0,10),58)
+	add.call("21_einfaedeln",Vector3(287.5,12.2,60),Vector3(278,10.5,-30),58)
+	add.call("22_auffahrt_nord",Vector3(-55,18,-175),Vector3(40,8,-228),58)
+	add.call("23_terrassen",Vector3(-60,22,-20),Vector3(-130,4,-100),58)
+	add.call("24_hangstrasse",Vector3(-46,FY(-46,-12)+1.8,-12),Vector3(-68,FY(-68,-90)+2.5,-90),60)
 	add.call("16_figur_skelett",V.call(C.call(190.6,w-2.3),1.35),V.call(C.call(190.0,w+1.7),1.0),40)
 	add.call("17_figuren_gehend",V.call(C.call(208.5,w+2.2),1.55),V.call(C.call(203.5,w+2.1),1.0),40)
 	for k in 3:await process_frame
