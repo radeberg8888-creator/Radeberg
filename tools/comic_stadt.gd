@@ -250,6 +250,8 @@ func _mesh_aus(k:String):
 	if not hoehen_an:
 		mi.mesh=st[k].commit();return
 	var arr=st[k].commit_to_arrays()
+	if arr.is_empty() or arr[Mesh.ARRAY_VERTEX]==null:
+		mi.queue_free();return
 	var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
 	if k.ends_with("n"):
 		mi.mesh=st[k].commit();return
@@ -2009,8 +2011,30 @@ func _auf_rand(p:Vector2,q:Vector2,poly:PackedVector2Array)->bool:
 	return false
 
 const LADEN_NAMEN:=["BÄCKEREI","KIOSK","DÖNER","FRISEUR","APOTHEKE","BLUMEN","PFANDLEIHE","WASCHSALON","BUCHLADEN","IMBISS","ELEKTRO","CAFÉ","SPÄTI","OPTIKER","FAHRSCHULE","BAR","SPIELHALLE","ZEITUNGEN","METZGEREI","TATTOO"]
+# Jedes Haus wird für sich gesammelt und dann als Ganzes auf seine Höhe gesetzt (kein Verzerren am Hang)
 func _gebaeude(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,stock:int,ecke:bool,alle:=[]):
-	_lot_mark(lot)
+	var hb=0.0
+	for v in lot:hb=max(hb,FY(v.x,v.y))
+	var alt=st;var altm=mats;var altz=zaehler;st={};mats={};zaehler={}
+	var n0=welt.get_child_count()
+	_gebaeude_roh(lot,aussen,innen,stock,ecke,alle)
+	for k in st.keys():
+		var arr=st[k].commit_to_arrays()
+		if arr.is_empty() or arr[Mesh.ARRAY_VERTEX]==null:continue
+		var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
+		for i in V.size():
+			var v=V[i];v.y+=(FY(v.x,v.z) if v.y<KB+0.03 else hb);V[i]=v
+		arr[Mesh.ARRAY_VERTEX]=V
+		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr)
+		var nk=str(mats[k].get_instance_id())+("h" if "h" in k else "b")+"n"
+		if not alt.has(nk):
+			var s2=SurfaceTool.new();s2.begin(Mesh.PRIMITIVE_TRIANGLES);alt[nk]=s2;altm[nk]=mats[k]
+		alt[nk].append_from(am,0,Transform3D())
+	st=alt;mats=altm;zaehler=altz
+	for i in range(n0,welt.get_child_count()):
+		var c=welt.get_child(i)
+		if c is Label3D:c.position.y+=hb-FY(c.position.x,c.position.z)
+func _gebaeude_roh(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,stock:int,ecke:bool,alle:=[]):
 	var eg=3.7;var oh=3.15;var H=eg+(stock-1)*oh;var y0=KB;var y1=KB+H
 	var ziegel=rng.randf()<0.5
 	var wand:Material=M.ziegel[rng.randi()%M.ziegel.size()] if ziegel else M.putz[rng.randi()%M.putz.size()]
@@ -2044,7 +2068,10 @@ func _gebaeude(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,stoc
 	var fronten=[]
 	for i in n:
 		var p=lot[i];var q=lot[(i+1)%n]
-		if p.distance_to(q)>=1.2 and _auf_rand(p,q,aussen):fronten.append(i)
+		if p.distance_to(q)<1.2:continue
+		# Straßenseite: direkt vor der Wand liegt kein Bauland mehr (robust auch bei vereinfachten Kanten)
+		var tq=(q-p).normalized();var mq=(p+q)*0.5;var aus=Vector2(tq.y,-tq.x)*sign(_flaeche2(lot))
+		if _auf_rand(p,q,aussen) or not Geometry2D.is_point_in_polygon(mq+aus*0.8,aussen):fronten.append(i)
 	var haupt=-1;var hl=0.0
 	for i in fronten:
 		var L=lot[i].distance_to(lot[(i+1)%n])
@@ -2612,6 +2639,8 @@ const LGZ0:=-172.0
 const LGC:=0.5
 var LGN:=0;var LGM:=0
 func Y_at(x:float,z:float)->float:
+	return FY(x,z)
+func _Y_alt(x:float,z:float)->float:
 	var i=int((x-LGX0)/LGC);var k=int((z-LGZ0)/LGC)
 	if i>=0 and k>=0 and i<LGN and k<LGM:
 		var v=LG[k*LGN+i]
