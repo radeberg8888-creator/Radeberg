@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image,ImageDraw,ImageFont
 from scipy import ndimage
 S=sys.argv[1]
+OUT=sys.argv[2] if len(sys.argv)>2 else S
 b=open(S+'hoehen.bin','rb').read()
 nx,nz=struct.unpack('<ii',b[:8]);x0,z0,st=struct.unpack('<fff',b[8:20])
 H=np.frombuffer(b[20:20+nx*nz*4],dtype=np.float32).reshape(nz,nx)
@@ -24,9 +25,29 @@ img[(dw>0)&(dw<5)]=[0.88,0.96,1.0]
 img[(dw>10)&(dw<13)]=[0.46,0.77,0.92]
 img[(dw>22)&(dw<24)]=[0.42,0.73,0.9]
 dl=ndimage.distance_transform_edt(landm)
-done=np.zeros_like(landm)
-for m,c in [(h<25,[0.56,0.8,0.36]),(h<120,[0.44,0.72,0.3]),(h<300,[0.36,0.6,0.28]),(h<550,[0.58,0.52,0.42]),(h<5000,[0.94,0.95,0.97])]:
-    mm=landm&m&~done;img[mm]=c;done|=mm
+# Bodenarten aus dem Geländeraster (gelaende.bin: Gras, Wald, Sand, Fels; Rest Trockengras/Wüste)
+gb=open('assets/cache/gelaende.bin','rb').read()
+grx,grz=struct.unpack('<ii',gb[4:12]);off=24+grx*grz*8
+bo=np.frombuffer(gb[off:off+grx*grz*4],dtype=np.uint8).reshape(grz,grx,4)/255.0
+bo=bo[iz][:,ix]
+gras,wald,sand,fels=bo[...,0],bo[...,1],bo[...,2],bo[...,3]
+trocken=np.clip(1-gras-wald-sand-fels,0,1)
+C_GRAS=np.array([0.5,0.78,0.34]);C_WALD=np.array([0.24,0.52,0.24]);C_SAND=np.array([0.96,0.83,0.52]);C_FELS=np.array([0.62,0.55,0.47]);C_TROCKEN=np.array([0.86,0.74,0.42])
+mix=gras[...,None]*C_GRAS+wald[...,None]*C_WALD+sand[...,None]*C_SAND+fels[...,None]*C_FELS+trocken[...,None]*C_TROCKEN
+# Comic: in wenige Stufen quantisieren (welche Bodenart überwiegt)
+art=np.argmax(np.stack([gras,wald,sand,fels,trocken],-1),-1)
+pal=np.array([C_GRAS,C_WALD,C_SAND,C_FELS,C_TROCKEN])
+flaeche=pal[art]*0.75+mix*0.25
+schnee=h>620
+flaeche[schnee]=[0.95,0.96,0.98]
+img[landm]=flaeche[landm]
+# Kontur zwischen Bodenarten
+grenz=np.zeros_like(landm)
+grenz[:-1]|=art[:-1]!=art[1:];grenz[:,:-1]|=art[:,:-1]!=art[:,1:]
+grenz=grenz&landm
+img[grenz]*=0.82
+# Wald: kleine Baumtupfer
+rng=np.random.default_rng(3)
 img[landm&(dl<7)&(h<6)]=[0.96,0.87,0.6]
 # Stadtflächen aus den Hauspositionen
 k=json.load(open(S+'karte.json'))
@@ -52,6 +73,12 @@ for t,x,z,yaw,skk in k['houses']:
     c=math.cos(yaw);s=math.sin(yaw);hx=6*skk[0];hz=6*skk[1]
     pts=[P(x+lx*c+lz*s,z-lx*s+lz*c) for lx,lz in [(-hx,-hz),(hx,-hz),(hx,hz),(-hx,hz)]]
     d.polygon(pts,fill=pal[(int(x)*7+int(z)*13)%len(pal)])
+ww=np.argwhere((art==1)&landm&~cm)
+for (y,x) in ww[rng.choice(len(ww),size=min(len(ww),9000),replace=False)]:
+    r=rng.integers(3,6);d.ellipse((x-r,y-r,x+r,y+r),fill=(60,125,55),outline=(25,55,25))
+ws=np.argwhere((art==2)&landm&~cm)
+for (y,x) in ws[rng.choice(len(ws),size=min(len(ws),400),replace=False)]:
+    d.line((x,y,x,y-9),fill=(70,140,60),width=3);d.line((x-4,y-5,x,y-5),fill=(70,140,60),width=2);d.line((x,y-7,x+4,y-7),fill=(70,140,60),width=2)
 roads=[]
 for line in open(S+'strassen_alt.txt'):
     a=line.split();pts=[tuple(map(int,q.split(','))) for q in a[2:]]
@@ -75,7 +102,7 @@ FB='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 f1=ImageFont.truetype(FB,40);f2=ImageFont.truetype(FB,24)
 namen=[("RADEBERG",-100,430,f1),("Downtown",250,-350,f2),("Grove",-250,700,f2),("Altstadt",-150,150,f2),("Südstadt",250,1500,f2),("Oststadt",2750,700,f2),("Hafen",400,2150,f2),
  ("Strand",-2080,-80,f2),("Kowloon",-2050,-1150,f2),("Sterndorf",1080,-520,f2),("Sandufer",880,-5900,f2),("Staubwinkel",1750,-5950,f2),("Kornfeld",1720,-7550,f2),
- ("Fischerdorf",-840,-6680,f2),("Nordbucht",-2150,-8700,f2),("Ost-Vorort",2500,-1050,f2),("Flugplatz",-2620,-5150,f2),("Rennstrecke",-660,-2380,f2),("Flughafen",-2100,2280,f2)]
+ ("Fischerdorf",-840,-6680,f2),("Nordbucht",-2150,-8700,f2),("Ost-Vorort",2500,-1050,f2),("Flugplatz",-2620,-5150,f2),("Rennstrecke",-660,-2380,f2),("Flughafen",-2100,2280,f2),("Wüste",-350,-6350,f1)]
 for n,x,z,f in namen:
     p=P(x,z);bb=d.textbbox(p,n,font=f,anchor='mm')
     d.rounded_rectangle((bb[0]-12,bb[1]-7,bb[2]+12,bb[3]+7),radius=12,fill=(255,250,235),outline=(25,20,22),width=3)
@@ -83,4 +110,4 @@ for n,x,z,f in namen:
 d.rounded_rectangle((30,30,600,130),radius=20,fill=(252,196,60),outline=(25,20,22),width=6)
 d.text((315,80),"INSEL RADEBERG",font=ImageFont.truetype(FB,50),fill=(25,20,22),anchor='mm')
 L=1000*sc;d.rectangle((40,Hh-70,40+L,Hh-52),fill=(255,255,255),outline=(25,20,22),width=3);d.text((40+L/2,Hh-95),"1 km",font=f2,fill=(25,20,22),anchor='mm')
-im.save(S+'gesamtkarte_comic.png');print(im.size)
+im.save(OUT+'gesamtkarte_comic.png');print(im.size)

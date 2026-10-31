@@ -1,7 +1,7 @@
 extends SceneTree
 # Comic-Musterblock: Kreuzung, eigene Häuser (Ziegel, Putz, Läden), Straßenmöbel, Autos (Trabant, Wartburg,
 # Sportwagen), Figuren. Alles aus Code erzeugt, Toon-Licht + schwarze Konturen (Hülle mit Rückseiten).
-const OUT:="/tmp/claude-0/-home-claude/28bc4cd7-234a-5fda-badb-fa2be879c9df/scratchpad/stadt/"
+const OUT:="/home/claude/work/stadt/"
 const RW:=5.0      # halbe Fahrbahnbreite
 const SW:=4.0      # Gehwegbreite
 const KB:=0.15     # Bordsteinhöhe
@@ -179,7 +179,7 @@ func _materialien():
 # ---------------- Geometrie-Sammler ----------------
 func _st(m:Material,eigen:=false)->SurfaceTool:
 	# eigen: von Hand gebaute Flächen getrennt halten (SurfaceTool mischt append_from und add_vertex nicht sauber)
-	var k=str(m.get_instance_id())+("h" if eigen else "")+("s" if strassen_modus else "")
+	var k=str(m.get_instance_id())+("h" if eigen else "")+("n" if fest_modus else ("s" if strassen_modus else ""))
 	if st.has(k) and not eigen:
 		zaehler[k]=zaehler.get(k,0)+1
 		if zaehler[k]>5000:
@@ -241,6 +241,7 @@ func _hex_in(s:SurfaceTool,p:Array,innen:=false):
 			var t=b;b=d;d=t;n=-n
 		# Godot: Vorderseite = im Uhrzeigersinn (von außen gesehen)
 		for v in [a,cc,b,a,d,cc]:s.set_normal(n);s.add_vertex(v)
+var fest_modus:=false      # Tunnel: unter der Erde, keine Höhenverschiebung
 var strassen_modus:=false   # Geometrie folgt nur dem Höhenfeld (Straßen, Autos), nicht den Blockstufen
 var hoehen_an:=false
 func _mesh_aus(k:String):
@@ -250,9 +251,13 @@ func _mesh_aus(k:String):
 		mi.mesh=st[k].commit();return
 	var arr=st[k].commit_to_arrays()
 	var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX]
+	if k.ends_with("n"):
+		mi.mesh=st[k].commit();return
 	var nur_feld=k.ends_with("s")
 	for i in V.size():
-		var v=V[i];v.y+=(FY(v.x,v.z) if nur_feld else Y_at(v.x,v.z));V[i]=v
+		var v=V[i]
+		# Boden (Gehweg, Hof, Wandfuß) folgt dem Gelände; alles darüber steht auf der Hausplatte (falls auf einem Grundstück)
+		v.y+=(FY(v.x,v.z) if (nur_feld or v.y<KB+0.03) else Y_at(v.x,v.z));V[i]=v
 	arr[Mesh.ARRAY_VERTEX]=V
 	var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);mi.mesh=am
 func _fertig():
@@ -1561,7 +1566,8 @@ const TIEFE_B:=13.0   # Bebauungstiefe
 const H_AB:=10.0      # Höhe der Autobahn
 var R:=[]             # Straßen {n,P,S,w,typ,closed,aussen}
 var JN:=[]            # Kreuzungen {p,r,a,b}
-var RAMPEN:=[]        # {P,S,H,w}
+var RAMPEN:=[]
+var TUN:={}        # {P,S,H,w}
 var HW:={}            # Autobahn
 var RING_POLY:PackedVector2Array
 var STADT_STUECKE:=[]
@@ -1664,6 +1670,7 @@ func _platte(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mater
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
 
 func _stadt():
+	hoehen_an=true
 	# ---------- Straßennetz ----------
 	var ring=_rundrechteck(Vector2(-195,-165),Vector2(195,165),30.0)
 	RING_POLY=ring
@@ -1680,6 +1687,18 @@ func _stadt():
 	_strasse("gasse2",_kurve([Vector2(15,-24),Vector2(18,101)]),2.2,"gasse")
 	_strasse("gasse3",_kurve([Vector2(140,4),Vector2(147,101)]),2.2,"gasse")
 	_strasse("land",_kurve([Vector2(196,8),Vector2(260,10),Vector2(330,12),Vector2(460,12)]),6.0,"land",false,true)
+	_strasse("allee_west",_kurve([Vector2(-201,-20),Vector2(-250,-23),Vector2(-300,-20)]),5.5,"land",false,true)
+	_strasse("westring",_kurve([Vector2(-300,-298),Vector2(-306,-200),Vector2(-300,-110),Vector2(-300,-20),Vector2(-304,60),Vector2(-300,110),Vector2(-306,200),Vector2(-300,298)]),6.0,"land",false,true)
+	# langer Tunnel: U-Bogen unter der Westhälfte der Stadt, Portale am Westring
+	var tp=_kurve([Vector2(-294,-110),Vector2(-262,-110),Vector2(-210,-104),Vector2(-150,-88),Vector2(-80,-55),Vector2(-38,5),Vector2(-62,70),Vector2(-140,104),Vector2(-210,112),Vector2(-262,110),Vector2(-294,110)],2.5)
+	var ts=_laengen(tp);var tl=ts[ts.size()-1];var th=PackedFloat32Array()
+	for i in tp.size():th.append(-8.0*smoothstep(4.0,70.0,ts[i])*smoothstep(4.0,70.0,tl-ts[i]))
+	TUN={"P":tp,"S":ts,"H":th}
+	for teil in [[0.0,46.0],[tl-46.0,tl]]:
+		var pp=PackedVector2Array()
+		for i in tp.size():
+			if ts[i]>=teil[0] and ts[i]<=teil[1]:pp.append(tp[i])
+		_strasse("tunnelrampe",pp,5.0,"tunnelrampe",false,true)
 	# Autobahn (Hochstraße, U-Form um die Stadt)
 	var hp=_kurve([Vector2(-460,-238),Vector2(-150,-238),Vector2(100,-236),Vector2(215,-222),Vector2(262,-165),Vector2(272,-60),Vector2(272,80),Vector2(262,170),Vector2(215,226),Vector2(100,238),Vector2(-150,240),Vector2(-460,242)],3.0)
 	HW={"P":hp,"S":_laengen(hp),"w":9.0}
@@ -1758,7 +1777,7 @@ func _stadt():
 				teile=t2
 		AUSSEN_STUECKE.append_array(teile)
 	for r in R:
-		if r.aussen:
+		if r.aussen and r.typ!="tunnelrampe":
 			for band in Geometry2D.offset_polyline(r.P,r.w,Geometry2D.JOIN_ROUND,Geometry2D.END_ROUND):_platte(band,-0.2,0.015,M.asphalt,M.stein_d)
 	for pc in AUSSEN_STUECKE:
 		_platte(pc,-0.2,KB,M.gras,M.stein)
@@ -1767,7 +1786,7 @@ func _stadt():
 	var n_haus=0
 	for pc in STADT_STUECKE:
 		var A=abs(_flaeche2(pc))
-		_platte(pc,-9.0,KB,M.pflaster,M.mauer)
+		_platte(pc,-1.2,KB,M.pflaster,M.stein)
 		_spitze_ecke_merken(pc)
 		if A<150:continue
 		n_haus+=_block(pc)
@@ -1783,6 +1802,9 @@ func _stadt():
 	_parken()
 	strassen_modus=false
 	_tunnel()
+	fest_modus=true
+	_langtunnel()
+	fest_modus=false
 	_aussen_baeume()
 	_fussgaenger()
 	_schaustueck()
@@ -1834,7 +1856,7 @@ func _aussen_gehweg(pc:PackedVector2Array):
 		var m=(p+q)*0.5;var nr=_naechste(m,30.0)
 		if nr[0]==null:continue
 		var r=nr[0]
-		if r.typ=="rampe":continue
+		if r.typ=="rampe" or r.typ=="tunnelrampe":continue
 		var t=(q-p).normalized();var inn=Vector2(-t.y,t.x)*sg
 		if abs(nr[1]-r.w)>1.6:continue
 		var a=p;var b=q;var c=q+inn*SWB;var d=p+inn*SWB
@@ -1988,6 +2010,7 @@ func _auf_rand(p:Vector2,q:Vector2,poly:PackedVector2Array)->bool:
 
 const LADEN_NAMEN:=["BÄCKEREI","KIOSK","DÖNER","FRISEUR","APOTHEKE","BLUMEN","PFANDLEIHE","WASCHSALON","BUCHLADEN","IMBISS","ELEKTRO","CAFÉ","SPÄTI","OPTIKER","FAHRSCHULE","BAR","SPIELHALLE","ZEITUNGEN","METZGEREI","TATTOO"]
 func _gebaeude(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,stock:int,ecke:bool,alle:=[]):
+	_lot_mark(lot)
 	var eg=3.7;var oh=3.15;var H=eg+(stock-1)*oh;var y0=KB;var y1=KB+H
 	var ziegel=rng.randf()<0.5
 	var wand:Material=M.ziegel[rng.randi()%M.ziegel.size()] if ziegel else M.putz[rng.randi()%M.putz.size()]
@@ -2140,7 +2163,7 @@ func _quer(p:Vector2,t:Vector2,lat:float,laengs:float,breite:float,lang:float,y:
 var ZEBRAS:=[]
 func _markierungen():
 	for r in R:
-		if r.typ=="gasse" or r.typ=="rampe":continue
+		if r.typ in ["gasse","rampe","tunnelrampe"]:continue
 		var L=r.S[r.S.size()-1];var s=2.0
 		while s<L-1.0:
 			var b=_bei_s(r.P,r.S,s);var p:Vector2=b[0];var t:Vector2=b[1]
@@ -2166,7 +2189,7 @@ func _markierungen():
 	for k in JN:
 		for paar in [[k.a,k.b],[k.b,k.a]]:
 			var r=paar[0];var o=paar[1]
-			if r.typ in ["gasse","rampe"]:continue
+			if r.typ in ["gasse","rampe","tunnelrampe"]:continue
 			var s0=_s_von(r.P,r.S,k.p);var L=r.S[r.S.size()-1]
 			for dir in [-1,1]:
 				var s=s0+dir*(o.w+2.0)
@@ -2177,7 +2200,7 @@ func _markierungen():
 					if k2!=k and k2.p.distance_to(p)<k2.r+0.5:andere=true
 				for zc in ZEBRAS:
 					if zc.distance_to(p)<7.0:andere=true
-				if andere or o.typ in ["gasse","rampe"]:continue
+				if andere or o.typ in ["gasse","rampe","tunnelrampe"]:continue
 				ZEBRAS.append(p)
 				var lat=-r.w+0.7
 				while lat<r.w-0.6:
@@ -2189,7 +2212,7 @@ func _markierungen():
 
 func _ampeln():
 	for k in JN:
-		if k.a.typ in ["gasse","rampe"] or k.b.typ in ["gasse","rampe"]:continue
+		if k.a.typ in ["gasse","rampe","tunnelrampe"] or k.b.typ in ["gasse","rampe","tunnelrampe"]:continue
 		var gruen=true
 		for pc in STADT_STUECKE:
 			if abs(_flaeche2(pc))<120.0:continue
@@ -2594,40 +2617,36 @@ func Y_at(x:float,z:float)->float:
 		var v=LG[k*LGN+i]
 		if v>-1000.0:return v
 	return FY(x,z)
+func _lot_mark(lot:PackedVector2Array)->float:
+	if LG.is_empty():
+		LGN=int(404.0/LGC);LGM=int(344.0/LGC);LG=PackedFloat32Array();LG.resize(LGN*LGM);LG.fill(-1e9)
+	# Grundstück um 1,3 m erweitert: Gesimse, Fensterbänke, Markisen ragen über die Bauflucht
+	var g=_groesstes(Geometry2D.offset_polygon(lot,1.3,Geometry2D.JOIN_MITER))
+	if g.size()>=3:lot=g
+	var hb=0.0
+	for v in lot:hb=max(hb,FY(v.x,v.y))
+	if hb<0.05:return 0.0
+	var bb=_bbox(lot)
+	var k0=max(0,int((bb.position.y-LGZ0)/LGC));var k1=min(LGM-1,int((bb.end.y-LGZ0)/LGC))
+	for k in range(k0,k1+1):
+		var z=LGZ0+(k+0.5)*LGC;var xs=[]
+		for i in lot.size():
+			var a=lot[i];var b=lot[(i+1)%lot.size()]
+			if (a.y<=z)!=(b.y<=z):xs.append(a.x+(z-a.y)/(b.y-a.y)*(b.x-a.x))
+		xs.sort()
+		for j in range(0,xs.size()-1,2):
+			var i0=max(0,int((xs[j]-LGX0)/LGC)-1);var i1=min(LGN-1,int((xs[j+1]-LGX0)/LGC)+1)
+			for i in range(i0,i1+1):LG[k*LGN+i]=hb
+	return hb
 func _block_hoehe(pc:PackedVector2Array)->float:
 	var m=0.0
 	for v in pc:m=max(m,FY(v.x,v.y))
 	return ceil(m/2.0-0.15)*2.0
 func _hoehenraster():
-	LGN=int(404.0/LGC);LGM=int(344.0/LGC)
-	LG=PackedFloat32Array();LG.resize(LGN*LGM);LG.fill(-1e9)
-	var n_stufe=0
-	var liste=[]
-	for pc in STADT_STUECKE:
-		var hb=_block_hoehe(pc)
-		if hb>0.0:n_stufe+=1
-		var gross=_groesstes(Geometry2D.offset_polygon(pc,3.5))
-		if gross.size()>=3:liste.append([gross,hb])
-	for pc in STADT_STUECKE:liste.append([pc,_block_hoehe(pc)])
-	for e in liste:
-		var pc:PackedVector2Array=e[0];var hb:float=e[1]
-		var bb=_bbox(pc)
-		var k0=max(0,int((bb.position.y-LGZ0)/LGC));var k1=min(LGM-1,int((bb.end.y-LGZ0)/LGC))
-		for k in range(k0,k1+1):
-			var z=LGZ0+(k+0.5)*LGC;var xs=[]
-			for i in pc.size():
-				var a=pc[i];var b=pc[(i+1)%pc.size()]
-				if (a.y<=z)!=(b.y<=z):xs.append(a.x+(z-a.y)/(b.y-a.y)*(b.x-a.x))
-			xs.sort()
-			for j in range(0,xs.size()-1,2):
-				var i0=max(0,int((xs[j]-LGX0)/LGC)-1);var i1=min(LGN-1,int((xs[j+1]-LGX0)/LGC)+1)
-				for i in range(i0,i1+1):LG[k*LGN+i]=hb
-	hoehen_an=true
-	# einzelne Knoten (Schrift, Figuren) mitverschieben
+	# einzelne Knoten (Schrift, Figuren) auf Gelände-/Hausplattenhöhe setzen
 	for c in welt.get_children():
 		if c is Label3D:c.position.y+=Y_at(c.position.x,c.position.z)
-	for p in SKELETTE:p.position.y+=Y_at(p.position.x,p.position.z)
-	print("TERRASSEN Blöcke erhöht: ",n_stufe)
+	for p in SKELETTE:p.position.y+=FY(p.position.x,p.position.z)
 
 # Fahrbahnband: Fläche fein unterteilt (damit sie dem Höhenfeld folgt)
 func _band(poly:PackedVector2Array):
@@ -2681,6 +2700,80 @@ func _tunnel():
 		_baum(c+Vector3(2.0,10.6,0.0))
 		_baum(c+Vector3(-5.0,8.8,sd*-3.0))
 
+# ================= Langer Tunnel =================
+func _langtunnel():
+	var P:PackedVector2Array=TUN.P;var S:PackedFloat32Array=TUN.S;var H:PackedFloat32Array=TUN.H
+	var n=P.size();var w=5.0;var wh=6.2;var L=S[n-1]
+	var beton=_toon(Color(0.8,0.78,0.73));var dunkel=_toon(Color(0.3,0.3,0.33));var kachel=_toon(Color(0.9,0.88,0.8))
+	var gelb=_toon(Color(0.95,0.8,0.2))
+	var N=[]
+	for i in n:N.append(_rn((P[min(i+1,n-1)]-P[max(i-1,0)]).normalized()))
+	var top=_st(M.asphalt,true);var wand=_st(beton,true);var decke=_st(dunkel,true);var band_=_st(kachel,true)
+	var portal_s=[]
+	for i in n-1:
+		var h0=H[i];var h1=H[i+1]
+		var a=P[i]-N[i]*w;var b=P[i]+N[i]*w;var c=P[i+1]+N[i+1]*w;var d=P[i+1]-N[i+1]*w
+		_tri(top,Vector3(a.x,h0,a.y),Vector3(b.x,h0,b.y),Vector3(c.x,h1,c.y),Vector3.UP);_tri(top,Vector3(a.x,h0,a.y),Vector3(c.x,h1,c.y),Vector3(d.x,h1,d.y),Vector3.UP)
+		var zu0=h0+wh+0.4<-0.3;var zu1=h1+wh+0.4<-0.3
+		if zu0!=zu1:portal_s.append(i)
+		for sd in [-1,1]:
+			var e0=P[i]+N[i]*(w+0.8)*sd;var e1=P[i+1]+N[i+1]*(w+0.8)*sd;var o=-Vector3(N[i].x*sd,0,N[i].y*sd)
+			var t0=(h0+wh) if zu0 else KB+0.9;var t1=(h1+wh) if zu1 else KB+0.9
+			_tri(wand,Vector3(e0.x,h0,e0.y),Vector3(e1.x,h1,e1.y),Vector3(e1.x,t1,e1.y),o);_tri(wand,Vector3(e0.x,h0,e0.y),Vector3(e1.x,t1,e1.y),Vector3(e0.x,t0,e0.y),o)
+			# Außenseite der Trogwand (sichtbar von oben) + Kachelband innen
+			_tri(wand,Vector3(e0.x,h0,e0.y),Vector3(e1.x,t1,e1.y),Vector3(e1.x,h1,e1.y),-o);_tri(wand,Vector3(e0.x,h0,e0.y),Vector3(e0.x,t0,e0.y),Vector3(e1.x,t1,e1.y),-o)
+			var k0=P[i]+N[i]*(w+0.78)*sd;var k1=P[i+1]+N[i+1]*(w+0.78)*sd
+			_tri(band_,Vector3(k0.x,h0+0.9,k0.y),Vector3(k1.x,h1+0.9,k1.y),Vector3(k1.x,h1+2.2,k1.y),o);_tri(band_,Vector3(k0.x,h0+0.9,k0.y),Vector3(k1.x,h1+2.2,k1.y),Vector3(k0.x,h0+2.2,k0.y),o)
+			# Notgehweg
+			var g0=P[i]+N[i]*(w+0.8)*sd;var g1=P[i+1]+N[i+1]*(w+0.8)*sd;var f0=P[i]+N[i]*w*sd;var f1=P[i+1]+N[i+1]*w*sd
+			_tri(wand,Vector3(f0.x,h0+0.3,f0.y),Vector3(g0.x,h0+0.3,g0.y),Vector3(g1.x,h1+0.3,g1.y),Vector3.UP);_tri(wand,Vector3(f0.x,h0+0.3,f0.y),Vector3(g1.x,h1+0.3,g1.y),Vector3(f1.x,h1+0.3,f1.y),Vector3.UP)
+			_tri(wand,Vector3(f0.x,h0,f0.y),Vector3(f1.x,h1,f1.y),Vector3(f1.x,h1+0.3,f1.y),o);_tri(wand,Vector3(f0.x,h0,f0.y),Vector3(f1.x,h1+0.3,f1.y),Vector3(f0.x,h0+0.3,f0.y),o)
+			if not zu0 and h0<-0.4:
+				# Geländer oben auf der offenen Trogwand
+				var mm=(e0+e1)*0.5;var dd=e1-e0
+				box(gelb,Vector3(mm.x,KB+1.35,mm.y),Vector3(0.08,0.08,dd.length()+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y)),0.0)
+				if i%3==0:box(gelb,Vector3(e0.x,KB+1.1,e0.y),Vector3(0.07,0.5,0.07),Basis(),0.0)
+		if zu0 and zu1:
+			var a2=P[i]-N[i]*(w+0.8);var b2=P[i]+N[i]*(w+0.8);var c2=P[i+1]+N[i+1]*(w+0.8);var d2=P[i+1]-N[i+1]*(w+0.8)
+			_tri(decke,Vector3(a2.x,h0+wh,a2.y),Vector3(b2.x,h0+wh,b2.y),Vector3(c2.x,h1+wh,c2.y),Vector3.DOWN);_tri(decke,Vector3(a2.x,h0+wh,a2.y),Vector3(c2.x,h1+wh,c2.y),Vector3(d2.x,h1+wh,d2.y),Vector3.DOWN)
+	# Markierungen, Lampen
+	var s=1.0
+	while s<L-1.0:
+		var b=_bei_s(P,S,s);var p:Vector2=b[0];var t:Vector2=b[1];var rn=_rn(t)
+		var i=clamp(S.bsearch(s),0,n-1);var h=H[i]
+		var bas=Basis(Vector3.UP,atan2(t.x,t.y))*Basis(Vector3.RIGHT,-atan2(H[min(i+1,n-1)]-H[max(i-1,0)],5.0))
+		if fmod(s,6.0)<2.6:box(M.markierung,Vector3(p.x,h+0.02,p.y),Vector3(0.15,0.012,3.0),bas,0.0)
+		for sd in [-1,1]:
+			var c=p+rn*(w-0.35)*sd;box(M.markierung,Vector3(c.x,h+0.02,c.y),Vector3(0.14,0.012,2.6),bas,0.0)
+		if h+wh+0.4<-0.3 and fmod(s,7.5)<2.6:
+			for sd in [-1,1]:
+				var c=p+rn*2.4*sd;box(M.lampe,Vector3(c.x,h+wh-0.06,c.y),Vector3(0.35,0.08,1.8),bas,0.0)
+			if fmod(s,30.0)<2.6:
+				var l=OmniLight3D.new();l.light_color=Color(1.0,0.85,0.6);l.light_energy=2.2;l.omni_range=18.0;welt.add_child(l);l.position=Vector3(p.x,h+wh-0.8,p.y)
+		s+=2.5
+	# Portale: Stirnwand mit Schrift, Lüftungsventilatoren
+	for i in portal_s:
+		var p=P[i];var t=(P[min(i+1,n-1)]-P[max(i-1,0)]).normalized();var rn=_rn(t);var h=H[i]
+		var raus=t if H[min(i+5,n-1)]>h else -t
+		var bas=Basis(Vector3.UP,atan2(raus.x,raus.y))
+		var c=p+raus*0.3
+		var unten=h+wh;var oben=KB+1.2
+		box(beton,Vector3(c.x,(unten+oben)*0.5,c.y),Vector3(w*2+3.4,oben-unten,0.9),bas,0.04)
+		box(gelb,Vector3(c.x,unten+0.12,c.y)+Vector3(raus.x,0,raus.y)*0.47,Vector3(w*2+1.6,0.24,0.04),bas,0.0)
+		_schrift("STADTTUNNEL",Vector3(c.x,(unten+oben)*0.5,c.y)+Vector3(raus.x,0,raus.y)*0.47,bas,0.006,Color(0.12,0.12,0.14))
+	# Ventilatoren unter der Decke
+	for f in [0.3,0.5,0.7]:
+		var b=_bei_s(P,S,L*f);var p:Vector2=b[0];var t:Vector2=b[1];var i=clamp(S.bsearch(L*f),0,n-1)
+		for sd in [-1,1]:
+			var c=p+_rn(t)*2.5*sd;var y=H[i]+wh-0.7
+			var a3=Vector3(c.x,y,c.y)
+			zyl(M.metall,a3-Vector3(t.x,0,t.y)*1.2,a3+Vector3(t.x,0,t.y)*1.2,0.45,1.06)
+	# Verkehr im Tunnel
+	for e in [[0.35,1],[0.55,-1],[0.72,1],[0.2,-1]]:
+		var s2=L*e[0];var b=_bei_s(P,S,s2);var p:Vector2=b[0];var t:Vector2=b[1];var i=clamp(S.bsearch(s2),0,n-1)
+		var hd=t*e[1];var c=p+_rn(t)*2.5*e[1]
+		_auto_zufall(Transform3D(Basis(Vector3.UP,atan2(hd.x,hd.y)),Vector3(c.x,H[i]+0.015,c.y)))
+
 # ================= Bilder =================
 func _bilder():
 	var vp=root.get_viewport()
@@ -2727,6 +2820,13 @@ func _bilder():
 	add.call("22_auffahrt_nord",Vector3(-55,18,-175),Vector3(40,8,-228),58)
 	add.call("23_terrassen",Vector3(-60,22,-20),Vector3(-130,4,-100),58)
 	add.call("24_hangstrasse",Vector3(-46,FY(-46,-12)+1.8,-12),Vector3(-68,FY(-68,-90)+2.5,-90),60)
+	var tb=_bei_s(TUN.P,TUN.S,18.0)
+	add.call("25_tunnel_einfahrt",Vector3(-298,4.5,-125),Vector3(tb[0].x,-3.0,tb[0].y),58)
+	var tm=_bei_s(TUN.P,TUN.S,TUN.S[TUN.S.size()-1]*0.47);var tmi=clamp(TUN.S.bsearch(TUN.S[TUN.S.size()-1]*0.47),0,TUN.P.size()-1)
+	var tz=_bei_s(TUN.P,TUN.S,TUN.S[TUN.S.size()-1]*0.47+40.0)
+	add.call("26_tunnel_innen",Vector3(tm[0].x,TUN.H[tmi]+2.0,tm[0].y)+Vector3(_rn(tm[1]).x,0,_rn(tm[1]).y)*2.5,Vector3(tz[0].x,TUN.H[tmi]+1.6,tz[0].y),62)
+	add.call("27_tunnel_luft",Vector3(-330,38,-170),Vector3(-262,-4,-108),55)
+	add.call("28_tunnel_portal",Vector3(-283,3.2,-113.5),Vector3(-250,-4.5,-109.5),60)
 	add.call("16_figur_skelett",V.call(C.call(190.6,w-2.3),1.35),V.call(C.call(190.0,w+1.7),1.0),40)
 	add.call("17_figuren_gehend",V.call(C.call(208.5,w+2.2),1.55),V.call(C.call(203.5,w+2.1),1.0),40)
 	for k in 3:await process_frame
