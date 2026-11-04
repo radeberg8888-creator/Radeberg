@@ -70,7 +70,17 @@ func _ready():
 		if c is WorldEnvironment:env=c.environment
 	env.fog_density=0.0009
 	await get_tree().process_frame
-	if WELT.cache_da() and _arg("--neu")=="":
+	var WC=load("res://scripts/comic/welt_comic.gd")
+	if WC.da() and _arg("--alt")=="":
+		# Comic-Welt (vorgebacken): Insel + Comic-Stadt
+		await _schritt("Welt wird geladen …",0.05)
+		ResourceLoader.load_threaded_request(WC.SZENE)
+		var pr=[0.0]
+		while ResourceLoader.load_threaded_get_status(WC.SZENE,pr)==ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			_lade("Welt wird geladen … %d %%"%int(pr[0]*100),0.05+pr[0]*0.7);await get_tree().process_frame
+		welt=ResourceLoader.load_threaded_get(WC.SZENE).instantiate();welt.spiel=true;add_child(welt);welt.aus_cache()
+		FARB=FARB_COMIC
+	elif WELT.cache_da() and _arg("--neu")=="":
 		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
 		await _schritt("Welt wird geladen …",0.05)
 		var pfad=WELT.CACHE_DIR+"welt.scn"
@@ -90,7 +100,7 @@ func _ready():
 	await _schritt("Autos werden vorbereitet …",0.86)
 	# alle Fahrzeuge jetzt laden (kein Nachladen im Hintergrund – das hat das Spiel auf dem Handy blockiert)
 	var alle=[]
-	for k in FARB+["lkw","lkw_blau","bus","feuerwehr","rtw","armored"]:
+	for k in FARB+(["c_feuerwehr","c_rtw","c_polizei"] if "comic" in welt else ["lkw","lkw_blau","bus","feuerwehr","rtw","armored"]):
 		if not k in alle:alle.append(k)
 	for i in alle.size():
 		AUTO.vorlage(alle[i]);_log("  vorlage "+alle[i])
@@ -263,7 +273,7 @@ func _spieler():
 	hud.kampf=kampf;mini.kampf=kampf
 	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
 	admin_mod=load("res://scripts/spiel/admin.gd").new();admin_mod.spiel=self;add_child(admin_mod)
-	gras=GRAS.new();gras.welt=welt;add_child(gras)
+	if not "comic" in welt:gras=GRAS.new();gras.welt=welt;add_child(gras)
 
 func _shop(typ:String)->Dictionary:
 	for s in welt.A.shops:
@@ -324,7 +334,7 @@ func _process(dt):
 	motor.setze(auto.kmh() if auto else 0.0,st.gas if auto else 0.0,auto!=null and panel==null)
 	var _t0=Time.get_ticks_usec();_verkehr_pflege(p);_pz('_verkehr_pflege(p)',_t0)
 	var _t1=Time.get_ticks_usec();strom.schritt(p);_pz('strom.schritt(p)',_t1)
-	if Engine.get_process_frames()%8==0:gras.aktualisieren(p,st.e.get("gras",true) and (auto==null or auto.kmh()<70.0))
+	if gras and Engine.get_process_frames()%8==0:gras.aktualisieren(p,st.e.get("gras",true) and (auto==null or auto.kmh()<70.0))
 	var _t2=Time.get_ticks_usec();_passanten_pflege(p,dt);_pz('_passanten_pflege(p,dt)',_t2)
 	var _t3=Time.get_ticks_usec();_interaktion();_pz('_interaktion()',_t3)
 	var _t4=Time.get_ticks_usec();_taxi(dt);_pz('_taxi(dt)',_t4)
@@ -368,7 +378,7 @@ func _tageszeit():
 func uhrzeit_text()->String:
 	return "%02d:%02d"%[int(zeit/60.0)%24,int(zeit)%60]
 
-func ist_taxi()->bool:return auto!=null and auto.kind=="taxi"
+func ist_taxi()->bool:return auto!=null and auto.kind in ["taxi","c_taxi"]
 
 # ---------------- Ein-/Aussteigen ----------------
 func _naechstes_auto(r:float):
@@ -457,7 +467,7 @@ func einsteigen(c):
 	spieler.visible=false;spieler.process_mode=Node.PROCESS_MODE_DISABLED;spieler.collision_layer=0
 	kampf.halter.entfernen();kam.zielen=false;kam.scope=false
 	kam.setze_ziel(c,true,[c]);hud.modus="auto";hud.reset_touch()
-	if c.kind=="taxi":hud.zeige("Taxi: Tippe TAXI für den Taxi-Job",3.5)
+	if c.kind in ["taxi","c_taxi"]:hud.zeige("Taxi: Tippe TAXI für den Taxi-Job",3.5)
 	ereignis("eingestiegen")
 
 func aussteigen_sofort():
@@ -508,7 +518,9 @@ func _rempler(b):
 
 # ---------------- Verkehr ----------------
 # Verkehr: nur Fahrzeuge mit Scheiben (Trabant, Geldtransporter ohne Glas sind nicht mehr dabei)
-const FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
+const FARB_COMIC=["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_trabant_rot","c_wartburg_beige","c_wartburg_blau","c_wartburg_gruen",
+	"c_taxi","c_trabant_gruen","c_wartburg_blau","c_polizei","c_sport_rot","c_trabant_beige","c_taxi","c_sport_gelb","c_wartburg_beige","c_sport_schwarz"]
+var FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
 	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","audi_rs7","rtw","hudson","mercedes","hoonicorn","bugatti","taxi"]
 func _ziel_anzahl()->int:return [8,14,22][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
@@ -518,6 +530,20 @@ func _verkehr_pflege(p:Vector3):
 	for c in geparkt.duplicate():
 		if c!=auto and is_instance_valid(c) and not (mis!=null and c==mis.auto_m) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>420.0:geparkt.erase(c);c.queue_free()
 	if verkehr.size()<_ziel_anzahl() and Engine.get_process_frames()%6==0:_spawn_auto(p2)
+	if "comic" in welt and Engine.get_process_frames()%20==0:_parker(p2)
+
+# Comic-Welt: geparkte Autos aus der Stadt-Datei in der Nähe des Spielers aufstellen
+var _parker_da:={}
+func _parker(p2:Vector2):
+	for i in welt.PARKEN.size():
+		var e=welt.PARKEN[i];var t:Transform3D=e[1]
+		var d=Vector2(t.origin.x,t.origin.z).distance_to(p2)
+		if _parker_da.has(i):
+			var c=_parker_da[i]
+			if (not is_instance_valid(c) or not geparkt.has(c)) and d>420.0:_parker_da.erase(i)
+			continue
+		if d>150.0 or d<25.0:continue
+		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.parken();geparkt.append(c);_parker_da[i]=c
 
 func _spawn_auto(p2:Vector2):
 	for versuch in 12:
@@ -534,9 +560,11 @@ func _spawn_auto(p2:Vector2):
 		if not frei:continue
 		var c=AUTO.new();add_child(c)
 		var k=FARB[rng.randi()%FARB.size()]
-		if r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","lkw_blau"][rng.randi()%2]
+		if "comic" in welt:
+			if rng.randf()<0.03:k=["c_feuerwehr","c_rtw"][rng.randi()%2]
+		elif r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","lkw_blau"][rng.randi()%2]
 		elif rng.randf()<0.02:k="feuerwehr"
-		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="taxi"
+		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="c_taxi" if "comic" in welt else "taxi"
 		if wirt and r.typ=="autobahn" and rng.randf()<int(wirt.personal.get("logistik",{}).get("lkw",0))*0.04:k="lkw_blau"
 		c.setup(k)
 		var dir=1 if rng.randf()<0.5 else -1

@@ -128,6 +128,9 @@ func setup(k:String):
 	max_kmh=110.0 if big else 175.0
 	if k in ["audi_r8","porsche911","bmw_m8","bugatti","hoonicorn","jdm","audi_rs7"]:kraft=6300.0;max_kmh=245.0
 	if k in ["trabant","small_car"]:kraft=3900.0;max_kmh=135.0
+	if k.begins_with("c_trabant"):kraft=3900.0;max_kmh=125.0
+	elif k.begins_with("c_wartburg"):kraft=4300.0;max_kmh=145.0
+	elif k.begins_with("c_sport"):kraft=6300.0;max_kmh=240.0
 	center_of_mass_mode=RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM;center_of_mass=Vector3(0.0,0.0,ab.get_center().z)
 	# Karosserie als Kollisionskasten (über dem Boden, damit die Räder federn können)
 	var cs=CollisionShape3D.new();var bx=BoxShape3D.new()

@@ -121,6 +121,32 @@ func _process(dt):
 			21:print("TEST nach Krankenhaus hp ",K.hp," tot ",K.tot);spiel.speichern();spiel.laden();print("TEST ENDE");get_tree().quit()
 		ui_schritt+=1
 		return
+	if spiel.test_modus=="comic":
+		# Comic-Welt: Start, Laufen, nächstes geparktes Auto nehmen, fahren, aussteigen, Luftbilder
+		if schritt==3 or schritt==4:st.t_gas=1.0;st.t_move=Vector2.ZERO
+		elif schritt==1:st.t_move=Vector2(0,-1)
+		else:st.t_gas=0.0;st.t_move=Vector2.ZERO
+		if t<[2.0,3.0,1.0,3.0,3.0,2.5,1.0,1.0,1.0][min(schritt,8)]:return
+		t=0
+		match schritt:
+			0:shot("start")
+			1:shot("gelaufen")
+			2:
+				var best=null;var bd=1e9
+				for c in spiel.geparkt:
+					var d=c.global_position.distance_to(spiel.spieler.global_position)
+					if d<bd:bd=d;best=c
+				print("TEST naechstes Auto ",best.kind if best else "keins"," ",bd)
+				if best:spiel.einsteigen(best)
+				shot("eingestiegen")
+			3:shot("fahrt1")
+			4:shot("fahrt2")
+			5:spiel.aussteigen_sofort();shot("ausgestiegen")
+			6:spiel.kam.pitch=-50.0;spiel.kam.dist=70.0;shot("luft1")
+			7:spiel.kam.pitch=-25.0;spiel.kam.dist=200.0;spiel.kam.yaw+=PI;shot("luft2")
+			8:get_tree().quit()
+		schritt+=1
+		return
 	if spiel.test_modus=="ost":
 		var P=[["bruecke",Vector2(1900,-158),Vector2(2400,-140)],["kowloon",Vector2(2760,-385),Vector2(2760,-560)],["lindstadt",Vector2(2700,600),Vector2(2700,450)],
 			["dorf",Vector2(3600,495),Vector2(3700,480)],["canyon",Vector2(3990,-330),Vector2(4180,-470)],["moewenbach",Vector2(1110,-490),Vector2(1110,-560)],["nacht",Vector2(250,-350),Vector2(250,-500)]]
