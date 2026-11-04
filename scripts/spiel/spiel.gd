@@ -53,6 +53,8 @@ var theme_ui:Theme
 var test_modus:=""       # für automatische Testbilder
 
 func _ready():
+	# Physik-Glättung nur für Spieler und Autos (alles andere bewegt sich pro Bild)
+	physics_interpolation_mode=Node.PHYSICS_INTERPOLATION_MODE_OFF
 	rng.randomize()
 	get_tree().quit_on_go_back=false
 	test_modus=_arg("--test")
@@ -438,7 +440,7 @@ func entern(c):
 	var start=spieler.global_position
 	spieler.velocity=Vector3.ZERO
 	var dauer=clamp(start.distance_to(tuer)/4.0,0.2,1.2)
-	var blick=(c.global_position-tuer);spieler.rotation.y=atan2(blick.x,blick.z)
+	var blick=(c.global_position-tuer);spieler.rotation.y=0.0;spieler.figur.rotation.y=atan2(blick.x,blick.z)
 	var tw=create_tween();tw.tween_property(spieler,"global_position",tuer,dauer)
 	await get_tree().create_timer(dauer+0.05).timeout   # Zeitgeber feuert immer (Tween-Signal kann ausbleiben)
 	if tw.is_valid():tw.kill()
@@ -480,7 +482,8 @@ func aussteigen():
 	var p=auto.aussteig_punkt()
 	kampf.halter.modell=null;kampf.halter.waffe_id="";kampf.halter.setze_waffe(kampf.aktuell)
 	auto.modus="geparkt";auto.engine_force=0;auto.brake=8.0;auto.steering=0
-	spieler.global_position=p;spieler.velocity=Vector3.ZERO;spieler.visible=true;spieler.process_mode=Node.PROCESS_MODE_INHERIT;spieler.collision_layer=1
+	spieler.rotation=Vector3.ZERO;spieler.figur.rotation.y=auto.global_rotation.y+PI*0.5
+	spieler.global_position=p;spieler.velocity=Vector3.ZERO;spieler.visible=true;spieler.reset_physics_interpolation();spieler.process_mode=Node.PROCESS_MODE_INHERIT;spieler.collision_layer=1
 	kam.setze_ziel(spieler,false,[spieler]);hud.modus="fuss";hud.reset_touch()
 	auto.scheinwerfer(false)
 	if taxi_aktiv:taxi_umschalten()
@@ -543,7 +546,7 @@ func _parker(p2:Vector2):
 			if (not is_instance_valid(c) or not geparkt.has(c)) and d>420.0:_parker_da.erase(i)
 			continue
 		if d>150.0 or d<25.0:continue
-		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.parken();geparkt.append(c);_parker_da[i]=c
+		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.reset_physics_interpolation();c.parken();geparkt.append(c);_parker_da[i]=c
 
 func _spawn_auto(p2:Vector2):
 	for versuch in 12:

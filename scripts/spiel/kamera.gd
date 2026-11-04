@@ -38,9 +38,10 @@ func drehen(d:Vector2):
 func _process(dt):
 	if ziel==null:return
 	_ruhe+=dt
-	var p=ziel.global_position+Vector3(0,hoehe,0)
+	var zt:Transform3D=ziel.get_global_transform_interpolated() if ziel.physics_interpolation_mode==Node.PHYSICS_INTERPOLATION_MODE_ON else ziel.global_transform
+	var p=zt.origin+Vector3(0,hoehe,0)
 	if im_auto:
-		var fw=ziel.global_transform.basis.z;fw.y=0
+		var fw=zt.basis.z;fw.y=0
 		if fw.length()>0.1 and _ruhe>1.2:
 			var want=atan2(fw.x,fw.z)+PI
 			var v=ziel.linear_velocity.dot(ziel.global_transform.basis.z) if ziel is RigidBody3D else 0.0

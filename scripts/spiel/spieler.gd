@@ -15,6 +15,7 @@ var im_wasser:=0.0
 var blick_fest:=false   # beim Zielen schaut die Figur in Kamerarichtung (seitwärts gehen)
 
 func _ready():
+	physics_interpolation_mode=Node.PHYSICS_INTERPOLATION_MODE_ON
 	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.32;cap.height=1.75;cs.shape=cap;cs.position.y=0.88;add_child(cs)
 	floor_snap_length=0.5;floor_max_angle=deg_to_rad(50)
 	collision_mask=1|8   # Welt und stehende Autos; fahrender Verkehr wird von Hand geprüft

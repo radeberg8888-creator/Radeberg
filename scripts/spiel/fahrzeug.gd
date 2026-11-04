@@ -117,6 +117,7 @@ static func bereit(k:String)->bool:
 var _spin:=0.0
 
 func setup(k:String):
+	physics_interpolation_mode=Node.PHYSICS_INTERPOLATION_MODE_ON
 	kind=k
 	var t=vorlage(k)
 	visual=t.duplicate();add_child(visual)
@@ -182,7 +183,7 @@ func als_ki(road,s:float,dir:int,lane:float,road_sys):
 	freeze_mode=RigidBody3D.FREEZE_MODE_KINEMATIC;freeze=true
 	ki_ziel=randf_range(9.0,14.0) if road.typ!="autobahn" else randf_range(22.0,30.0)
 	ki_speed=ki_ziel*0.6
-	_ki_place(0.0)
+	_ki_place(0.0);reset_physics_interpolation()
 
 func uebernehmen():
 	_schicht(false)

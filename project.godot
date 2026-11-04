@@ -40,4 +40,5 @@ sensors/enable_gravity=true
 
 [physics]
 common/physics_ticks_per_second=60
+common/physics_interpolation=true
 common/max_physics_steps_per_frame=3

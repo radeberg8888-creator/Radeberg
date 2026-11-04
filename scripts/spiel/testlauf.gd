@@ -124,9 +124,9 @@ func _process(dt):
 	if spiel.test_modus=="comic":
 		# Comic-Welt: Start, Laufen, nächstes geparktes Auto nehmen, fahren, aussteigen, Luftbilder
 		if schritt==3 or schritt==4:st.t_gas=1.0;st.t_move=Vector2.ZERO
-		elif schritt==1:st.t_move=Vector2(0,-1)
+		elif schritt==1 or schritt==6:st.t_move=Vector2(0,-1) if schritt==1 else Vector2(0,1)
 		else:st.t_gas=0.0;st.t_move=Vector2.ZERO
-		if t<[2.0,3.0,1.0,3.0,3.0,2.5,1.0,1.0,1.0][min(schritt,8)]:return
+		if t<[2.0,3.0,1.0,3.0,3.0,2.5,3.0,1.0,1.0][min(schritt,8)]:return
 		t=0
 		match schritt:
 			0:shot("start")
@@ -142,8 +142,8 @@ func _process(dt):
 			3:shot("fahrt1")
 			4:shot("fahrt2")
 			5:spiel.aussteigen_sofort();shot("ausgestiegen")
-			6:spiel.kam.pitch=-50.0;spiel.kam.dist=70.0;shot("luft1")
-			7:spiel.kam.pitch=-25.0;spiel.kam.dist=200.0;spiel.kam.yaw+=PI;shot("luft2")
+			6:print("TEST figur ",spiel.spieler.figur.global_rotation.y," vel ",spiel.spieler.velocity);shot("nach_aussteigen_gelaufen")
+			7:pass
 			8:get_tree().quit()
 		schritt+=1
 		return
