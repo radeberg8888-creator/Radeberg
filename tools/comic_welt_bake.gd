@@ -105,11 +105,9 @@ func _init():
 	neu.call("Autobahn","autobahn",hw.P,func(_p,_s):return L.H_AB+0.01,hw.w,0.0,0.9)
 	for rp in L.RAMPEN:
 		var Pr:PackedVector2Array=rp.P;var Sr:PackedFloat32Array=rp.S;var Hr:PackedFloat32Array=rp.H
-		neu.call(rp.n,"rampe",Pr,func(_p,s):
-			var i=clampi(Sr.bsearch(s),0,Hr.size()-1);return max(Hr[i],0.03)+0.01,rp.w,0.0,0.0)
+		neu.call(rp.n,"rampe",Pr,func(pp,s):return _interp(Sr,Hr,s)+L.FY(pp.x,pp.y)+0.01,rp.w,0.0,0.0)
 	var TS:PackedFloat32Array=L.TUN.S
-	neu.call("Stadttunnel","land",TUNP,func(_p,s):
-		var i=clampi(TS.bsearch(s),0,TUNH.size()-1);return TUNH[i]+0.01,5.0,0.0,0.0,true)
+	neu.call("Stadttunnel","land",TUNP,func(_p,s):return _interp(TS,TUNH,s)+0.01,5.0,0.0,0.0,true)
 	var junctions=[]
 	for k in L.JN:
 		if idx.has(k.a) and idx.has(k.b):
@@ -144,6 +142,9 @@ func _init():
 	print("GESPEICHERT ",error_string(e1)," ",error_string(e2)," Straßen ",roads.size()," Kreuzungen ",junctions.size()," Parkplätze ",parken.size()," ",(Time.get_ticks_msec()-t0)/1000.0," s")
 	quit()
 
+static func _interp(S:PackedFloat32Array,H:PackedFloat32Array,s:float)->float:
+	var i=clampi(S.bsearch(s),1,S.size()-1)
+	return lerp(H[i-1],H[i],clamp((s-S[i-1])/max(S[i]-S[i-1],1e-4),0.0,1.0))
 func _owner(n:Node,o:Node):
 	for c in n.get_children():c.owner=o;_owner(c,o)
 

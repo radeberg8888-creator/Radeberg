@@ -24,7 +24,8 @@ func _ready():
 func figur_bauen():
 	if figur:figur.queue_free()
 	var r=RandomNumberGenerator.new();r.seed=5
-	figur=PE.make(figur_basis,r,{"skin":PE.SKIN[5],"hair":PE.HAIR[0],"mix":0.0,"height":1.8,"c_haut":Color(0.8,0.58,0.42),"c_haar":Color(0.12,0.08,0.05)});add_child(figur)
+	if load("res://scripts/comic/comic_figur.gd").aktiv and figur_basis=="joe":figur_basis="biker"   # Comic: Skelett mit natürlichen Schultern
+	figur=PE.make(figur_basis,r,{"skin":PE.SKIN[5],"hair":PE.HAIR[0],"mix":0.0,"height":1.8,"c_haut":Color(0.8,0.58,0.42),"c_haar":Color(0.12,0.08,0.05),"c_frisur":"kurz","c_bart":false,"c_aermel":"kurz"});add_child(figur)
 	PE.play(figur,"idle")
 	anim="idle"
 	await get_tree().process_frame

@@ -121,6 +121,43 @@ func _process(dt):
 			21:print("TEST nach Krankenhaus hp ",K.hp," tot ",K.tot);spiel.speichern();spiel.laden();print("TEST ENDE");get_tree().quit()
 		ui_schritt+=1
 		return
+	if spiel.test_modus=="zielen":
+		if t<(2.0 if schritt==0 else 1.0):return
+		t=0
+		var K=spiel.kampf;var sp=spiel.spieler
+		match schritt:
+			0:
+				spiel.admin=true;spiel.admin_gott=true
+				var r=null
+				for x in spiel.welt.S.roads:
+					if x.name=="ew2":r=x
+				var ii=int(r.P.size()*0.45);var q:Vector2=r.P[ii];var tt:Vector2=r.T[ii]
+				sp.global_position=Vector3(q.x,r.h[ii]+0.5,q.y);sp.reset_physics_interpolation()
+				spiel.kam.yaw=atan2(-tt.x,-tt.y);spiel.kam.pitch=-6.0
+				var fw=Vector3(tt.x,0,tt.y)
+				var rt=Vector3(fw.z,0,-fw.x)
+				for i in 3:
+					var g=K.spawn(sp.global_position+fw*(9.0+i*3.0)+rt*(i-1)*3.0+Vector3(0,0.5,0),"gang","faust")
+					g.set_physics_process(false)
+				K.gib_waffe("ak47",4);spiel.st.t_zielen=true;spiel.kam.yaw+=0.3
+			3:shot("zielerfassung")
+			4:K.gib_waffe("jagdgewehr",2);spiel.st.t_zielen=false
+			5:spiel.st.t_zielen=true
+			7:shot("zielfernrohr")
+			8:get_tree().quit()
+		schritt+=1
+		return
+	if spiel.test_modus=="rad":
+		if t<(2.0 if schritt==0 else 0.4):return
+		t=0
+		match schritt:
+			0:spiel.admin=true;spiel.kampf.waffen_rad()
+			1:shot("waffenrad")
+			2:spiel.kampf.rad._gui_input(_tipp(spiel.kampf.rad,4));spiel.kampf.rad._gui_input(_tipp(spiel.kampf.rad,4))
+			3:shot("waffenrad_gewehr")
+			4:get_tree().quit()
+		schritt+=1
+		return
 	if spiel.test_modus=="comic":
 		# Comic-Welt: Start, Laufen, nächstes geparktes Auto nehmen, fahren, aussteigen, Luftbilder
 		if schritt==3 or schritt==4:st.t_gas=1.0;st.t_move=Vector2.ZERO
@@ -253,3 +290,9 @@ func _process(dt):
 			# Verkehr ansehen
 			spiel.kam.pitch=-25.0;spiel.kam.dist=14.0
 			if t>3.0:shot("verkehr");get_tree().quit()
+
+func _tipp(rad,fach:int):
+	var e=InputEventScreenTouch.new();e.pressed=true
+	var a=(fach+0.5)*TAU/8.0
+	e.position=rad.size*0.5+Vector2(sin(a),-cos(a))*(rad.R+rad.R_innen)*0.5
+	return e

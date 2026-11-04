@@ -9,11 +9,13 @@ func _init():
 	var PE=load("res://scripts/people.gd");var CF=load("res://scripts/comic/comic_figur.gd");CF.aktiv=true
 	var r=RandomNumberGenerator.new();r.seed=7
 	var t0=Time.get_ticks_msec()
-	var figs=[["joe","idle",{"c_haut":Color(0.8,0.58,0.42),"c_haar":Color(0.12,0.08,0.05),"mix":0.0}],["female","walk",{}],["police","idle",{}],["biker","run",{}],["daya","walk",{}],["hqman","talk",{}]]
+	var sp={"c_haut":Color(0.8,0.58,0.42),"c_haar":Color(0.12,0.08,0.05),"c_oben":Color(0.9,0.9,0.88),"c_unten":Color(0.2,0.3,0.55),"mix":0.0}
+	var figs=[["joe","idle",sp],["biker","idle",sp],["daya","idle",sp],["hqman","idle",sp],["police","idle",sp],["aiman","idle",sp]]
 	for i in figs.size():
 		var f=figs[i]
 		var p=PE.make(f[0],r,f[2]);W.add_child(p);p.position=Vector3(-3.75+i*1.5,0,0)
 		if f[1]!="idle":p.rotation.y=PI*0.5
+		var lb=Label3D.new();lb.text=f[0];lb.position=Vector3(-3.75+i*1.5,2.2,0);lb.font_size=64;lb.pixel_size=0.004;W.add_child(lb)
 		PE.play(p,f[1],0.3)
 	print("FIGUREN ms ",Time.get_ticks_msec()-t0)
 	var vp=root.get_viewport();vp.msaa_3d=Viewport.MSAA_4X
@@ -21,10 +23,10 @@ func _init():
 	cam.look_at_from_position(Vector3(0,1.2,10.5),Vector3(0,0.9,0))
 	for k in 20:await process_frame
 	await RenderingServer.frame_post_draw
-	vp.get_texture().get_image().save_png(OUT+"5_im_spiel_skelett.png")
+	vp.get_texture().get_image().save_png(OUT+"7_grundmodelle.png")
 	cam.look_at_from_position(Vector3(-3.75,1.5,3.2),Vector3(-3.75,1.2,0))
 	for k in 4:await process_frame
 	await RenderingServer.frame_post_draw
-	vp.get_texture().get_image().save_png(OUT+"6_spieler_skelett_nah.png")
+	vp.get_texture().get_image().save_png(OUT+"8_grundmodell_joe_nah.png")
 	print("FERTIG")
 	quit()

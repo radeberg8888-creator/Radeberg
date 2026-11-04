@@ -53,14 +53,21 @@ func ort(key:String,salt:=0)->Vector3:
 	var S=spiel.welt.S;var best=null;var bd=1e9
 	var r2=RandomNumberGenerator.new();r2.seed=hash(key)+salt
 	var off=Vector2(r2.randf_range(-60,60),r2.randf_range(-60,60)) if key!="werkstatt" else Vector2.ZERO
+	var comic="comic" in spiel.welt
+	if comic and key!="werkstatt":
+		# Comic-Welt: Orte der alten Karte gleichmäßig in der Stadt verteilen (fest je Name)
+		var rc:Rect2=spiel.welt.B.rect;var r3=RandomNumberGenerator.new();r3.seed=hash(key)
+		p=rc.position+Vector2(r3.randf_range(0.12,0.88)*rc.size.x,r3.randf_range(0.12,0.88)*rc.size.y);off=off*0.5
 	for r in S.roads:
 		if not r.typ in ["strasse","allee","gasse","land","piste","taxi"]:continue
+		if comic and r.sw<=0.0:continue
 		for i in range(0,r.P.size(),3):
 			var d=r.P[i].distance_to(p+off)
 			if d<bd:bd=d;best=[r,i]
 	var r=best[0];var i=best[1];var t:Vector2=r.T[i];var nn=Vector2(-t.y,t.x)
 	var q=r.P[i]-nn*(r.w*0.5)
-	return Vector3(q.x,r.h[i]+0.3,q.y)
+	if "comic" in spiel.welt:q=r.P[i]-nn*(r.w+r.sw*0.6)   # auf den Gehweg, nicht auf die Fahrbahn
+	return Vector3(q.x,r.h[i]+0.3+(0.15 if "comic" in spiel.welt else 0.0),q.y)
 
 func starten(m:Dictionary):
 	abbrechen(false)

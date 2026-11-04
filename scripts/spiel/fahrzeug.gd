@@ -173,6 +173,7 @@ func _schicht(ki:bool):
 	else:collision_layer=SCHICHT_AUTO;collision_mask=1|SCHICHT_AUTO|SCHICHT_VERKEHR
 
 func parken():
+	ki_ton_aus()
 	_schicht(false)
 	modus="geparkt";freeze=false;engine_force=0;brake=6.0;steering=0
 	sleeping=true
@@ -184,6 +185,15 @@ func als_ki(road,s:float,dir:int,lane:float,road_sys):
 	ki_ziel=randf_range(9.0,14.0) if road.typ!="autobahn" else randf_range(22.0,30.0)
 	ki_speed=ki_ziel*0.6
 	_ki_place(0.0);reset_physics_interpolation()
+	# vorbeifahrende Autos hört man (Leerlauf-Schleife, Tonhöhe nach Tempo)
+	if ResourceLoader.exists("res://assets/sounds/motor_vier_leer.wav"):
+		var MS=load("res://scripts/spiel/motor_sound.gd")
+		_ki_ton=AudioStreamPlayer3D.new();add_child(_ki_ton);_ki_ton.stream=MS.schleife("motor_%s_leer"%MS.klasse_von(kind))
+		_ki_ton.unit_size=5.0;_ki_ton.max_distance=70.0;_ki_ton.volume_db=-6.0;_ki_ton.attenuation_model=AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		_ki_ton.play(randf()*1.0)
+var _ki_ton:AudioStreamPlayer3D=null
+func ki_ton_aus():
+	if _ki_ton:_ki_ton.queue_free();_ki_ton=null
 
 func uebernehmen():
 	_schicht(false)
@@ -265,6 +275,7 @@ func ki_schritt(dt:float,hindernisse:Array):
 		if side<2.4:frei=min(frei,max(0.0,(dist-8.0)*0.9))
 	ki_speed=move_toward(ki_speed,frei,dt*(6.0 if frei<ki_speed else 2.5))
 	ki_s+=ki_speed*dt*ki_dir
+	if _ki_ton:_ki_ton.pitch_scale=clamp(1.0+ki_speed/14.0,0.8,3.0)
 	var L=S.length(ki_road)
 	if ki_s<2.0 or ki_s>L-2.0:_ki_weiter()
 	_ki_place(dt)

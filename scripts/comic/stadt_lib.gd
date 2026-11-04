@@ -130,7 +130,7 @@ void fragment(){
 	float streif=smoothstep(0.0,0.05,s)*(1.0-smoothstep(0.12,0.17,s));
 	c=mix(c,vec3(0.75,0.88,0.98),streif*0.55);
 	c=mix(c,vec3(0.55,0.75,0.92),smoothstep(0.55,1.0,fract(wp.y/3.1))*0.35);
-	ALBEDO=c; ROUGHNESS=0.15; SPECULAR=0.8;
+	ALBEDO=c; ROUGHNESS=0.35; SPECULAR=0.35;
 	EMISSION=farbe*licht;
 }
 """
@@ -195,9 +195,16 @@ func _st(m:Material,eigen:=false)->SurfaceTool:
 	return st[k]
 var zaehler:={}
 # Kasten: Mitte, Größe, Drehung; Kontur als etwas größerer Kasten mit Rückseiten
+var BOX_FACES:PackedVector3Array
+var koll_kasten:=false
 func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
+	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
 	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
 	_st(m).append_from(BOX,0,Transform3D(b*Basis().scaled(s),c))
+	if koll_kasten and s.y>0.3:
+		# Leitplanken, Mittelwände usw. sind fest
+		var xf=Transform3D(b*Basis().scaled(s),c);var ziel=KOLL_N if fest_modus else KOLL_F
+		for v in BOX_FACES:ziel.append(xf*v)
 	if kontur>0.0 and (int(s.x>0.25)+int(s.y>0.25)+int(s.z>0.25))>=2:
 		_st(ink).append_from(BOX,0,Transform3D(b*Basis().scaled(s+Vector3.ONE*kontur*2.0),c))
 func mesh(m:Material,me:Mesh,xf:Transform3D,kontur:=1.06):
@@ -875,7 +882,8 @@ func _kabine(T:Transform3D,secs:Array,lack:Material,dachm:Material,dach_secs:Arr
 		lstab(lack,T,Vector3(sd*(a0[3]-0.01),a0[1],a0[0]),Vector3(sd*(a1[4]+0.005),a1[2]-0.02,a1[0]),0.07,0.018)
 		# C-Säule
 		var c0=secs[n-1];var c1=secs[n-2]
-		lstab(lack,T,Vector3(sd*(c0[3]-0.01),c0[1],c0[0]),Vector3(sd*(c1[4]+0.005),c1[2]-0.02,c1[0]),c_dick,0.018)
+		if c_dick>0.1:_saeule_flach(lack,T,Vector3(sd*(c0[3]-0.004),c0[1],c0[0]),Vector3(sd*(c1[4]+0.008),c1[2]-0.02,c1[0]),c_dick*2.8,0.035)
+		else:lstab(lack,T,Vector3(sd*(c0[3]-0.01),c0[1],c0[0]),Vector3(sd*(c1[4]+0.005),c1[2]-0.02,c1[0]),c_dick,0.018)
 		# B-Säule
 		if b_saeule:
 			var zb=(a1[0]+c1[0])*0.5-0.05
@@ -885,6 +893,12 @@ func _kabine(T:Transform3D,secs:Array,lack:Material,dachm:Material,dach_secs:Arr
 	# Front-/Heckscheibenrahmen
 	lstab(lack,T,Vector3(-a_bw(secs,1),secs[1][2]-0.02,secs[1][0]),Vector3(a_bw(secs,1),secs[1][2]-0.02,secs[1][0]),0.06,0.015)
 func a_bw(secs:Array,i:int)->float:return secs[i][4]
+# flache Säule: dünn quer zum Auto, breit in Fahrtrichtung, hintere Kante auf der Linie a-e
+func _saeule_flach(m:Material,T:Transform3D,a:Vector3,e:Vector3,breite:float,dicke:float):
+	var up=(e-a).normalized();var side=Vector3(sign(a.x),0,0);var fw=side.cross(up).normalized();side=up.cross(fw).normalized()
+	if fw.z>0:fw=-fw;side=-side
+	var c=(a+e)*0.5-fw*breite*0.35
+	box(m,T*c,Vector3(dicke,(e-a).length()+0.04,breite),T.basis.orthonormalized()*Basis(side,up,fw),0.015)
 func _scheinwerfer_rund(T:Transform3D,c:Vector3,r:float):
 	var A=T*c;var f=T.basis*Vector3(0,0,1)
 	zyl(M.chrom,A-f*0.05,A+f*0.02,r,1.12)
@@ -977,8 +991,9 @@ func _trabant(T:Transform3D,farbe:Color,dachfarbe:Color):
 		var sz=sign(z)
 		loft(M.chrom,[ring_s(T*Vector3(0,0.37,z-sz*0.07),X,Y,0.79,0.045,4.0,16),ring_s(T*Vector3(0,0.37,z),X,Y,0.77,0.045,4.0,16)],true,0.018)
 		for sd in [-1,1]:
-			lbox(M.dunkel,T,Vector3(sd*0.62,0.37,z+sz*0.005),Vector3(0.1,0.13,0.1),0.018)
+			if sz>0:lbox(M.dunkel,T,Vector3(sd*0.62,0.37,z+sz*0.005),Vector3(0.1,0.13,0.1),0.018)
 			lbox(M.dunkel,T,Vector3(sd*0.78,0.37,z-sz*0.09),Vector3(0.06,0.11,0.18),0.015)
+		if sz<0:lbox(lack,T,Vector3(0,0.27,z+0.06),Vector3(1.36,0.14,0.06),0.015)
 	lbox(M.weiss,T,Vector3(0,0.27,1.82),Vector3(0.46,0.1,0.01),0.008)
 	_schrift("RDB-601",T*Vector3(0,0.27,1.828),T.basis.orthonormalized(),0.0013,Color(0.1,0.1,0.12))
 	# Kabine: Glas als gerundeter Kegelstumpf (Ringe übereinander)
@@ -1021,7 +1036,7 @@ func _trabant(T:Transform3D,farbe:Color,dachfarbe:Color):
 		for sz in [1.02,-1.02]:_rad(T,Vector3(sx*0.69,0.29,sz),0.29,0.16,sx,"stahl",lack,0.70)
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.45,0.004,3.4),T.basis,0.0)
 
-func _wartburg(T:Transform3D,farbe:Color):
+func _wartburg_alt(T:Transform3D,farbe:Color):
 	var lack=_lack(farbe)
 	karosse(lack,T,[[2.11,0.38,0.72,0.76,0.74,0.04],[2.07,0.33,0.80,0.81,0.79,0.05],[0.88,0.32,0.84,0.82,0.80,0.05],[-1.5,0.32,0.86,0.82,0.80,0.05],[-2.07,0.33,0.86,0.81,0.79,0.05],[-2.11,0.40,0.82,0.76,0.74,0.04]])
 	_kabine(T,[[0.88,0.84,0.86,0.78,0.77,0.02],[0.17,0.84,1.40,0.78,0.68,0.04],[-0.95,0.84,1.40,0.78,0.68,0.04],[-1.5,0.84,0.86,0.78,0.77,0.02]],lack,lack,
@@ -1047,7 +1062,7 @@ func _wartburg(T:Transform3D,farbe:Color):
 		for sz in [1.3,-1.25]:_rad(T,Vector3(sx*0.72,0.3,sz),0.3,0.18,sx,"stahl",M.stein,0.82)
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.55,0.004,4.0),T.basis,0.0)
 
-func _taxi(T:Transform3D):
+func _taxi_alt(T:Transform3D):
 	var lack=_lack(Color(0.96,0.9,0.62))
 	karosse(lack,T,[[2.37,0.40,0.70,0.80,0.77,0.06],[2.30,0.33,0.80,0.86,0.83,0.07],[1.0,0.32,0.86,0.87,0.84,0.06],[-1.6,0.32,0.90,0.87,0.84,0.06],[-2.3,0.34,0.90,0.85,0.82,0.07],[-2.37,0.42,0.86,0.80,0.77,0.06]])
 	_kabine(T,[[1.0,0.86,0.88,0.83,0.82,0.02],[0.25,0.86,1.42,0.83,0.72,0.05],[-0.95,0.86,1.42,0.83,0.72,0.05],[-1.65,0.86,0.90,0.83,0.82,0.02]],lack,lack,
@@ -1077,7 +1092,7 @@ func _taxi(T:Transform3D):
 		for sz in [1.4,-1.42]:_rad(T,Vector3(sx*0.75,0.31,sz),0.31,0.2,sx,"",M.chrom,0.87)
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.65,0.004,4.5),T.basis,0.0)
 
-func _polizei(T:Transform3D):
+func _polizei_alt(T:Transform3D):
 	var lack=_lack(Color(0.85,0.87,0.9));var blau=_lack(Color(0.12,0.3,0.7))
 	karosse(lack,T,[[2.3,0.42,0.70,0.76,0.70,0.12],[2.22,0.34,0.80,0.85,0.80,0.12],[1.5,0.32,0.92,0.88,0.84,0.1],[0.9,0.32,0.96,0.88,0.84,0.1],[-1.9,0.32,0.98,0.88,0.84,0.1],[-2.25,0.36,0.96,0.84,0.80,0.12],[-2.3,0.45,0.92,0.78,0.75,0.1]])
 	_kabine(T,[[0.9,0.95,0.97,0.84,0.83,0.03],[0.05,0.95,1.48,0.84,0.72,0.06],[-1.95,0.95,1.48,0.84,0.72,0.06],[-2.24,0.95,1.02,0.82,0.80,0.04]],lack,blau,
@@ -1171,22 +1186,25 @@ func _feuerwehr(T:Transform3D):
 		for sz in [2.65,-1.95]:_rad(T,Vector3(sx*1.05,0.52,sz),0.52,0.34,sx,"lkw",M.stein,1.25)
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(2.4,0.004,7.4),T.basis,0.0)
 
-func _sport(T:Transform3D,farbe:Color):
+func _sport_alt(T:Transform3D,farbe:Color):
 	var lack=_lack(farbe)
 	karosse(lack,T,[[2.2,0.30,0.50,0.84,0.76,0.12],[2.05,0.25,0.62,0.95,0.9,0.12],[1.0,0.25,0.74,0.97,0.94,0.12],[-0.4,0.25,0.82,0.99,0.95,0.12],[-1.85,0.27,0.86,0.97,0.92,0.1],[-2.2,0.33,0.80,0.9,0.86,0.08]],0.03)
 	_kabine(T,[[1.0,0.73,0.75,0.86,0.84,0.02],[0.05,0.76,1.16,0.83,0.63,0.08],[-0.65,0.78,1.16,0.83,0.63,0.08],[-1.85,0.84,0.88,0.87,0.86,0.02]],lack,lack,
 		[[0.07,1.13,1.18,0.64,0.62,0.04],[-0.67,1.13,1.18,0.64,0.62,0.04]],false,0.12)
 	for sd in [-1,1]:
-		lbox(M.lampe,T,Vector3(sd*0.62,0.56,2.08),Vector3(0.42,0.07,0.16),0.014,Basis(Vector3(1,0,0),0.5)*Basis(Vector3(0,1,0),-sd*0.25))
-		lbox(M.dunkel,T,Vector3(sd*0.99,0.55,-0.75),Vector3(0.02,0.24,0.6),0.012)
+		lbox(M.dunkel,T,Vector3(sd*0.6,0.585,2.0),Vector3(0.44,0.02,0.2),0.0,Basis(Vector3(1,0,0),0.2))
+		lbox(M.lampe,T,Vector3(sd*0.6,0.588,2.07),Vector3(0.4,0.022,0.05),0.0,Basis(Vector3(1,0,0),0.2))
+		lbox(M.dunkel,T,Vector3(sd*0.952,0.58,-0.72),Vector3(0.012,0.17,0.52),0.0)
 		lbox(M.rot_l,T,Vector3(sd*0.55,0.73,-2.19),Vector3(0.6,0.06,0.03),0.012)
 		lbox(lack,T,Vector3(sd*0.95,0.86,0.62),Vector3(0.12,0.06,0.07),0.012)
 	lbox(M.dunkel,T,Vector3(0,0.36,2.16),Vector3(1.2,0.12,0.05),0.012)
 	lbox(M.dunkel,T,Vector3(0,0.33,-2.2),Vector3(1.4,0.1,0.06),0.012)
-	for k in 4:lbox(M.metall,T,Vector3(-0.45+k*0.3,0.3,-2.22),Vector3(0.03,0.1,0.12))
+	for sd in [-1,1]:zyl(M.chrom,T*Vector3(sd*0.35,0.33,-2.12),T*Vector3(sd*0.35,0.33,-2.24),0.05,1.1)
 	# Heckflügel
-	lbox(M.dunkel,T,Vector3(0,1.03,-1.98),Vector3(1.75,0.04,0.32),0.018)
-	for sd in [-1,1]:lbox(M.dunkel,T,Vector3(sd*0.6,0.93,-1.98),Vector3(0.05,0.18,0.18),0.012)
+	lbox(lack,T,Vector3(0,1.0,-2.0),Vector3(1.6,0.025,0.26),0.012,Basis(Vector3(1,0,0),-0.08))
+	for sd in [-1,1]:
+		lbox(M.dunkel,T,Vector3(sd*0.55,0.92,-1.98),Vector3(0.035,0.14,0.12),0.0)
+		lbox(lack,T,Vector3(sd*0.8,1.0,-2.0),Vector3(0.02,0.1,0.3),0.0)
 	for sx in [-1,1]:
 		for sz in [1.32,-1.3]:_rad(T,Vector3(sx*0.86,0.34,sz),0.34,0.24,sx,"sport",M.chrom,0.97)
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.9,0.004,4.2),T.basis,0.0)
@@ -1786,7 +1804,10 @@ func _stadt():
 		var P=_kurve(ctrl,2.5);var S=_laengen(P);var L=S[S.size()-1]
 		var s_par=_s_von(P,S,ctrl[par0])
 		var H=PackedFloat32Array()
-		for i in P.size():H.append(H_AB*smoothstep(6.0,max(s_par,12.0),S[i]))
+		var fy0=FY(P[0].x,P[0].y)
+		for i in P.size():
+			var k=smoothstep(6.0,max(s_par,12.0),S[i])
+			H.append(max(lerp(fy0,H_AB,k)-FY(P[i].x,P[i].y),0.0))
 		RAMPEN.append({"P":P,"S":S,"H":H,"w":4.5,"n":d[0],"par":s_par})
 		var flach=PackedVector2Array()
 		for i in P.size():
@@ -2361,9 +2382,9 @@ func _offen(p:Vector2,eigen)->bool:
 		if _bei_s(HW.P,HW.S,s)[0].distance_to(p)<HW.w+1.2:return true
 	return false
 func _deck(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:bool,leitplanke:bool,eigen=null):
-	var alt_k=koll_an;koll_an=true
+	var alt_k=koll_an;koll_an=true;koll_kasten=true
 	_deck_k(P,H,w,dicke,mittel,leitplanke,eigen)
-	koll_an=alt_k
+	koll_an=alt_k;koll_kasten=false
 func _deck_k(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:bool,leitplanke:bool,eigen=null):
 	var top=_st(M.asphalt,true);var seite=_st(M.stein_d,true);var unten=_st(M.stein_d,true)
 	var n=P.size()
@@ -2477,23 +2498,32 @@ func _auto_zufall(tf:Transform3D):
 	elif z<0.78:_polizei(tf)
 	elif z<0.93:_sport(tf,[Color(0.95,0.18,0.12),Color(0.98,0.75,0.12),Color(0.15,0.15,0.18),Color(0.2,0.5,0.95)][rng.randi()%4])
 	else:_trabant(tf,_auto_farbe(),_auto_farbe())
+func _park_frei(c:Vector2)->bool:
+	for z in ZEBRAS:
+		if z.distance_to(c)<9.0:return false
+	for pf in PFOSTEN:
+		if Vector2(pf[0].x,pf[0].z).distance_to(c)<3.4:return false
+	for e in PARKEN:
+		if Vector2(e[1].origin.x,e[1].origin.z).distance_to(c)<5.6:return false
+	return true
 func _parken():
 	var ns2=null
 	for r in R:
 		if r.n=="ns2":ns2=r
 	for r in R:
-		if not r.typ in ["strasse","allee","einbahn","land"]:continue
+		if not r.typ in ["strasse","allee","einbahn"] or r.aussen:continue
 		var L=r.S[r.S.size()-1];var s=rng.randf_range(4,10)
 		while s<L-4:
 			var b=_bei_s(r.P,r.S,s);var p:Vector2=b[0];var t:Vector2=b[1];var rn=_rn(t)
 			s+=rng.randf_range(5.8,7.5)
-			if _nah_kreuzung(p,9.0):continue
+			if _nah_kreuzung(p,14.0):continue
 			if r==ns2 and s>180 and s<255:continue
 			if r.typ=="land" and p.x>205 and p.x<300:continue
 			for sd in [-1,1]:
-				if rng.randf()>0.42:continue
+				if rng.randf()>0.5:continue
 				var h=t*(-sd) if r.typ!="einbahn" else t
 				var c=p+rn*sd*(r.w-1.15)
+				if not _park_frei(c):continue
 				_auto_zufall(Transform3D(Basis(Vector3.UP,atan2(h.x,h.y)),Vector3(c.x,0.015,c.y)))
 		# fahrende Autos auf der Fahrspur (im Spiel: echter Verkehr)
 		if spiel_modus:continue
@@ -3020,3 +3050,334 @@ func _bilder():
 		for k in 8:await welt.get_tree().process_frame
 		vp.get_texture().get_image().save_png(OUT+v[0]+".png")
 		print("BILD ",v[0])
+
+# ================= Glatte Comic-Karosserie (ein durchgehender Körper) =================
+# Seitenprofil als Stützstellen [z, unten, guertel, oben, breite, dach_breite]; dazwischen weich (kubisch) interpoliert.
+# Radläufe werden aus der Unterkante ausgeschnitten, Scheiben/Leuchten liegen als Aufkleber auf der Haut.
+func _kub(K:Array,z:float,j:int)->float:
+	# Catmull-Rom über die Stützstellen (z absteigend von vorn nach hinten)
+	var n=K.size();var i=0
+	while i<n-2 and z<K[i+1][0]:i+=1
+	var z0=K[i][0];var z1=K[i+1][0];var t=clamp((z0-z)/max(z0-z1,1e-4),0.0,1.0)
+	var p0=K[max(i-1,0)][j];var p1=K[i][j];var p2=K[i+1][j];var p3=K[min(i+2,n-1)][j]
+	var t2=t*t;var t3=t2*t
+	return 0.5*((2.0*p1)+(-p0+p2)*t+(2.0*p0-5.0*p1+4.0*p2-p3)*t2+(-p0+3.0*p1-3.0*p2+p3)*t3)
+func _querschnitt(u:float,g:float,o:float,b:float,db:float)->PackedVector2Array:
+	# halbes Profil von unten-Mitte bis oben-Mitte (x>=0), 12 Punkte
+	var sch=g+min(0.05,(o-g)*0.3)
+	var h=PackedVector2Array([Vector2(0,u),Vector2(b*0.72,u),Vector2(b*0.93,u+0.035),Vector2(b*0.995,u+0.12),
+		Vector2(b*1.01,lerp(u,g,0.55)),Vector2(b,g-0.04),Vector2(b*0.975,g),Vector2(lerp(b*0.95,db,0.35),lerp(sch,o,0.35)),
+		Vector2(lerp(b*0.95,db,0.8),lerp(sch,o,0.8)),Vector2(db,o-0.03),Vector2(db*0.75,o),Vector2(0,o+0.004)])
+	return h
+func _ring_auto(h:PackedVector2Array,z:float)->PackedVector3Array:
+	var r=PackedVector3Array()
+	for i in h.size():r.append(Vector3(h[i].x,h[i].y,z))
+	for i in range(h.size()-2,0,-1):r.append(Vector3(-h[i].x,h[i].y,z))
+	return r
+func _gitter_flaeche(m:Material,T:Transform3D,R:Array,kontur:float,deckel:bool,zu:=true):
+	# R: Liste gleich langer Ringe (geschlossen, wenn zu). Normalen aus den Nachbarn, Kontur = nach außen versetzte Hülle.
+	var n=R.size();var k=R[0].size()
+	var N=[]
+	for i in n:
+		var row=PackedVector3Array()
+		for j in k:
+			var a=R[i][(j+1)%k] if zu else R[i][min(j+1,k-1)];var b=R[i][(j-1+k)%k] if zu else R[i][max(j-1,0)]
+			var c=R[min(i+1,n-1)][j];var d=R[max(i-1,0)][j]
+			var nn=(a-b).cross(c-d)
+			if nn.length()<1e-8:nn=Vector3.UP
+			row.append(nn.normalized())
+		N.append(row)
+	# Ausrichtung: Normalen sollen nach außen zeigen
+	var mitte=Vector3.ZERO;for r in R:mitte+=r[0]
+	# Ausrichtung gegen die Fahrzeug-Längsachse (x=0, y=0.5) prüfen
+	var summe=0.0
+	for i in range(0,n,max(1,n/6)):
+		for j in k:var v:Vector3=R[i][j];summe+=N[i][j].dot(v-Vector3(0,0.5,v.z))
+	if summe<0:
+		for i in n:
+			for j in k:N[i][j]=-N[i][j]
+	for pass_ in ([0,1] if kontur>0.0 else [0]):
+		var s=_st(m if pass_==0 else ink,true);var off=0.0 if pass_==0 else kontur
+		var B=T.basis
+		for i in n-1:
+			for j in (k if zu else k-1):
+				var j2=(j+1)%k
+				var a=R[i][j]+N[i][j]*off;var b=R[i][j2]+N[i][j2]*off;var c=R[i+1][j2]+N[i+1][j2]*off;var d=R[i+1][j]+N[i+1][j]*off
+				var na=(B*N[i][j]).normalized();var nb=(B*N[i][j2]).normalized();var nc=(B*N[i+1][j2]).normalized();var nd=(B*N[i+1][j]).normalized()
+				var fn=(na+nb+nc+nd).normalized()
+				_tri(s,T*a,T*b,T*c,fn,na,nb,nc);_tri(s,T*a,T*c,T*d,fn,na,nc,nd)
+		if deckel:
+			for e in [0,n-1]:
+				var c0=Vector3.ZERO;for v in R[e]:c0+=v
+				c0/=k;var dz=Vector3(0,0,0.01 if e==0 else -0.01)
+				var out=T.basis*(Vector3(0,0,1) if e==0 else Vector3(0,0,-1))
+				for j in k:
+					var a=R[e][j]+dz*(off*100.0);var b=R[e][(j+1)%k]+dz*(off*100.0);var cc=c0+dz*(off*100.0)
+					_tri(s,T*cc,T*b,T*a,out)
+
+# Karosserie bauen. D: {"K":Stützstellen, "raeder":[[z,r]...], "rad_y":y, "glas":{"front":[z0,z1],"seite":[z0,z1],"heck":[z0,z1],"b":z}}
+func auto_koerper(T:Transform3D,lack:Material,D:Dictionary)->Array:
+	var K:Array=D.K;var zv=K[0][0];var zh=K[K.size()-1][0]
+	var n=int(D.get("schnitte",90));var R=[];var Z=[];var H=[]
+	for i in n:
+		# an den Enden dichter (runde Nase/Heck)
+		var t=float(i)/(n-1);t=t-sin(t*TAU)*0.06
+		var z=lerp(zv,zh,t)
+		var u=_kub(K,z,1);var g=_kub(K,z,2);var o=_kub(K,z,3);var b=_kub(K,z,4);var db=_kub(K,z,5)
+		for rd in D.raeder:
+			var dz=z-rd[0];var ra=rd[1]+0.07
+			if abs(dz)<ra:u=max(u,D.rad_y+sqrt(ra*ra-dz*dz)*0.92)
+		u=min(u,g-0.08)
+		# Enden: weich einziehen
+		var ende=min(abs(z-zv),abs(z-zh))
+		if ende<0.12:var f=sqrt(ende/0.12);b*=lerp(0.86,1.0,f);db*=lerp(0.86,1.0,f);o=lerp(g-0.02,o,f) if o>g else o;u=lerp(u+0.05,u,f)
+		var h=_querschnitt(u,g,o,b,db);H.append(h);Z.append(z);R.append(_ring_auto(h,z))
+	_gitter_flaeche(lack,T,R,0.025,true)
+	for rd in D.raeder:
+		var g=_kub(K,rd[0],2);var obenrad=D.rad_y+rd[1]
+		var frei=g-obenrad
+		if frei<0.1:push_warning("RAD STOESST bei z=%.2f: Kotfluegel %.2f, Radoberkante %.2f"%[rd[0],g,obenrad]);print("RAD STOESST z=",rd[0]," frei=",frei)
+	# Unterboden/Radhäuser dunkel, damit man nicht durch die Ausschnitte sieht
+	for rd in D.raeder:
+		# Radhaus je Seite (nur außen, damit es nie durch eine tiefere Haubenmitte ragt)
+		var g=_kub(K,rd[0],2);var o=_kub(K,rd[0],3);var bw=_kub(K,rd[0],4)
+		var top=min(g-0.1,lerp(min(o,g),g,0.6)-0.04);var y0=D.rad_y-0.12
+		for sd in [-1,1]:box(M.dunkel,T*Vector3(sd*bw*0.7,(top+y0)*0.5,rd[0]),Vector3(bw*0.42,top-y0,(rd[1]+0.09)*2.0),T.basis,0.0)
+	box(M.dunkel,T*Vector3(0,D.rad_y-0.02,(zv+zh)*0.5),Vector3(_kub(K,0.0,4)*1.7,0.12,(zv-zh)*0.9),T.basis,0.0)
+	# Scheiben als Aufkleber auf der Haut
+	if _glas_auto==null:_glas_auto=_shader(GLAS,{"farbe":Color(0.2,0.33,0.43)})
+	var gl=D.get("glas",{})
+	var band=func(z0:float,z1:float,i0:float,i1:float,quer:bool):
+		var RR=[]
+		for i in n:
+			if Z[i]>z0 or Z[i]<z1:continue
+			var h:PackedVector2Array=H[i];var row=PackedVector3Array()
+			if quer:
+				# über das Dach von links nach rechts (Front-/Heckscheibe), Punkte 6..11 beider Seiten
+				for q in [6.0+i0,7,8,9,10,11]:row.append(Vector3(-_hp(h,q).x,_hp(h,q).y,Z[i]))
+				for q in [10,9,8,7,6.0+i0]:row.append(Vector3(_hp(h,q).x,_hp(h,q).y,Z[i]))
+			else:
+				for q in [6.0+i0,lerp(6.0+i0,9.0-i1,0.5),9.0-i1]:row.append(Vector3(_hp(h,q).x,_hp(h,q).y,Z[i]))
+			RR.append(row)
+		return RR
+	for nm in ["front","heck"]:
+		if gl.has(nm):
+			var RR=band.call(gl[nm][0],gl[nm][1],0.35,0.0,true)
+			if RR.size()>1:_aufkleber(_glas_auto,T,RR,0.012)
+	if gl.has("seite"):
+		for seite in [1,-1]:
+			var RR=band.call(gl.seite[0],gl.seite[1],0.25,0.35,false)
+			if seite<0:
+				for r in RR:
+					for q in r.size():r[q].x=-r[q].x
+			if RR.size()>1:_aufkleber(_glas_auto,T,RR,0.012,false)
+			if gl.has("b"):
+				# B-Säule: schwarzer Streifen über die Seitenscheibe
+				var i=0;while i<n-1 and Z[i]>gl.b:i+=1
+				var h:PackedVector2Array=H[i]
+				var a=_hp(h,6.2);var e=_hp(h,8.7)
+				lstab(M.dunkel,T,Vector3(seite*a.x*1.004,a.y,gl.b),Vector3(seite*e.x*1.004,e.y,gl.b-0.05),0.07,0.0)
+	return [Z,H]
+func _hp(h:PackedVector2Array,q:float)->Vector2:
+	var i=clampi(int(q),0,h.size()-2);return h[i].lerp(h[i+1],q-i)
+func _aufkleber(m:Material,T:Transform3D,RR:Array,abst:float,zu:=false):
+	# Fläche leicht über der Haut (entlang der Ringnormalen nach außen geschoben), mit dünnem Rahmen
+	var A=[]
+	for r in RR:
+		var c=Vector3(0,(r[0].y+r[r.size()-1].y)*0.5-0.25,r[0].z);var q=PackedVector3Array()
+		for v in r:var d=(v-c);d.z=0;q.append(v+d.normalized()*abst)
+		A.append(q)
+	_gitter_flaeche(m,T,A,0.0,false,false)
+	# schwarzer Rand
+	for sd in [0,A.size()-1]:
+		for j in A[sd].size()-1:lstab(M.dunkel,T,A[sd][j],A[sd][j+1],0.025,0.0)
+	for j in [0,A[0].size()-1]:
+		for i in A.size()-1:lstab(M.dunkel,T,A[i][j],A[i+1][j],0.025,0.0)
+
+# Rad: Reifen mit Flanke, Felge hell mit dunklen Aussparungen (gut lesbar), Chromkappe
+func rad_neu(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String):
+	var ax=T.basis*Vector3(1,0,0);var C=T*c
+	var alt=null
+	if rad_capture:alt=[st,mats,zaehler];st={};mats={};zaehler={}
+	zyl(M.reifen,C-ax*br*0.5,C+ax*br*0.5,r,1.05)
+	var F=C+ax*seite*(br*0.5)
+	zyl(M.reifen,F-ax*seite*0.02,F+ax*seite*0.01,r*0.93,1.0)
+	var fr=r*(0.6 if art=="stahl" else 0.72)
+	var felge=M.chrom if art!="stahl" else _toon(Color(0.82,0.83,0.84),0.3)
+	zyl(felge,F,F+ax*seite*0.018,fr,1.0)
+	var lochzahl=5 if art=="sport" else (6 if art=="stahl" else 8)
+	for k in lochzahl:
+		var a=TAU*(k+0.5)/lochzahl;var o=(T.basis*Vector3(0,cos(a),sin(a)))
+		if art=="sport":
+			# fünf breite Speichen auf dunklem Grund
+			if k==0:zyl(M.dunkel,F+ax*seite*0.012,F+ax*seite*0.02,fr*0.88,1.0)
+			var bb=Basis(ax,o,ax.cross(o)).orthonormalized()
+			box(M.chrom,F+o*fr*0.48+ax*seite*0.024,Vector3(0.02,fr*0.82,fr*0.26),bb,0.0)
+		else:
+			kugel(M.dunkel,F+o*fr*0.68+ax*seite*0.02,Vector3(0.012,1,1)*fr*0.11,1.0)
+	zyl(M.chrom,F+ax*seite*0.018,F+ax*seite*0.04,fr*0.38,1.06)
+	kugel(M.dunkel,F+ax*seite*0.042,Vector3(0.01,1,1)*fr*0.1,1.0)
+	if rad_capture:
+		var rn=Node3D.new();rn.name="Rad_"+("V" if c.z>0 else "H")+("L" if c.x>0 else "R");welt.add_child(rn);rn.position=C
+		for k in st:
+			var mi=MeshInstance3D.new();mi.mesh=st[k].commit();mi.material_override=mats[k];rn.add_child(mi);mi.position=-C
+			if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		RAEDER.append({"p":C,"r":r,"vorne":c.z>0,"links":c.x>0})
+		st=alt[0];mats=alt[1];zaehler=alt[2]
+
+# Fläche auf der Front/Heck-Kappe (flach), z.B. Leuchte
+func _kappe_teil(m:Material,T:Transform3D,c:Vector3,s:Vector2,vorn:bool,rund:=0.0):
+	var d=0.012 if vorn else -0.012
+	if rund>0.0:zyl(m,T*Vector3(c.x,c.y,c.z),T*Vector3(c.x,c.y,c.z+d),s.x,1.12)
+	else:lbox(m,T,Vector3(c.x,c.y,c.z+d*0.5),Vector3(s.x,s.y,abs(d)),0.012)
+
+# ---- Autos mit glatter Karosserie ----
+func _seite_x(K:Array,z:float)->float:return _kub(K,z,4)*1.012
+func _tuerlinie(K:Array,T:Transform3D,z:float,u:float,g:float):
+	for sd in [-1,1]:lstab(M.dunkel,T,Vector3(sd*_seite_x(K,z)*1.001,u+0.08,z),Vector3(sd*_seite_x(K,z)*0.995,g-0.02,z),0.012,0.0)
+func _griff(K:Array,T:Transform3D,z:float,y:float):
+	for sd in [-1,1]:lbox(M.chrom,T,Vector3(sd*(_seite_x(K,z)+0.008),y,z),Vector3(0.02,0.03,0.12),0.008)
+func _spiegel(K:Array,T:Transform3D,z:float,y:float,lack:Material):
+	for sd in [-1,1]:
+		var x=_seite_x(K,z)
+		lstab(M.dunkel,T,Vector3(sd*(x-0.05),y,z),Vector3(sd*(x+0.06),y+0.04,z-0.02),0.02)
+		kugel(lack,T*Vector3(sd*(x+0.1),y+0.05,z-0.03),Vector3(0.07,0.045,0.03),1.1)
+func _stossstange(T:Transform3D,z:float,y:float,b:float,m:Material,vorn:bool):
+	var X=T.basis*Vector3(1,0,0);var Y=T.basis*Vector3(0,1,0);var d=0.06 if vorn else -0.06
+	loft(m,[ring_s(T*Vector3(0,y,z),X,Y,b,0.055,4.0,18),ring_s(T*Vector3(0,y,z+d),X,Y,b-0.02,0.05,4.0,18)],true,0.018)
+
+func _wartburg(T:Transform3D,farbe:Color):
+	var lack=_lack(farbe)
+	var K=[[2.11,0.36,0.70,0.74,0.75,0.70],[2.0,0.32,0.76,0.80,0.80,0.75],[1.5,0.30,0.80,0.84,0.81,0.77],[0.95,0.30,0.82,0.87,0.81,0.76],
+		[0.32,0.30,0.84,1.38,0.81,0.65],[-0.9,0.30,0.84,1.39,0.81,0.65],[-1.48,0.30,0.84,0.91,0.81,0.77],[-2.0,0.32,0.84,0.88,0.80,0.76],[-2.11,0.36,0.80,0.84,0.76,0.72]]
+	auto_koerper(T,lack,{"K":K,"raeder":[[1.3,0.3],[-1.22,0.3]],"rad_y":0.3,"glas":{"front":[0.9,0.36],"seite":[0.28,-0.86],"heck":[-0.94,-1.44],"b":-0.28}})
+	# Front: breiter Chromgrill mit eckigen Scheinwerfern
+	_kappe_teil(M.chrom,T,Vector3(0,0.57,2.11),Vector2(1.36,0.22),true)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.57,2.122),Vector2(0.7,0.15),true)
+	for k in 4:_kappe_teil(M.chrom,T,Vector3(0,0.515+k*0.035,2.13),Vector2(0.68,0.012),true)
+	for sd in [-1,1]:
+		_kappe_teil(M.lampe,T,Vector3(sd*0.52,0.57,2.125),Vector2(0.26,0.15),true)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.62,0.44,2.1),Vector2(0.16,0.06),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.52,0.66,-2.11),Vector2(0.36,0.13),false)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.52,0.56,-2.11),Vector2(0.36,0.06),false)
+	_stossstange(T,2.12,0.4,0.8,M.chrom,true);_stossstange(T,-2.12,0.42,0.8,M.chrom,false)
+	_kappe_teil(M.weiss,T,Vector3(0,0.55,-2.12),Vector2(0.44,0.11),false)
+	_tuerlinie(K,T,0.86,0.3,0.82);_tuerlinie(K,T,-0.3,0.3,0.84)
+	_griff(K,T,0.62,0.76);_griff(K,T,-0.55,0.77);_spiegel(K,T,0.75,0.86,lack)
+	for sd in [-1,1]:streifen(M.chrom,T,sd*_seite_x(K,0.0)*1.002,0.62,0.02,1.9,-1.95,[1.3,-1.22],0.3,0.0)
+	for sx in [-1,1]:
+		for sz in [1.3,-1.22]:rad_neu(T,Vector3(sx*0.72,0.3,sz),0.3,0.18,sx,"stahl")
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.55,0.004,4.0),T.basis,0.0)
+
+func _taxi(T:Transform3D):
+	var lack=_lack(Color(0.96,0.9,0.62))
+	var K=[[2.37,0.40,0.72,0.76,0.80,0.76],[2.25,0.34,0.80,0.84,0.86,0.82],[1.6,0.32,0.85,0.90,0.87,0.83],[1.0,0.32,0.87,0.92,0.87,0.82],
+		[0.3,0.32,0.89,1.42,0.87,0.72],[-0.95,0.32,0.89,1.43,0.87,0.72],[-1.6,0.32,0.9,0.96,0.87,0.83],[-2.25,0.34,0.9,0.95,0.86,0.82],[-2.37,0.40,0.86,0.9,0.8,0.77]]
+	auto_koerper(T,lack,{"K":K,"raeder":[[1.42,0.32],[-1.36,0.32]],"rad_y":0.32,"glas":{"front":[0.95,0.34],"seite":[0.26,-0.9],"heck":[-1.0,-1.55],"b":-0.32}})
+	for sd in [-1,1]:
+		_kappe_teil(M.dunkel,T,Vector3(sd*0.56,0.64,2.38),Vector2(0.34,0.21),true)
+		_kappe_teil(M.lampe,T,Vector3(sd*0.56,0.64,2.39),Vector2(0.28,0.15),true)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.75,0.64,2.37),Vector2(0.1,0.15),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.56,0.7,-2.375),Vector2(0.4,0.18),false)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.56,0.58,-2.375),Vector2(0.4,0.06),false)
+	# Kühler mit Stern-Ersatz (Kreis)
+	_kappe_teil(M.chrom,T,Vector3(0,0.62,2.385),Vector2(0.42,0.22),true)
+	for k in 6:_kappe_teil(M.dunkel,T,Vector3(-0.15+k*0.06,0.62,2.395),Vector2(0.02,0.18),true)
+	_stossstange(T,2.4,0.42,0.86,M.chrom,true);_stossstange(T,-2.4,0.44,0.86,M.chrom,false)
+	_kappe_teil(M.weiss,T,Vector3(0,0.5,-2.4),Vector2(0.46,0.11),false)
+	_tuerlinie(K,T,0.92,0.32,0.87);_tuerlinie(K,T,-0.34,0.32,0.89)
+	_griff(K,T,0.68,0.8);_griff(K,T,-0.6,0.81);_spiegel(K,T,0.8,0.92,lack)
+	for sd in [-1,1]:streifen(M.chrom,T,sd*_seite_x(K,0.0)*1.002,0.58,0.025,2.2,-2.2,[1.42,-1.36],0.32,0.0)
+	# Taxischild
+	lbox(_toon(Color(0.98,0.85,0.15)),T,Vector3(0,1.53,-0.3),Vector3(0.55,0.17,0.24),0.02)
+	_schrift("TAXI",T*Vector3(0,1.455,-0.176),T.basis.orthonormalized(),0.0026,Color(0.1,0.1,0.1))
+	_schrift("TAXI",T*Vector3(0,1.455,-0.424),T.basis.orthonormalized()*Basis(Vector3.UP,PI),0.0026,Color(0.1,0.1,0.1))
+	for sx in [-1,1]:
+		for sz in [1.42,-1.36]:rad_neu(T,Vector3(sx*0.78,0.32,sz),0.32,0.2,sx,"stahl")
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.75,0.004,4.5),T.basis,0.0)
+
+func _sport(T:Transform3D,farbe:Color):
+	# Mittelmotor-Keil: flache Nase mit Klappscheinwerfern, Kotflügel höher als die Haube, flache Kabine,
+	# breite Hüften über den Hinterrädern, Seitenkiemen vor dem Hinterrad, schwarzes Lamellen-Heck.
+	var lack=_lack(farbe)
+	var K=[[2.24,0.30,0.48,0.46,0.86,0.70],[2.1,0.27,0.58,0.55,0.93,0.72],[1.75,0.26,0.70,0.66,0.96,0.66],[1.25,0.26,0.77,0.72,0.975,0.6],
+		[0.85,0.26,0.77,0.73,0.98,0.66],[0.45,0.26,0.78,0.98,0.98,0.66],[0.05,0.26,0.79,1.12,0.985,0.62],[-0.45,0.26,0.82,1.12,0.99,0.62],
+		[-0.85,0.26,0.88,0.96,1.0,0.72],[-1.3,0.26,0.93,0.92,1.02,0.88],[-1.85,0.27,0.92,0.91,1.01,0.9],[-2.15,0.31,0.88,0.88,0.98,0.88],[-2.24,0.38,0.82,0.82,0.94,0.84]]
+	var RD=[[1.25,0.315],[-1.3,0.33]]
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.33,"glas":{"front":[0.82,0.1],"seite":[0.4,-0.5],"heck":[-0.52,-0.84]}})
+	# Klappscheinwerfer: Deckelfugen auf der Haube + schmale Leuchten in der Nase
+	for sd in [-1,1]:
+		var x0=sd*0.38;var x1=sd*0.78
+		for z in [1.72,2.0]:lstab(M.dunkel,T,Vector3(x0,_oben_y(K,z,x0)+0.006,z),Vector3(x1,_oben_y(K,z,x1)+0.006,z),0.012,0.0)
+		for x in [x0,x1]:lstab(M.dunkel,T,Vector3(x,_oben_y(K,1.72,x)+0.006,1.72),Vector3(x,_oben_y(K,2.0,x)+0.006,2.0),0.012,0.0)
+		_kappe_teil(M.lampe,T,Vector3(sd*0.62,0.42,2.24),Vector2(0.34,0.05),true)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.8,0.4,2.22),Vector2(0.12,0.06),true)
+	# Frontgrill: schmales schwarzes Band
+	_kappe_teil(M.dunkel,T,Vector3(0,0.36,2.24),Vector2(1.0,0.07),true)
+	for k in 3:_kappe_teil(M.chrom,T,Vector3(0,0.335+k*0.025,2.252),Vector2(0.96,0.006),true)
+	# Seitenkiemen: schwarze Öffnung mit fünf Lamellen in Wagenfarbe
+	_seitenband(M.dunkel,T,K,0.42,0.76,-0.12,-0.88,RD,0.006)
+	for k in 5:_seitenband(lack,T,K,0.445+k*0.065,0.47+k*0.065,-0.12,-0.88,RD,0.02)
+	# Heck: schwarzes Lamellenband über die ganze Breite, Rückleuchten dahinter, vier Endrohre
+	_kappe_teil(M.dunkel,T,Vector3(0,0.62,-2.24),Vector2(1.7,0.24),false)
+	for sd in [-1,1]:_kappe_teil(M.rot_l,T,Vector3(sd*0.62,0.62,-2.247),Vector2(0.38,0.16),false)
+	for k in 5:_kappe_teil(lack,T,Vector3(0,0.52+k*0.045,-2.256),Vector2(1.72,0.012),false)
+	for sd in [-1,1]:
+		for dx in [0.28,0.42]:zyl(M.chrom,T*Vector3(sd*dx,0.36,-2.2),T*Vector3(sd*dx,0.36,-2.32),0.04,1.1)
+	_kappe_teil(M.weiss,T,Vector3(0,0.44,-2.24),Vector2(0.42,0.1),false)
+	# Motorabdeckung mit Lüftungsschlitzen
+	for k in 6:
+		var z=-1.0-k*0.12
+		lstab(M.dunkel,T,Vector3(-0.45,_oben_y(K,z,0.45)+0.008,z),Vector3(0.45,_oben_y(K,z,0.45)+0.008,z),0.025,0.0)
+	_tuerlinie(K,T,0.78,0.26,0.76);_tuerlinie(K,T,-0.12,0.26,0.8)
+	_griff(K,T,-0.05,0.7);_spiegel(K,T,0.62,0.8,lack)
+	for sx in [-1,1]:
+		for rd in RD:rad_neu(T,Vector3(sx*(0.8 if rd[0]>0 else 0.85),0.33,rd[0]),rd[1],0.24 if rd[0]>0 else 0.3,sx,"sport")
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.95,0.004,4.4),T.basis,0.0)
+
+# Höhe der Oberseite an Stelle (z, x) aus dem Querschnitt (für Teile, die auf Haube/Deck liegen)
+func _oben_y(K:Array,z:float,x:float)->float:
+	var h=_querschnitt(_kub(K,z,1),_kub(K,z,2),_kub(K,z,3),_kub(K,z,4),_kub(K,z,5))
+	var ax=abs(x)
+	for i in range(6,h.size()-1):
+		var a=h[i];var b=h[i+1]
+		if (ax<=a.x and ax>=b.x) or (ax>=a.x and ax<=b.x):
+			return lerp(a.y,b.y,(ax-a.x)/(b.x-a.x) if abs(b.x-a.x)>1e-5 else 0.0)
+	return h[h.size()-1].y
+
+func _polizei(T:Transform3D):
+	var lack=_lack(Color(0.88,0.89,0.92));var blau=_lack(Color(0.12,0.3,0.7))
+	var K=[[2.3,0.40,0.70,0.74,0.80,0.76],[2.2,0.34,0.78,0.82,0.86,0.82],[1.5,0.32,0.88,0.93,0.88,0.84],[0.95,0.32,0.92,0.97,0.88,0.84],
+		[0.25,0.32,0.95,1.47,0.88,0.72],[-1.85,0.32,0.96,1.48,0.88,0.72],[-2.2,0.36,0.94,1.3,0.86,0.76],[-2.27,0.4,0.9,1.0,0.82,0.78]]
+	auto_koerper(T,lack,{"K":K,"raeder":[[1.42,0.32],[-1.35,0.32]],"rad_y":0.32,"glas":{"front":[0.9,0.28],"seite":[0.2,-1.8],"heck":[-1.95,-2.25],"b":-0.4}})
+	for sd in [-1,1]:
+		var x=_seite_x(K,0.0)*1.004
+		_schrift("POLIZEI",T*Vector3(sd*(x+0.015),0.66,-0.2),T.basis.orthonormalized()*Basis(Vector3.UP,sd*PI*0.5),0.0035,Color(1,1,1))
+		_kappe_teil(M.dunkel,T,Vector3(sd*0.56,0.64,2.295),Vector2(0.36,0.17),true)
+		_kappe_teil(M.lampe,T,Vector3(sd*0.56,0.64,2.305),Vector2(0.3,0.12),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.62,0.8,-2.27),Vector2(0.24,0.28),false)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.64,2.31),Vector2(0.7,0.12),true)
+	_stossstange(T,2.32,0.42,0.86,M.dunkel,true);_stossstange(T,-2.3,0.44,0.86,M.dunkel,false)
+	_tuerlinie(K,T,0.9,0.32,0.92);_tuerlinie(K,T,-0.42,0.32,0.95);_griff(K,T,0.66,0.86);_griff(K,T,-0.65,0.88);_spiegel(K,T,0.78,0.98,lack)
+	_blaulicht(T,Vector3(0,1.52,-0.3),1.2)
+	var rd=[[1.42,0.32],[-1.35,0.32]]
+	_seitenband(blau,T,K,0.56,0.78,2.15,-2.15,rd);_seitenband(M.weiss,T,K,0.52,0.555,2.15,-2.15,rd)
+	for sx in [-1,1]:
+		for sz in [1.42,-1.35]:rad_neu(T,Vector3(sx*0.78,0.32,sz),0.32,0.2,sx,"alu")
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.75,0.004,4.4),T.basis,0.0)
+
+# farbiges Band (Zierstreifen/Folie) eng auf der Flanke, an den Radläufen unterbrochen
+func _seitenband(m:Material,T:Transform3D,K:Array,y0:float,y1:float,z0:float,z1:float,raeder:Array,abst:=0.004):
+	var n=48
+	for sd in [-1,1]:
+		var s=_st(m,true);var prev=null
+		for i in n+1:
+			var z=lerp(z0,z1,float(i)/n)
+			var frei=true
+			for rd in raeder:
+				if abs(z-rd[0])<rd[1]+0.1:frei=false
+			if not frei:prev=null;continue
+			var x=sd*(_seite_x(K,z)+abst)
+			var a=T*Vector3(x,y0,z);var b=T*Vector3(x,y1,z);var o=T.basis*Vector3(sd,0,0)
+			if prev!=null:_tri(s,prev[0],prev[1],b,o);_tri(s,prev[0],b,a,o)
+			prev=[a,b]

@@ -195,13 +195,36 @@ func _kampf_anzeige(s:Vector2):
 			var col=Color(1,0.25,0.2) if kampf.treffer_marke>0.0 else Color(1,1,1,0.9)
 			var rr=min(s.x,s.y)*0.42
 			if spiel.kam.scope:
-				draw_arc(c,rr,0,TAU,64,Color(0,0,0,0.85),6.0)
-				draw_line(c-Vector2(rr,0),c+Vector2(rr,0),Color(0,0,0,0.8),2.0);draw_line(c-Vector2(0,rr),c+Vector2(0,rr),Color(0,0,0,0.8),2.0)
+				# Zielfernrohr: alles außerhalb des Kreises schwarz, Strichkreuz mit Teilung
+				draw_rect(Rect2(0,0,c.x-rr,s.y),Color(0,0,0));draw_rect(Rect2(c.x+rr,0,s.x-c.x-rr,s.y),Color(0,0,0))
+				for k in 32:
+					var a0=PI+PI*k/32.0;var a1=PI+PI*(k+1)/32.0
+					draw_colored_polygon(PackedVector2Array([c+Vector2.from_angle(a0)*rr,c+Vector2.from_angle(a1)*rr,Vector2(c.x+cos(a1)*rr,0),Vector2(c.x+cos(a0)*rr,0)]),Color(0,0,0))
+					draw_colored_polygon(PackedVector2Array([c+Vector2.from_angle(-a0)*rr,c+Vector2.from_angle(-a1)*rr,Vector2(c.x+cos(a1)*rr,s.y),Vector2(c.x+cos(a0)*rr,s.y)]),Color(0,0,0))
+				draw_arc(c,rr,0,TAU,96,Color(0,0,0),8.0)
+				draw_line(c-Vector2(rr,0),c+Vector2(rr,0),Color(0,0,0,0.9),2.0);draw_line(c-Vector2(0,rr),c+Vector2(0,rr),Color(0,0,0,0.9),2.0)
+				for k in range(-4,5):
+					if k==0:continue
+					draw_line(c+Vector2(k*rr*0.1,-6),c+Vector2(k*rr*0.1,6),Color(0,0,0,0.9),2.0);draw_line(c+Vector2(-6,k*rr*0.1),c+Vector2(6,k*rr*0.1),Color(0,0,0,0.9),2.0)
+				draw_circle(c,2.5,Color(0.9,0.1,0.1))
 			else:
 				for d in [Vector2(1,0),Vector2(-1,0),Vector2(0,1),Vector2(0,-1)]:draw_line(c+d*6,c+d*16,col,2.5)
 				draw_circle(c,2.0,col)
 			if kampf.treffer_marke>0.0:
 				for d in [Vector2(1,1),Vector2(-1,1),Vector2(1,-1),Vector2(-1,-1)]:draw_line(c+d*9,c+d*17,Color(1,1,1),2.5)
+			# erfasstes Ziel: rote Ecken um den Gegner + Lebensbalken
+			var zl=kampf.ziel_lock
+			if zl!=null and is_instance_valid(zl) and not spiel.kam.scope:
+				var cam=spiel.kam.cam;var kopf=zl.global_position+Vector3(0,1.95,0);var fuss=zl.global_position
+				if not cam.is_position_behind(kopf):
+					var a=cam.unproject_position(kopf);var b=cam.unproject_position(fuss);var h=max(b.y-a.y,20.0);var w=h*0.45
+					var m=Vector2(a.x,(a.y+b.y)*0.5);var rc=Color(1,0.2,0.15)
+					for sx in [-1,1]:
+						for sy in [-1,1]:
+							var e=m+Vector2(sx*w*0.5,sy*h*0.55)
+							draw_line(e,e-Vector2(sx*w*0.25,0),rc,3.0);draw_line(e,e-Vector2(0,sy*h*0.18),rc,3.0)
+					var hp=clamp(float(zl.get("hp") if zl.get("hp")!=null else 100.0)/100.0,0.0,1.0)
+					draw_rect(Rect2(m.x-w*0.5,a.y-h*0.12-10,w,6),Color(0,0,0,0.6));draw_rect(Rect2(m.x-w*0.5,a.y-h*0.12-10,w*hp,6),rc)
 	if kampf.schaden_blitz>0.0:
 		draw_rect(Rect2(Vector2.ZERO,s),Color(0.7,0,0,kampf.schaden_blitz*0.45))
 	if kampf.tot:

@@ -23,7 +23,7 @@ static func aussehen(base:String,frau:bool,rng:RandomNumberGenerator,look:Dictio
 	if look.get("tint") is Color and look.get("mix",1.0)>0.0:o.oben=look.tint
 	if base=="police":
 		o.oben=Color(0.16,0.25,0.45);o.unten=Color(0.12,0.14,0.2);o.schuh=Color(0.08,0.08,0.08);o.aermel="lang";o.schirmmuetze=Color(0.12,0.16,0.3);o.frisur="glatze";o.bart=false
-	for k in ["haut","haar","oben","unten","schuh"]:
+	for k in ["haut","haar","oben","unten","schuh","frisur","bart","aermel"]:
 		if look.has("c_"+k):o[k]=look["c_"+k]
 	return o
 
@@ -33,8 +33,26 @@ static func anziehen(p:Node3D,o:Dictionary):
 	if sk==null:return
 	for m in p.find_children("*","MeshInstance3D",true,false):
 		m.get_parent().remove_child(m);m.free()
-	lib().skelett_koerper(p,sk,o)
+	_koerper(p,sk,o)
 	p.set_meta("comic",o)
+
+# gleiche Figur (Grundmodell + Aussehen) nur einmal bauen, danach Meshes wiederverwenden (kein Ruckeln beim Erscheinen)
+static var _meshes:={}
+static func _koerper(p:Node3D,sk:Skeleton3D,o:Dictionary):
+	var key=str(p.name)+str(o)
+	if _meshes.has(key):
+		for e in _meshes[key]:
+			var mi=MeshInstance3D.new();mi.name=e[0];mi.mesh=e[1];sk.add_child(mi)
+			mi.skeleton=NodePath("..");mi.skin=sk.create_skin_from_rest_transforms();mi.extra_cull_margin=1.5
+			if e[0]=="ComicKontur":mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return
+	lib().skelett_koerper(p,sk,o)
+	if _meshes.size()<80:
+		var l=[]
+		for nm in ["ComicKoerper","ComicKontur"]:
+			var mi=sk.get_node_or_null(nm)
+			if mi:l.append([nm,mi.mesh])
+		_meshes[key]=l
 
 static func umfaerben(p:Node3D,farben:Dictionary):
 	var o:Dictionary=p.get_meta("comic",{}).duplicate()
@@ -44,5 +62,5 @@ static func umfaerben(p:Node3D,farben:Dictionary):
 	for nm in ["ComicKoerper","ComicKontur"]:
 		var alt=sk.get_node_or_null(nm)
 		if alt:sk.remove_child(alt);alt.free()
-	lib().skelett_koerper(p,sk,o)
+	_koerper(p,sk,o)
 	p.set_meta("comic",o)

@@ -69,7 +69,7 @@ func gib_waffe(id:String,magazine:=3):
 	if not waffen.has(id):waffen[id]=0
 	if d.typ!="nah":
 		waffen[id]+=int(d.get("magazin",10))*magazine
-		if not magazin.has(id):magazin[id]=int(d.magazin);waffen[id]-=int(d.magazin)
+		if not magazin.has(id):magazin[id]=int(d.get("magazin",10));waffen[id]-=int(d.get("magazin",10))
 	waehle(id)
 
 func waehle(id:String):
@@ -78,6 +78,16 @@ func waehle(id:String):
 	if halter:halter.setze_waffe(id)
 	if spiel and spiel.hud:spiel.hud.zeige(WD.daten(id).name,1.2)
 
+var rad=null
+func waffen_rad():
+	# Admin: alle Waffen mit Munition, dann Waffenrad öffnen
+	var alt=aktuell
+	for id in WD.REIHE:
+		if not waffen.has(id):gib_waffe(id,8)
+	waehle(alt)
+	if rad==null:
+		rad=load("res://scripts/spiel/waffen_rad.gd").new();rad.kampf=self;spiel.ui.add_child(rad)
+	rad.oeffnen()
 func weiter(schritt:=1):
 	var liste=WD.REIHE.filter(func(i):return waffen.has(i))
 	var i=liste.find(aktuell)
@@ -107,7 +117,9 @@ func spieler_schritt(dt:float):
 	if tot or halter==null:return
 	var st=spiel.st
 	var sp=spiel.spieler
-	if st.pressed("waffe"):weiter(1)
+	if st.pressed("waffe"):
+		if spiel.admin:waffen_rad()
+		else:weiter(1)
 	if st.pressed("waffe_zurueck"):weiter(-1)
 	if st.pressed("nachladen"):nachladen()
 	if _laden>0.0:
@@ -119,12 +131,24 @@ func spieler_schritt(dt:float):
 	if zielt!=_zielen_alt:
 		_zielen_alt=zielt;spiel.kam.zielen=zielt
 	spiel.kam.scope=zielt and d.typ=="sniper" and st.zielen
+	# Zielfernrohr: eigene Figur und Waffe ausblenden (Blick durchs Fernrohr)
+	if sp.figur:sp.figur.visible=not spiel.kam.scope
+	if halter and halter.modell:halter.modell.visible=not spiel.kam.scope
 	# Zielrichtung aus der Kamera (Fadenkreuz) + Zielhilfe
 	var cam:Camera3D=spiel.kam.cam
 	var von=cam.global_position;var fw=-cam.global_transform.basis.z
 	var reich=float(d.get("reichweite",100))
 	var hit=_ray(von+fw*1.0,von+fw*reich,[sp])
 	var punkt:Vector3=hit.position if hit else von+fw*reich
+	# Zielerfassung wie in GTA (weich): nächster sichtbarer Gegner im Blickkegel zieht das Fadenkreuz sanft heran
+	ziel_lock=null
+	if zielt and not spiel.kam.scope:
+		ziel_lock=_ziel_suchen(von,fw,reich)
+		if ziel_lock!=null:
+			var tp=ziel_lock.global_position+Vector3(0,1.3,0);var v=tp-von
+			var w_yaw=atan2(-v.x,-v.z);var w_pitch=rad_to_deg(asin(clamp(v.y/v.length(),-1.0,1.0)))
+			var zug=clamp(dt*(3.0 if spiel.kam._ruhe>0.15 else 0.8),0.0,1.0)
+			spiel.kam.yaw=lerp_angle(spiel.kam.yaw,w_yaw,zug);spiel.kam.pitch=lerp(spiel.kam.pitch,clamp(w_pitch,-60.0,30.0),zug)
 	var hilfe=_zielhilfe(von,fw,reich)
 	if hilfe!=null:punkt=hilfe
 	halter.zielen=zielt
@@ -207,6 +231,20 @@ func tags_wiederherstellen():
 		var dc=Decal.new();add_child(dc);dc.texture_albedo=_tag_tex(int(t[6]));dc.size=Vector3(3.2,0.8,1.6)
 		dc.global_transform=Transform3D(tag_basis(Vector3(t[3],t[4],t[5])),Vector3(t[0],t[1],t[2]));_tags.append(dc)
 
+var ziel_lock=null
+func _ziel_suchen(von:Vector3,fw:Vector3,reich:float):
+	var best=null;var bw=1e9
+	for g in gegner:
+		if not is_instance_valid(g) or g.tot or (g.get("verbuendet") and g.verbuendet):continue
+		var p=g.global_position+Vector3(0,1.3,0);var v=p-von;var dist=v.length()
+		if dist>min(reich,70.0) or dist<1.5:continue
+		var w=fw.angle_to(v)
+		if w>deg_to_rad(24.0):continue
+		var wert=w*1.0+dist*0.004
+		if wert<bw:
+			var h=_ray(von+fw*1.0,p,[spiel.spieler])
+			if h and h.collider==g:bw=wert;best=g
+	return best
 func _zielhilfe(von:Vector3,fw:Vector3,reich:float):
 	var best=null;var bw=deg_to_rad(7.0 if not spiel.st.controller else 5.0)
 	for g in gegner:
@@ -486,6 +524,11 @@ func _effekte_bauen():
 	_sounds["mg"]=_knall(0.38,0.7,1.0)
 	_sounds["schrot"]=_knall(0.5,0.55,1.0)
 	_sounds["sniper"]=_knall(0.7,0.5,1.0)
+	# neue Schussgeräusche (tools/sounds_gen.py), falls vorhanden
+	for k in ["pistole","mp","gewehr","schrot","sniper"]:
+		var p="res://assets/sounds/schuss_%s.wav"%k
+		if ResourceLoader.exists(p):_sounds[k]=load(p)
+	if ResourceLoader.exists("res://assets/sounds/schuss_gewehr.wav"):_sounds["mg"]=load("res://assets/sounds/schuss_gewehr.wav")
 	_sounds["schlag"]=_knall(0.08,2.5,0.4)
 	_sounds["laden"]=_klick()
 	for i in 10:

@@ -83,6 +83,9 @@ func _ready():
 		welt=ResourceLoader.load_threaded_get(WC.SZENE).instantiate();welt.spiel=true;add_child(welt);welt.aus_cache()
 		FARB=FARB_COMIC
 		load("res://scripts/comic/comic_figur.gd").aktiv=true
+		# Stadtgeräusche (leiser Verkehr, ferne Hupe, Vögel) als Schleife
+		var MS=load("res://scripts/spiel/motor_sound.gd")
+		var amb=AudioStreamPlayer.new();amb.name="Umgebung";add_child(amb);amb.stream=MS.schleife("umgebung_stadt");amb.volume_db=-12.0;amb.play()
 	elif WELT.cache_da() and _arg("--neu")=="":
 		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
 		await _schritt("Welt wird geladen …",0.05)
@@ -466,6 +469,8 @@ func einsteigen(c):
 	ereignis("einsteigen "+str(c.kind))
 	verkehr.erase(c);if not geparkt.has(c):geparkt.append(c)
 	auto=c;c.uebernehmen();c.contact_monitor=true;c.max_contacts_reported=4
+	if motor.has_method("waehle"):motor.waehle(c.kind)
+	c.ki_ton_aus()
 	if not c.body_entered.is_connected(_rempler):c.body_entered.connect(_rempler)
 	spieler.visible=false;spieler.process_mode=Node.PROCESS_MODE_DISABLED;spieler.collision_layer=0
 	kampf.halter.entfernen();kam.zielen=false;kam.scope=false
@@ -534,7 +539,7 @@ func _verkehr_pflege(p:Vector3):
 	for c in geparkt.duplicate():
 		if c!=auto and is_instance_valid(c) and not (mis!=null and c==mis.auto_m) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>420.0:geparkt.erase(c);c.queue_free()
 	if verkehr.size()<_ziel_anzahl() and Engine.get_process_frames()%6==0:_spawn_auto(p2)
-	if "comic" in welt and Engine.get_process_frames()%20==0:_parker(p2)
+	if "comic" in welt and Engine.get_process_frames()%4==0:_parker(p2)
 
 # Comic-Welt: geparkte Autos aus der Stadt-Datei in der Nähe des Spielers aufstellen
 var _parker_da:={}
@@ -548,6 +553,7 @@ func _parker(p2:Vector2):
 			continue
 		if d>150.0 or d<25.0:continue
 		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.reset_physics_interpolation();c.parken();geparkt.append(c);_parker_da[i]=c
+		return   # höchstens ein Auto pro Durchgang (verteilt die Arbeit, kein Ruckeln)
 
 func _spawn_auto(p2:Vector2):
 	for versuch in 12:
