@@ -82,6 +82,7 @@ func _ready():
 			_lade("Welt wird geladen … %d %%"%int(pr[0]*100),0.05+pr[0]*0.7);await get_tree().process_frame
 		welt=ResourceLoader.load_threaded_get(WC.SZENE).instantiate();welt.spiel=true;add_child(welt);welt.aus_cache()
 		FARB=FARB_COMIC
+		load("res://scripts/comic/comic_figur.gd").aktiv=true
 	elif WELT.cache_da() and _arg("--neu")=="":
 		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
 		await _schritt("Welt wird geladen …",0.05)

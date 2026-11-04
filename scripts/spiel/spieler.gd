@@ -24,13 +24,16 @@ func _ready():
 func figur_bauen():
 	if figur:figur.queue_free()
 	var r=RandomNumberGenerator.new();r.seed=5
-	figur=PE.make(figur_basis,r,{"skin":PE.SKIN[5],"hair":PE.HAIR[0],"mix":0.0,"height":1.8});add_child(figur)
+	figur=PE.make(figur_basis,r,{"skin":PE.SKIN[5],"hair":PE.HAIR[0],"mix":0.0,"height":1.8,"c_haut":Color(0.8,0.58,0.42),"c_haar":Color(0.12,0.08,0.05)});add_child(figur)
 	PE.play(figur,"idle")
 	anim="idle"
 	await get_tree().process_frame
 	kleidung()
 
 func kleidung():
+	if figur.has_meta("comic"):
+		load("res://scripts/comic/comic_figur.gd").umfaerben(figur,{"oben":O.TOPS[outfit.top][1],"unten":O.BOTTOMS[outfit.bottom][1],"schuh":O.SHOE_LIST[outfit.shoes][1]})
+		return
 	O.apply(figur,{"top":O.TOPS[outfit.top][1],"bottom":O.BOTTOMS[outfit.bottom][1],"shoes":O.SHOE_LIST[outfit.shoes][1],"hat":O.HATS[outfit.hat][1],"glasses":outfit.glasses,"chain":outfit.chain})
 
 func steuern(st,dt:float):

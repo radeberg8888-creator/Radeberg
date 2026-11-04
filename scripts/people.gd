@@ -130,6 +130,8 @@ static func make(base:String,rng:RandomNumberGenerator,look:={})->Node3D:
 		var ap=AnimationPlayer.new();ap.name="Anim";ch.add_child(ap);ap.root_node=ap.get_path_to(ch)
 		ap.add_animation_library("",library(base,ch,sk))
 		root.set_meta("anim",ap)
+	var CF=load("res://scripts/comic/comic_figur.gd")
+	if CF.aktiv:CF.anziehen(root,CF.aussehen(base,b[3]=="f",rng,look))
 	return root
 
 static func play(p:Node3D,anim:String,phase:=0.0,speed:=1.0):

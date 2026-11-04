@@ -1207,7 +1207,7 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 	var kurz:bool=o.get("kurz",false);var rock:bool=o.get("rock",false)
 	for sd in [-1,1]:
 		var a=sw*sd
-		var bend=max(0.0,-a)*1.3+0.06
+		var bend=max(0.0,-a)*0.8+0.06
 		var H=Vector3(sd*hb,0.93,0)
 		var K=H+Vector3(0,-cos(a),sin(a))*0.44
 		var A=K+Vector3(0,-cos(a-bend),sin(a-bend))*0.42
@@ -1239,7 +1239,7 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 	var sh:float=0.205 if not frau else 0.175
 	var lang:bool=o.get("lang",false)
 	var R=[]
-	var torso=[[0.98,0.158,0.102,0.0],[1.1,0.15,0.1,0.0],[1.24,0.18 if not frau else 0.155,0.118,0.01],[1.34,sh,0.125 if not frau else 0.135,0.02 if frau else 0.012],[1.43,sh-0.005,0.11,0.0],[1.5,0.15,0.085,-0.005],[1.53,0.07,0.06,0.0]]
+	var torso=[[0.98,0.158,0.102,0.0],[1.1,0.15,0.1,0.0],[1.24,0.18 if not frau else 0.155,0.118,0.01],[1.34,sh-0.01,0.125 if not frau else 0.135,0.02 if frau else 0.012],[1.42,sh-0.035,0.11,0.0],[1.48,sh-0.075,0.092,-0.004],[1.52,0.1,0.07,0.0],[1.54,0.06,0.055,0.0]]
 	if frau:torso[1]=[1.1,0.128,0.092,0.0]
 	for q in torso:R.append(ring_ell(X.call(Vector3(0,q[0],q[3])),ux,uz,q[1]*sk,q[2]*sk,14))
 	loft(oben,R,true,0.018)
@@ -1247,7 +1247,7 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 	if o.get("muster","")=="streifen":
 		for k in 3:loft(_toon(Color(0.95,0.95,0.92)),[ring_ell(X.call(Vector3(0,1.15+k*0.1,0.004)),ux,uz,(0.168+k*0.012)*sk,0.115*sk,14),ring_ell(X.call(Vector3(0,1.18+k*0.1,0.006)),ux,uz,(0.172+k*0.012)*sk,0.118*sk,14)],true,0.0,false)
 	# ---- Hals & Kopf ----
-	rohr(haut,[X.call(Vector3(0,1.48,0)),X.call(Vector3(0,1.6,0.012))],[0.05*sk,0.048*sk],0.014,10,false)
+	rohr(haut,[X.call(Vector3(0,1.48,0)),X.call(Vector3(0,1.6,0.012))],[0.058*sk,0.052*sk],0.014,10,false)
 	var kc=Vector3(0,1.69,0.012)
 	kugel(haut,X.call(kc),Vector3(0.102,0.122,0.112)*sk,1.07)
 	kugel(haut,X.call(kc+Vector3(0,-0.06,0.025)),Vector3(0.082,0.07,0.085)*sk,1.0)
@@ -1271,7 +1271,7 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 	match o.get("frisur","kurz"):
 		"kurz":
 			kugel(haar,X.call(kc+Vector3(0,0.042,-0.02)),Vector3(0.11,0.1,0.112)*sk,1.04)
-			lbox(haar,T,kc+Vector3(0,0.09,0.07),Vector3(0.17,0.05,0.07),0.0,Basis(Vector3(1,0,0),-0.35))
+			kugel(haar,X.call(kc+Vector3(0.015,0.085,0.055)),Vector3(0.1,0.04,0.06)*sk,1.03)
 		"glatze":
 			kugel(haar,X.call(kc+Vector3(0,-0.01,-0.04)),Vector3(0.106,0.07,0.09)*sk,1.02)
 		"locken":
@@ -1286,7 +1286,14 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 		"zopf":
 			kugel(haar,X.call(kc+Vector3(0,0.04,-0.018)),Vector3(0.114,0.104,0.116)*sk,1.04)
 			kugel(haar,X.call(kc+Vector3(0,0.1,-0.09)),Vector3(0.06,0.06,0.06)*sk,1.06)
-	if o.has("muetze"):
+	if o.has("schirmmuetze"):
+		# Polizei-Schirmmütze: flache runde Krone, dunkles Band, Schirm, Abzeichen
+		var mu=_toon(o.schirmmuetze)
+		zyl(mu,X.call(kc+Vector3(0,0.07,-0.01)),X.call(kc+Vector3(0,0.15,-0.01)),0.125*sk,1.04)
+		zyl(_toon(Color(0.05,0.05,0.07)),X.call(kc+Vector3(0,0.065,-0.01)),X.call(kc+Vector3(0,0.1,-0.01)),0.118*sk,1.0)
+		lbox(_toon(Color(0.05,0.05,0.07)),T,kc+Vector3(0,0.07,0.115),Vector3(0.17,0.014,0.09),0.012,Basis(Vector3(1,0,0),0.25))
+		kugel(_toon(Color(0.95,0.8,0.25)),X.call(kc+Vector3(0,0.12,0.118)),Vector3(0.022,0.022,0.008)*sk,1.0)
+	elif o.has("muetze"):
 		var mu=_toon(o.muetze)
 		kugel(mu,X.call(kc+Vector3(0,0.06,-0.01)),Vector3(0.118,0.085,0.122)*sk,1.05)
 		lbox(mu,T,kc+Vector3(0,0.05,0.13),Vector3(0.17,0.018,0.12),0.015)
@@ -1294,12 +1301,13 @@ func _mensch(pos:Vector3,yaw:float,o:Dictionary):
 	var aermel:String=o.get("aermel","kurz")
 	for sd in [-1,1]:
 		var b=-sw*sd*0.75
-		var S=Vector3(sd*(sh-0.015),1.43,0.0)
+		var S=Vector3(sd*(sh-0.03),1.41,0.0)
 		var E=S+Vector3(sd*0.05,-0.28*cos(b),0.28*sin(b)-0.01)
 		var flex=0.32+max(0.0,b)*0.6
 		var W=E+Vector3(sd*0.005,-0.25*cos(b+flex),0.25*sin(b+flex))
 		if o.get("tasche",false) and sd==1:W=E+Vector3(0.02,-0.24,0.04)
 		var arm_oben=oben if aermel!="ohne" else haut
+		kugel(arm_oben,X.call(S+Vector3(0,0.008,0)),Vector3(0.07,0.068,0.07)*sk,1.0)
 		if aermel=="lang":
 			rohr(oben,[X.call(S),X.call(E),X.call(W)],[0.068*sk,0.058*sk,0.05*sk],0.016)
 		else:
@@ -2608,6 +2616,20 @@ func _haenge(sk:Skeleton3D,idx:Dictionary,Rx:Transform3D,key:String,fn:Callable)
 	if not idx.has(key):return
 	var alt=st;var altm=mats;var altz=zaehler;st={};mats={};zaehler={}
 	fn.call()
+	if _skin!=null:
+		var bi:int=idx[key];var inv:=Rx.affine_inverse()
+		for k in st:
+			var arr=st[k].commit_to_arrays()
+			if arr.is_empty() or arr[Mesh.ARRAY_VERTEX]==null:continue
+			var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX];var N=arr[Mesh.ARRAY_NORMAL];var I=arr[Mesh.ARRAY_INDEX]
+			var z=_skin.i if mats[k]==ink else _skin.c
+			var col:Color=mats[k].albedo_color if mats[k] is BaseMaterial3D else Color.WHITE
+			var hat_i=I!=null and I.size()>0
+			for t in (I.size() if hat_i else V.size()):
+				var j=I[t] if hat_i else t
+				z.v.append(inv*V[j]);z.n.append((inv.basis*(N[j] if N!=null else Vector3.UP)).normalized());z.c.append(col);z.b.append(bi)
+		st=alt;mats=altm;zaehler=altz
+		return
 	var ba=BoneAttachment3D.new();ba.bone_name=sk.get_bone_name(idx[key]);sk.add_child(ba)
 	var inv=sk.get_bone_global_rest(idx[key]).affine_inverse()*Rx.affine_inverse()
 	for k in st:
@@ -2617,12 +2639,44 @@ func _haenge(sk:Skeleton3D,idx:Dictionary,Rx:Transform3D,key:String,fn:Callable)
 
 var SKELETTE:=[]
 func _skelett_mensch(pos:Vector3,yaw:float,o:Dictionary,anim:String,zeit:float):
-	var PE=load("res://scripts/people.gd");var U=load("res://scripts/anim_util.gd");var F=load("res://scripts/fit.gd")
+	var PE=load("res://scripts/people.gd");var U=load("res://scripts/anim_util.gd")
 	var rr=RandomNumberGenerator.new();rr.seed=3
 	var p:Node3D=PE.make("joe",rr);welt.add_child(p);p.position=pos;p.rotation.y=yaw;SKELETTE.append(p)
 	for m in p.find_children("*","MeshInstance3D",true,false):m.visible=false
 	var sk:Skeleton3D=U.find_skel(p)
 	if sk==null:print("SKELETT fehlt");return
+	skelett_koerper(p,sk,o)
+	var ap:AnimationPlayer=p.get_meta("anim")
+	if ap and ap.has_animation(anim):
+		ap.play(anim);ap.seek(zeit,true);ap.speed_scale=0.0
+
+# Comic-Körper als EIN gehäutetes Mesh (Farbe + Kontur, 2 Zeichenaufrufe) am Skelett einer people.gd-Figur
+var _skin=null
+var fig_mat:StandardMaterial3D
+func skelett_koerper(p:Node3D,sk:Skeleton3D,o:Dictionary)->MeshInstance3D:
+	var U=load("res://scripts/anim_util.gd");var F=load("res://scripts/fit.gd")
+	_skin={"c":{"v":PackedVector3Array(),"n":PackedVector3Array(),"c":PackedColorArray(),"b":PackedInt32Array()},"i":{"v":PackedVector3Array(),"n":PackedVector3Array(),"c":PackedColorArray(),"b":PackedInt32Array()}}
+	_skelett_teile(p,sk,o,U,F)
+	if fig_mat==null:
+		fig_mat=_toon(Color.WHITE);fig_mat.vertex_color_use_as_albedo=true
+	var erstes:MeshInstance3D=null
+	for e in [[_skin.c,fig_mat],[_skin.i,ink]]:
+		var z=e[0]
+		if z.v.size()==0:continue
+		var a=[];a.resize(Mesh.ARRAY_MAX)
+		var B=PackedInt32Array();B.resize(z.b.size()*4);var Wt=PackedFloat32Array();Wt.resize(z.b.size()*4)
+		for i in z.b.size():B[i*4]=z.b[i];Wt[i*4]=1.0
+		a[Mesh.ARRAY_VERTEX]=z.v;a[Mesh.ARRAY_NORMAL]=z.n;a[Mesh.ARRAY_BONES]=B;a[Mesh.ARRAY_WEIGHTS]=Wt
+		if e[1]!=ink:a[Mesh.ARRAY_COLOR]=z.c
+		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,e[1])
+		# Kontur getrennt und ohne Schatten (sonst wirft die Konturhülle Flecken auf Gesicht und Shirt)
+		var mi=MeshInstance3D.new();mi.name="ComicKoerper" if e[1]!=ink else "ComicKontur";mi.mesh=am;sk.add_child(mi)
+		mi.skeleton=NodePath("..");mi.skin=sk.create_skin_from_rest_transforms();mi.extra_cull_margin=1.5
+		if e[1]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		else:erstes=mi
+	_skin=null
+	return erstes
+func _skelett_teile(p:Node3D,sk:Skeleton3D,o:Dictionary,U,F):
 	var Rx:Transform3D=F.rel_xf(sk,p)
 	var idx={}
 	for i in sk.get_bone_count():
@@ -2669,19 +2723,32 @@ func _skelett_mensch(pos:Vector3,yaw:float,o:Dictionary,anim:String,zeit:float):
 			kugel(haar,kc+Vector3(0,0.04,-0.018)*s,Vector3(0.115,0.104,0.117)*s,1.04)
 			loft(haar,[ring_ell(kc+Vector3(0,0,-0.035)*s,X,Z,0.11*s,0.09*s,12),ring_ell(kc+Vector3(0,-0.16,-0.05)*s,X,Z,0.12*s,0.075*s,12),ring_ell(kc+Vector3(0,-0.28,-0.065)*s,X,Z,0.1*s,0.05*s,12)],true,0.016)
 			box(haar,kc+Vector3(0,0.08,0.075)*s,Vector3(0.16,0.045,0.06)*s,Basis(Vector3(1,0,0),-0.5),0.0)
+		elif o.get("frisur","kurz")=="glatze":
+			kugel(haar,kc+Vector3(0,-0.01,-0.04)*s,Vector3(0.104,0.07,0.09)*s,1.02)
 		else:
 			kugel(haar,kc+Vector3(0,0.042,-0.02)*s,Vector3(0.108,0.098,0.11)*s,1.04)
-			box(haar,kc+Vector3(0,0.09,0.07)*s,Vector3(0.17,0.05,0.07)*s,Basis(Vector3(1,0,0),-0.35),0.0))
+			kugel(haar,kc+Vector3(0.015,0.085,0.055)*s,Vector3(0.1,0.04,0.06)*s,1.03)
+		if o.get("bart",false):kugel(haar,kc+Vector3(0,-0.085,0.06)*s,Vector3(0.075,0.045,0.06)*s,1.04)
+		if o.has("schirmmuetze"):
+			var mu=_toon(o.schirmmuetze);var sw=_toon(Color(0.05,0.05,0.07))
+			zyl(mu,kc+Vector3(0,0.07,-0.01)*s,kc+Vector3(0,0.15,-0.01)*s,0.125*s,1.04)
+			zyl(sw,kc+Vector3(0,0.065,-0.01)*s,kc+Vector3(0,0.1,-0.01)*s,0.118*s,1.0)
+			box(sw,kc+Vector3(0,0.07,0.115)*s,Vector3(0.17,0.014,0.09)*s,Basis(Vector3(1,0,0),0.25),0.012)
+			kugel(_toon(Color(0.95,0.8,0.25)),kc+Vector3(0,0.12,0.118)*s,Vector3(0.022,0.022,0.008)*s,1.0))
 	# Arme: Schulterkugel + Ärmel am Oberarm, Unterarm mit Ellbogenkugel, Hand mit Daumen
 	for seite in ["Left","Right"]:
 		var A=J.call(seite+"Arm");var E=J.call(seite+"ForeArm");var W=J.call(seite+"Hand")
 		_haenge(sk,idx,Rx,seite+"Arm",func():
-			kugel(oben,A,Vector3.ONE*0.075*s,1.08)
-			rohr(oben,[A,A.lerp(E,0.55)],[0.072*s,0.066*s],0.016,12,false)
-			rohr(haut,[A.lerp(E,0.5),E],[0.052*s,0.047*s],0.015,12,false))
+			kugel(oben,A,Vector3.ONE*0.07*s,1.0)
+			if o.get("aermel","kurz")=="lang":rohr(oben,[A,E],[0.07*s,0.06*s],0.016,12,false)
+			else:
+				rohr(oben,[A,A.lerp(E,0.55)],[0.072*s,0.066*s],0.016,12,false)
+				rohr(haut,[A.lerp(E,0.5),E],[0.052*s,0.047*s],0.015,12,false))
 		_haenge(sk,idx,Rx,seite+"ForeArm",func():
-			kugel(haut,E,Vector3.ONE*0.048*s,1.1)
-			rohr(haut,[E,W],[0.046*s,0.036*s],0.015,12,false))
+			var lang=o.get("aermel","kurz")=="lang"
+			kugel(oben if lang else haut,E,Vector3.ONE*(0.06 if lang else 0.048)*s,1.0 if lang else 1.1)
+			rohr(oben if lang else haut,[E,E.lerp(W,0.85) if lang else W],[(0.058 if lang else 0.046)*s,(0.05 if lang else 0.036)*s],0.015,12,false)
+			if lang:rohr(haut,[E.lerp(W,0.8),W],[0.04*s,0.036*s],0.015,10,false))
 		_haenge(sk,idx,Rx,seite+"Hand",func():
 			var d=(W-E).normalized()
 			kugel(haut,W+d*0.06*s,Vector3(0.06,0.04,0.035)*s,1.1)
@@ -2696,9 +2763,6 @@ func _skelett_mensch(pos:Vector3,yaw:float,o:Dictionary,anim:String,zeit:float):
 			loft(schuh,[ring_ell(Vector3(Fu.x,gy+0.055*s,Fu.z-0.07*s),X,Vector3.UP,0.05*s,0.05*s,10),ring_ell(Vector3(Fu.x,gy+0.055*s,Fu.z+0.04*s),X,Vector3.UP,0.056*s,0.055*s,10),
 				ring_ell(Vector3(Fu.x,gy+0.04*s,Fu.z+0.14*s),X,Vector3.UP,0.05*s,0.035*s,10),ring_ell(Vector3(Fu.x,gy+0.032*s,Fu.z+0.18*s),X,Vector3.UP,0.03*s,0.025*s,10)],true,0.016)
 			box(_toon(Color(0.15,0.13,0.12)),Vector3(Fu.x,gy+0.008*s,Fu.z+0.05*s),Vector3(0.11*s,0.016*s,0.3*s),Basis(),0.0))
-	var ap:AnimationPlayer=p.get_meta("anim")
-	if ap and ap.has_animation(anim):
-		ap.play(anim);ap.seek(zeit,true);ap.speed_scale=0.0
 
 # ================= Höhen: Terrassen =================
 # Höhenfeld: ein Hügelviertel im Nordwesten (Plateau), Straßen steigen weich an.
