@@ -127,7 +127,8 @@ func _init():
 	# ---- Parkplätze, Läden ----
 	var parken=[]
 	var var_={"c_trabant":["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_trabant_rot"],"c_wartburg":["c_wartburg_beige","c_wartburg_blau","c_wartburg_gruen"],
-		"c_sport":["c_sport_rot","c_sport_gelb","c_sport_schwarz"]}
+		"c_sport":["c_sport_rot","c_sport_gelb","c_sport_schwarz"],"c_jdm":["c_jdm_weiss","c_jdm_blau","c_jdm_rot"],"c_kompakt":["c_kompakt_rot","c_kompakt_weiss","c_kompakt_schwarz"],
+		"c_e30":["c_e30_gruen","c_e30_silber","c_e30_schwarz"],"c_luxus":["c_luxus_schwarz","c_luxus_silber"],"c_muscle":["c_muscle_orange","c_muscle_schwarz"],"c_suv":["c_suv_grau","c_suv_gruen"]}
 	var rr=RandomNumberGenerator.new();rr.seed=5
 	for e in L.PARKEN:
 		var k:String=e[0];var tf:Transform3D=e[1]
@@ -143,7 +144,11 @@ func _init():
 			if r.n=="ew2":
 				var b=L._bei_s(r.P,r.S,r.S[r.S.size()-1]*lo[1]);var p:Vector2=b[0];var n:Vector2=L._rn(b[1])
 				var q=p+n*(r.w+L.SWB-0.6)
-				shops.append({"typ":lo[0],"c":q+off,"y":H0+L.FY(q.x,q.y)+L.KB,"yaw":atan2(-n.x,-n.y),"w":4.0,"d":-3.0})
+				# Werkstatt: Einfahrtszone auf der Parkspur vor dem Laden (d so gewählt, dass die Zone dort liegt)
+				shops.append({"typ":lo[0],"c":q+off,"y":H0+L.FY(q.x,q.y)+L.KB,"yaw":atan2(-n.x,-n.y),"w":4.0,"d":25.0 if lo[0]=="werkstatt" else -3.0})
+				if lo[0]=="werkstatt":
+					var zp=q+off-n*6.5
+					parken=parken.filter(func(e):return Vector2(e[1].origin.x,e[1].origin.z).distance_to(zp)>16.0)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
 		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2))}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()

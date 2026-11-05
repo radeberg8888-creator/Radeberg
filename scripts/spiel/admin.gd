@@ -6,7 +6,7 @@ const VH=preload("res://scripts/vehicles.gd")
 const AUTO=preload("res://scripts/spiel/fahrzeug.gd")
 var spiel
 
-const ORTE:=[["Zuhause (Ghetto)","zuhause"],["Downtown","downtown"],["Altstadt","altstadt"],["Strandviertel","strand"],["Sonnenhügel (Villen)","sonnenhuegel"],
+const ORTE:=[["Tuning-Werkstatt","werkstatt"],["Zuhause (Ghetto)","zuhause"],["Downtown","downtown"],["Altstadt","altstadt"],["Strandviertel","strand"],["Sonnenhügel (Villen)","sonnenhuegel"],
 	["Sternviertel","stern"],["Neu-Kowloon","kowloon"],["Hauptbahnhof","bahnhof"],["Hafen","hafen"],["Flughafen","flugplatz"],["Ostvororte","vorort"],
 	["Staubwinkel (Wüste)","staubwinkel"],["Staubsee","see"],["Roter Canyon","canyon"],["Farmland","farm"],["Espenwald","espenwald"],
 	["Radeberg-Gipfel","berg"],["Nordbucht","nordbucht"],["Autobahn (Stadtring)","autobahn"],["Oststadt","oststadt"],["Südstadt","suedstadt"],["Docks","docks"],["Militärbasis (Tor)","militaer"],["Stausee","stausee"],["Wüste","wueste"]]
@@ -84,7 +84,11 @@ func auto_rufen(k:String):
 	spiel.geparkt.append(c);spiel.panel_zu();spiel.hud.zeige(VH.LIST[k][2]+" steht bereit",1.5)
 
 func _boden(p:Vector3)->float:
-	return spiel.kampf._boden(p)
+	# von hoch oben nach unten suchen (Berge bis 700 m)
+	var g=spiel.welt.G.h_at(p.x,p.z) if spiel.welt.G else p.y
+	var raum=spiel.get_world_3d().direct_space_state
+	var hit=raum.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(p.x,max(g,p.y)+150.0,p.z),Vector3(p.x,g-30.0,p.z),1))
+	return hit.position.y+0.1 if hit else g
 
 func teleport_ort(key:String):
 	var p:Vector3

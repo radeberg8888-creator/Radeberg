@@ -147,6 +147,40 @@ func _process(dt):
 			8:get_tree().quit()
 		schritt+=1
 		return
+	if spiel.test_modus=="v28":
+		if t<(2.0 if schritt==0 else 1.2):return
+		t=0
+		var sp=spiel.spieler;var K=spiel.kampf
+		match schritt:
+			0:
+				spiel.admin=true;spiel.admin_geld=true
+				# Skyline-Typ vor die Werkstatt stellen, Spieler daneben
+				var w=spiel._shop("werkstatt");var fw=Vector3(sin(w.yaw),0,cos(w.yaw))
+				var z=Vector3(w.c.x,w.y,w.c.y)+fw*(w.d*0.5-6.0)
+				var c=spiel.AUTO.new();spiel.add_child(c);c.setup("c_jdm_blau")
+				c.global_transform=Transform3D(Basis(Vector3.UP,w.yaw+PI*0.5),z+Vector3(0,0.4,0)+fw.cross(Vector3.UP)*9.0);c.reset_physics_interpolation();c.parken();spiel.geparkt.append(c);set_meta("testauto",c)
+				sp.global_position=c.global_position+c.global_transform.basis.x*3.5+Vector3(0,0.3,0);sp.reset_physics_interpolation()
+				print("TEST auto ",c.global_position," spieler ",sp.global_position)
+			1:print("TEST vor einsteigen auto ",get_meta("testauto").global_position);spiel.entern(get_meta("testauto"))
+			3:
+				var c=spiel.auto;print("TEST nach einsteigen auto ",c.global_position if c else null," kipp ",c.global_transform.basis.y if c else null)
+				var w=spiel._shop("werkstatt");var fw=Vector3(sin(w.yaw),0,cos(w.yaw))
+				var z=Vector3(w.c.x,w.y,w.c.y)+fw*(w.d*0.5-6.0)
+				c.global_transform=Transform3D(Basis(Vector3.UP,w.yaw+PI*0.5),z+Vector3(0,0.6,0));c.linear_velocity=Vector3.ZERO;c.reset_physics_interpolation()
+			5:print("TEST panel ",spiel.panel!=null);shot("werkstatt_menue")
+			6:
+				var c=spiel.auto
+				spiel._comic_umbauen({"tief":0.06,"breit":0.06,"lippe":true,"schweller":true,"diffusor":true,"spoiler":"gt","felge":"kreuz","felgenfarbe":Color(0.95,0.78,0.25),"neon":Color(0.2,0.6,1.0)},Color(0.8,0.12,0.12),0)
+				spiel.panel_zu();spiel.kam.yaw+=2.4;spiel.kam.pitch=-12.0
+			8:shot("getunt")
+			9:spiel.aussteigen_sofort();print("TEST ausgestiegen ",sp.global_position)
+			10:K.gib_waffe("ak47",3);K.magazin["ak47"]=5;K.nachladen()
+			11:shot("nachladen")
+			12:spiel.karte_oeffnen(false)
+			13:shot("karte")
+			14:get_tree().quit()
+		schritt+=1
+		return
 	if spiel.test_modus=="rad":
 		if t<(2.0 if schritt==0 else 0.4):return
 		t=0

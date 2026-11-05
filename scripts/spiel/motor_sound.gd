@@ -1,7 +1,7 @@
 extends Node
 # Motorsound aus zwei Schleifen je Fahrzeugklasse (Leerlauf / hohe Drehzahl, tools/sounds_gen.py),
 # Tonhöhe folgt der Drehzahl, Gangwechsel, Überblendung zwischen den Schleifen. Dazu Hupe.
-const KLASSE:={"c_trabant":"trabant","c_wartburg":"wartburg","c_taxi":"vier","c_polizei":"vier","c_sport":"v8","c_rtw":"diesel","c_feuerwehr":"diesel"}
+const KLASSE:={"c_jdm":"vier","c_kompakt":"vier","c_e30":"vier","c_luxus":"v8","c_muscle":"v8","c_suv":"diesel","c_trabant":"trabant","c_wartburg":"wartburg","c_taxi":"vier","c_polizei":"vier","c_sport":"v8","c_rtw":"diesel","c_feuerwehr":"diesel"}
 const DREH:={"trabant":[900.0,4500.0,4],"wartburg":[850.0,4800.0,4],"vier":[800.0,6000.0,5],"v8":[850.0,7500.0,6],"diesel":[650.0,2600.0,5]}
 var lo:AudioStreamPlayer;var hi:AudioStreamPlayer;var horn:AudioStreamPlayer
 var klasse:=""

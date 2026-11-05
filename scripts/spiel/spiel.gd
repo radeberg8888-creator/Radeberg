@@ -85,7 +85,7 @@ func _ready():
 		load("res://scripts/comic/comic_figur.gd").aktiv=true
 		# Stadtgeräusche (leiser Verkehr, ferne Hupe, Vögel) als Schleife
 		var MS=load("res://scripts/spiel/motor_sound.gd")
-		var amb=AudioStreamPlayer.new();amb.name="Umgebung";add_child(amb);amb.stream=MS.schleife("umgebung_stadt");amb.volume_db=-12.0;amb.play()
+		var amb=AudioStreamPlayer.new();amb.name="Umgebung";add_child(amb);amb.stream=MS.schleife("umgebung_stadt");amb.volume_db=-1.0;amb.play()
 	elif WELT.cache_da() and _arg("--neu")=="":
 		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
 		await _schritt("Welt wird geladen …",0.05)
@@ -273,6 +273,9 @@ func _spieler():
 	kam.yaw=home.yaw+PI*0.0
 	hud=HUD.new();hud.st=st;hud.spiel=self;ui.add_child(hud)
 	mini=MINI.new();ui.add_child(mini);mini.position=Vector2(22,22)
+	if "comic" in welt:
+		mini.strassen=welt.S.roads;mini.icons=[]
+		for s in welt.A.shops:mini.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y})
 	motor=MOTOR.new();add_child(motor)
 	mis=MIS.new();mis.spiel=self;add_child(mis)
 	kampf=KAMPF.new();kampf.spiel=self;add_child(kampf);kampf.setup_spieler()
@@ -299,6 +302,9 @@ func _zonen():
 		if s.typ=="lager":continue
 		zonen.append({"typ":s.typ,"p":p,"r":3.5 if reinfahren else 1.6,"text":txt})
 		_marker(p,1.2 if not reinfahren else 2.6)
+		if s.typ=="werkstatt" and "comic" in welt:
+			var l=Label3D.new();l.text="RADEBERG CUSTOMS\nTuning-Werkstatt – reinfahren";l.font_size=64;l.pixel_size=0.008;l.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+			l.modulate=Color(1,0.75,0.2);l.outline_size=14;add_child(l);l.global_position=p+Vector3(0,4.5,0);l.visibility_range_end=250.0
 
 func _geldautomaten():
 	for g in get_tree().get_nodes_in_group("geldautomat"):
@@ -324,6 +330,7 @@ func _physics_process(dt):
 		if is_instance_valid(c) and c!=auto and c.global_position.distance_to(sp2)<160.0:hind.append(c)
 	for c in verkehr:c.ki_schritt(dt,hind)
 	if auto==null and not _entert:_anfahren_pruefen()
+	if Engine.get_physics_frames()%30==0:_rettung()
 
 var prof:={}
 func _pz(n,t):prof[n]=max(prof.get(n,0.0)*0.98,(Time.get_ticks_usec()-t)/1000.0)
@@ -446,6 +453,9 @@ func entern(c):
 	var tuer:Vector3=c.aussteig_punkt()
 	var start=spieler.global_position
 	spieler.velocity=Vector3.ZERO
+	# Figur schiebt das Auto beim Hingehen nicht weg (keine Kollision), Auto bleibt stehen
+	spieler.collision_layer=0;spieler.collision_mask=0
+	tuer.y=max(tuer.y,c.global_position.y+0.1)
 	var dauer=clamp(start.distance_to(tuer)/4.0,0.2,1.2)
 	var blick=(c.global_position-tuer);spieler.rotation.y=0.0;spieler.figur.rotation.y=atan2(blick.x,blick.z)
 	var tw=create_tween();tw.tween_property(spieler,"global_position",tuer,dauer)
@@ -461,12 +471,17 @@ func entern(c):
 		PE.play(p,"run")
 		hud.zeige("Fahrer rausgezogen!",1.5)
 		kampf.verbrechen(0.35)
-		var tw2=create_tween();tw2.tween_property(p,"global_position",tuer+weg*16.0+Vector3(0,0,0),3.5)
+		# Fahrer wird rausgezerrt, stolpert kurz, rennt dann weg
+		p.global_position=tuer-weg*0.2+Vector3(0,0.0,0);PE.play(p,"shake")
+		var tw2=create_tween();tw2.tween_property(p,"global_position",tuer+weg*1.4,0.5)
+		tw2.tween_callback(func():PE.play(p,"run"))
+		tw2.tween_property(p,"global_position",tuer+weg*18.0,3.5)
 		tw2.tween_callback(func():p.visible=false)
-		await get_tree().create_timer(0.35).timeout
+		await get_tree().create_timer(0.9).timeout
 	_entert=false
+	spieler.collision_mask=1|8
 	if is_instance_valid(c):einsteigen(c)
-	else:ereignis("entern: Auto weg")
+	else:spieler.collision_layer=1;ereignis("entern: Auto weg")
 
 func einsteigen(c):
 	ereignis("einsteigen "+str(c.kind))
@@ -481,6 +496,36 @@ func einsteigen(c):
 	if c.kind in ["taxi","c_taxi"]:hud.zeige("Taxi: Tippe TAXI für den Taxi-Job",3.5)
 	ereignis("eingestiegen")
 
+# freier Platz neben dem Auto (Fahrerseite, Beifahrerseite, hinten, vorn, Dach) auf echtem Boden
+func _aussteig_platz(c)->Vector3:
+	var b=c.global_transform.basis;var o=c.global_position
+	var hx=c.ab.size.x*0.5+0.6;var hz=c.ab.size.z*0.5+0.7
+	var kand=[c.aussteig_punkt(),o+b.x*hx,o-b.x*hx,o-b.z*hz,o+b.z*hz]
+	var raum=get_world_3d().direct_space_state
+	var kap=CapsuleShape3D.new();kap.radius=0.3;kap.height=1.7
+	for q in kand:
+		var hit=raum.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(q.x,o.y+2.5,q.z),Vector3(q.x,o.y-3.0,q.z),1))
+		if not hit:continue
+		var stand=hit.position+Vector3(0,0.05,0)
+		var pq=PhysicsShapeQueryParameters3D.new();pq.shape=kap;pq.transform=Transform3D(Basis(),stand+Vector3(0,0.95,0));pq.collision_mask=1|8;pq.exclude=[c.get_rid()]
+		if raum.intersect_shape(pq,1).is_empty():return stand
+	return o+Vector3(0,c.ab.size.y+0.4,0)   # notfalls aufs Dach
+# Sicherheitsnetz: unter die Welt gefallen -> zurück auf den Boden darüber
+func _rettung():
+	if not "comic" in welt:return
+	var ziel=auto if auto else spieler
+	var p=ziel.global_position
+	var boden=welt.G.h_at(p.x,p.z)
+	if p.y<boden-4.0 or p.y<-20.0:
+		var raum=get_world_3d().direct_space_state
+		var hit=raum.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(p.x,boden+80.0,p.z),Vector3(p.x,boden-30.0,p.z),1))
+		var y=(hit.position.y if hit else boden)+(1.0 if auto else 0.4)
+		ziel.global_position=Vector3(p.x,y,p.z)
+		if auto:auto.linear_velocity=Vector3.ZERO;auto.angular_velocity=Vector3.ZERO;auto.aufrichten()
+		else:spieler.velocity=Vector3.ZERO
+		ziel.reset_physics_interpolation()
+		hud.zeige("Zurück auf die Straße",1.5)
+
 func aussteigen_sofort():
 	if auto==null:return
 	var v=auto.kmh();auto.linear_velocity=Vector3.ZERO
@@ -488,7 +533,7 @@ func aussteigen_sofort():
 
 func aussteigen():
 	if auto.kmh()>25.0:hud.zeige("Zu schnell zum Aussteigen!",1.5);return
-	var p=auto.aussteig_punkt()
+	var p=_aussteig_platz(auto)
 	kampf.halter.modell=null;kampf.halter.waffe_id="";kampf.halter.setze_waffe(kampf.aktuell)
 	auto.modus="geparkt";auto.engine_force=0;auto.brake=8.0;auto.steering=0
 	spieler.rotation=Vector3.ZERO;spieler.figur.rotation.y=auto.global_rotation.y+PI*0.5
@@ -531,10 +576,11 @@ func _rempler(b):
 # ---------------- Verkehr ----------------
 # Verkehr: nur Fahrzeuge mit Scheiben (Trabant, Geldtransporter ohne Glas sind nicht mehr dabei)
 const FARB_COMIC=["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_trabant_rot","c_wartburg_beige","c_wartburg_blau","c_wartburg_gruen",
-	"c_taxi","c_trabant_gruen","c_wartburg_blau","c_polizei","c_sport_rot","c_trabant_beige","c_taxi","c_sport_gelb","c_wartburg_beige","c_sport_schwarz"]
+	"c_taxi","c_polizei","c_sport_rot","c_taxi","c_sport_gelb","c_sport_schwarz","c_jdm_weiss","c_jdm_blau","c_jdm_rot","c_kompakt_rot","c_kompakt_weiss","c_kompakt_schwarz",
+	"c_e30_gruen","c_e30_silber","c_e30_schwarz","c_luxus_schwarz","c_luxus_silber","c_muscle_orange","c_muscle_schwarz","c_suv_grau","c_suv_gruen","c_trabant_gruen","c_wartburg_blau"]
 var FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
 	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","audi_rs7","rtw","hudson","mercedes","hoonicorn","bugatti","taxi"]
-func _ziel_anzahl()->int:return [8,14,22][int(st.e.sichtweite)]
+func _ziel_anzahl()->int:return [14,22,30][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
 	var p2=Vector2(p.x,p.z)
 	for c in verkehr.duplicate():
@@ -771,6 +817,7 @@ func kleider_menue():
 var _tu:={}
 func werkstatt_menue():
 	if auto==null:return
+	if auto.kind.begins_with("c_"):_comic_werkstatt();return
 	auto.engine_force=0;auto.brake=10.0
 	var v=_panel("RADEBERG CUSTOMS")
 	_tu=auto.get_meta("tuning",TU.default_cfg())
@@ -827,13 +874,29 @@ func _tu_anwenden():
 # ---------------- Karte ----------------
 func karte_oeffnen(teleport:=false):
 	var k=load("res://scripts/karte_ui.gd").new()
-	if teleport:k.tippen=func(w:Vector2):admin_mod.teleport(Vector3(w.x,0,w.y))
+	if teleport or admin:k.tippen=func(w:Vector2):admin_mod.teleport(Vector3(w.x,0,w.y))
+	k.teleport_an=teleport
 	hud.modus="menue";hud.reset_touch()
 	var p=(auto if auto else spieler).global_position
 	k.player=Vector2(p.x,p.z);k.player_dir=kam.blick_yaw()
+	if "comic" in welt:
+		k.strassen=welt.S.roads;k.stadt=welt.B.rect;k.zoom=14.0;k.mitte_w=k.player
 	ui.add_child(k);panel=k
-	var b=Button.new();b.text="  ZURÜCK  ";b.theme=theme_ui;b.custom_minimum_size=Vector2(200,64);k.add_child(b)
-	var vs=get_viewport().get_visible_rect().size;b.position=Vector2(vs.x-240,vs.y-90)
+	if "comic" in welt:
+		k.icons=[]
+		for s in welt.A.shops:k.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y,"name":s.typ})
+	var vs=get_viewport().get_visible_rect().size
+	var knopf=func(t:String,pos:Vector2,f:Callable):
+		var b=Button.new();b.text=t;b.theme=theme_ui;b.custom_minimum_size=Vector2(96,64);k.add_child(b);b.position=pos;b.pressed.connect(f);return b
+	knopf.call("  +  ",Vector2(vs.x-340,vs.y-180),func():k.zoom_um(1.6,k.map_rect().get_center()))
+	knopf.call("  –  ",Vector2(vs.x-230,vs.y-180),func():k.zoom_um(0.625,k.map_rect().get_center()))
+	knopf.call(" ICH ",Vector2(vs.x-120,vs.y-180),func():k.mitte_w=k.player;k.queue_redraw())
+	if admin:
+		var tb=knopf.call(" TELEPORT ",Vector2(vs.x-340,vs.y-270),func():pass)
+		tb.custom_minimum_size=Vector2(316,64);tb.toggle_mode=true;tb.button_pressed=k.teleport_an
+		tb.toggled.connect(func(an):k.teleport_an=an;k.queue_redraw())
+	var b=Button.new();b.text="  ZURÜCK  ";b.theme=theme_ui;b.custom_minimum_size=Vector2(316,64);k.add_child(b)
+	b.position=Vector2(vs.x-340,vs.y-90)
 	b.pressed.connect(panel_zu)
 
 # ---------------- Pause / Einstellungen ----------------
@@ -1009,3 +1072,81 @@ func _notification(what):
 # ---------------- automatischer Test (Bilder) ----------------
 func _testlauf():
 	var s=load("res://scripts/spiel/testlauf.gd").new();s.spiel=self;add_child(s)
+
+
+# ---------------- Comic-Tuning-Werkstatt ----------------
+const CA=preload("res://scripts/comic/comic_autos.gd")
+const TU_TIEF:=[[0.0,"Serie"],[0.03,"Sport (-3 cm)"],[0.06,"Tief (-6 cm)"],[0.08,"Extrem (-8 cm)"]]
+const TU_BREIT:=[[0.0,"Serie"],[0.03,"Street (+3 cm)"],[0.06,"Widebody (+6 cm)"]]
+const TU_SPOILER:=[["","Keiner"],["lippe","Heckklappen-Lippe"],["ente","Entenbürzel"],["dach","Dachspoiler"],["fluegel","Flügel"],["gt","GT-Flügel"]]
+const TU_FELGEN:=[["std","Serie"],["fuenf","5-Speichen"],["kreuz","Kreuzspeichen"],["mesh","Mesh"],["tiefbett","Tiefbett"],["turbine","Turbine"],["zehn","10-Speichen"],["drei","3-Speichen"],["sechs","6-Speichen"],["schale","Schale"],["stahl","Stahl"]]
+const TU_FFARBE:=[[Color(0.82,0.83,0.85),"Silber"],[Color(0.95,0.78,0.25),"Gold"],[Color(0.1,0.1,0.11),"Schwarz"],[Color(0.95,0.95,0.95),"Weiß"],[Color(0.85,0.15,0.12),"Rot"],[Color(0.62,0.42,0.25),"Bronze"]]
+const TU_NEON:=[[null,"Aus"],[Color(0.2,0.6,1.0),"Blau"],[Color(1.0,0.2,0.3),"Rot"],[Color(0.3,1.0,0.4),"Grün"],[Color(0.75,0.3,1.0),"Lila"],[Color(0.2,1.0,0.95),"Türkis"],[Color(1.0,0.85,0.2),"Gelb"]]
+const TU_LACK:=[Color(0.85,0.12,0.1),Color(0.98,0.78,0.12),Color(0.15,0.35,0.85),Color(0.1,0.1,0.12),Color(0.95,0.95,0.95),Color(0.55,0.85,0.2),Color(0.95,0.5,0.1),Color(0.5,0.25,0.75),Color(0.95,0.45,0.7),Color(0.72,0.74,0.77),Color(0.8,0.65,0.25),Color(0.1,0.45,0.45)]
+func _ctu()->Dictionary:return auto.get_meta("ctu",{})
+func _comic_umbauen(tu:Dictionary,farbe=null,preis:=0)->bool:
+	if not _zahlen(preis):return false
+	auto.set_meta("ctu",tu)
+	if farbe!=null:auto.set_meta("cfarbe",farbe)
+	var v=CA.bauen(auto.kind,tu,auto.get_meta("cfarbe",null))
+	auto.neue_optik(v)
+	return true
+func _comic_werkstatt():
+	auto.engine_force=0;auto.brake=10.0
+	var v=_panel("RADEBERG CUSTOMS")
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(520,560);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;w.add_theme_constant_override("separation",6);sc.add_child(w)
+	var neu=func():panel_zu();_comic_werkstatt()
+	var hat_lack=CA.LISTE.has(auto.kind) and (CA.LISTE[auto.kind][1] as Array).size()>0
+	if hat_lack:
+		var l=Label.new();l.text="Lack ($250)";w.add_child(l)
+		var g=GridContainer.new();g.columns=6;w.add_child(g)
+		for c in TU_LACK:
+			var b=Button.new();b.custom_minimum_size=Vector2(70,52);g.add_child(b)
+			var sb=StyleBoxFlat.new();sb.bg_color=c;sb.set_corner_radius_all(8);b.add_theme_stylebox_override("normal",sb);b.add_theme_stylebox_override("hover",sb)
+			b.pressed.connect(func():
+				if _comic_umbauen(_ctu(),c,250):
+					if kampf.sterne>0.0 and not kampf.polizei_sieht_dich():kampf.sterne=0.0;hud.zeige("Neue Farbe – Fahndung abgeschüttelt!",2.5))
+	if CA.tunbar(auto.kind):
+		var tu=_ctu()
+		var zeile=func(titel:String,liste:Array,schl:String,preis:int):
+			var akt=tu.get(schl,liste[0][0]);var i=0
+			for k in liste.size():
+				if liste[k][0]==akt:i=k
+			var b=Button.new();b.text="%s:  %s   ›   ($%d)"%[titel,liste[i][1],preis];b.custom_minimum_size=Vector2(500,56);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
+			b.pressed.connect(func():
+				var t2=_ctu().duplicate();var nx=liste[(i+1)%liste.size()][0]
+				if nx==null or (nx is String and (nx=="" or nx=="std")):t2.erase(schl)
+				else:t2[schl]=nx
+				if _comic_umbauen(t2,null,preis):neu.call())
+		var schalter=func(titel:String,schl:String,preis:int):
+			var an=tu.get(schl,false)
+			var b=Button.new();b.text="%s:  %s   ($%d)"%[titel,"AN" if an else "aus",preis];b.custom_minimum_size=Vector2(500,56);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
+			b.pressed.connect(func():
+				var t2=_ctu().duplicate();t2[schl]=not an
+				if _comic_umbauen(t2,null,preis):neu.call())
+		var l2=Label.new();l2.text="Karosserie & Fahrwerk";w.add_child(l2)
+		zeile.call("Tieferlegung",TU_TIEF,"tief",800)
+		zeile.call("Kotflügel",TU_BREIT,"breit",1500)
+		schalter.call("Frontlippe","lippe",400)
+		schalter.call("Seitenschweller","schweller",500)
+		schalter.call("Heckdiffusor","diffusor",450)
+		zeile.call("Spoiler",TU_SPOILER,"spoiler",600)
+		var l3=Label.new();l3.text="Räder & Licht";w.add_child(l3)
+		zeile.call("Felgen",TU_FELGEN,"felge",900)
+		zeile.call("Felgenfarbe",TU_FFARBE,"felgenfarbe",200)
+		zeile.call("Bodenbeleuchtung",TU_NEON,"neon",400)
+	var l4=Label.new();l4.text="Leistung";w.add_child(l4)
+	_btn(w,"Motor-Tuning Stufe %d → %d ($1.500)"%[auto.get_meta("motor",0),min(auto.get_meta("motor",0)+1,3)],func():
+		var lv=auto.get_meta("motor",0)
+		if lv>=3:hud.zeige("Motor ist voll getunt");return
+		if _zahlen(1500):auto.set_meta("motor",lv+1);auto.kraft*=1.12;auto.max_kmh+=12;hud.zeige("Motor Stufe "+str(lv+1));neu.call())
+	_btn(w,"NOS-Tank füllen ($200)",func():if _zahlen(200):auto.nos_vorrat=1.0;hud.zeige("NOS voll"))
+	_btn(w,"Reparieren ($100)",func():
+		if _zahlen(100):
+			auto.aufrichten();auto.hp=1000.0
+			if auto._rauch:auto._rauch.queue_free();auto._rauch=null
+			hud.zeige("Repariert"))
+	if not CA.tunbar(auto.kind):
+		var hl=Label.new();hl.text="Karosserie-Tuning gibt es für: Sportcoupé (Skyline-Typ), Kompakter, Sportlimousine";hl.autowrap_mode=TextServer.AUTOWRAP_WORD;hl.custom_minimum_size=Vector2(480,0);w.add_child(hl)
+	_btn(w,"Fertig",panel_zu)

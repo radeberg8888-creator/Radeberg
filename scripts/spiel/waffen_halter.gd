@@ -14,6 +14,7 @@ var zielen:=false
 var ziel_richtung:=Vector3.FORWARD   # Welt
 var schwung:=0.0          # Nahkampf-Schlag 0..1
 var rueckstoss:=0.0
+var laden_t:=-1.0         # Nachladen 0..1 (-1 = nicht)
 var _schulter_r:=-1;var _schulter_l:=-1;var _hand_r:=-1
 
 static func modell_szene(id:String)->PackedScene:
@@ -96,8 +97,21 @@ func aktualisieren(dt:float):
 		else:griff=sr+fw*0.18-up*0.42
 		ik.oberkoerper_pitch=0.0
 	griff-=dir*rueckstoss*0.06
+	# Nachladen: Waffe zur Brust kippen, linke Hand zieht das Magazin nach unten und setzt ein neues ein
+	var lk=0.0
+	if laden_t>=0.0:
+		lk=sin(PI*clamp(laden_t,0.0,1.0))
+		dir=dir.slerp((fw*0.7-up*0.35-rt*0.35).normalized(),lk*0.75).normalized()
+		griff=griff.lerp(brust+fw*0.32-up*0.18-rt*0.05,lk*0.6)
+		ik.oberkoerper_pitch=lerp(ik.oberkoerper_pitch,-0.15,lk)
 	var b=_basis_aus(dir+up*rueckstoss*0.15,up)
 	if modell:modell.global_transform=Transform3D(b,griff)
+	if laden_t>=0.0 and modell:
+		ik.ziel_r=griff;ik.pol_r=(rt*0.5-up+(-fw*0.3)).normalized()
+		var mag=modell.global_transform*Vector3(0,-0.06,0.1 if zwei else 0.0)
+		var ab=sin(PI*clamp((laden_t-0.25)/0.5,0.0,1.0))
+		ik.ziel_l=mag-up*0.32*ab-fw*0.05*ab;ik.pol_l=(-rt*0.7-up).normalized()
+		return
 	ik.ziel_r=griff;ik.pol_r=(rt*0.5-up+(-fw*0.3)).normalized()
 	if zwei and modell:
 		ik.ziel_l=modell.global_transform*modell.get_meta("vorn",Vector3(0,-0.03,0.3))

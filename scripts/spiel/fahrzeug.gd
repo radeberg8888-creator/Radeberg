@@ -132,6 +132,12 @@ func setup(k:String):
 	if k.begins_with("c_trabant"):kraft=3900.0;max_kmh=125.0
 	elif k.begins_with("c_wartburg"):kraft=4300.0;max_kmh=145.0
 	elif k.begins_with("c_sport"):kraft=6300.0;max_kmh=240.0
+	elif k.begins_with("c_jdm"):kraft=5800.0;max_kmh=235.0
+	elif k.begins_with("c_kompakt"):kraft=4600.0;max_kmh=180.0
+	elif k.begins_with("c_e30"):kraft=5200.0;max_kmh=205.0
+	elif k.begins_with("c_luxus"):kraft=5600.0;max_kmh=215.0
+	elif k.begins_with("c_muscle"):kraft=6400.0;max_kmh=225.0
+	elif k.begins_with("c_suv"):kraft=5400.0;max_kmh=175.0
 	center_of_mass_mode=RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM;center_of_mass=Vector3(0.0,0.0,ab.get_center().z)
 	# Karosserie als Kollisionskasten (über dem Boden, damit die Räder federn können)
 	var cs=CollisionShape3D.new();var bx=BoxShape3D.new()
@@ -171,6 +177,18 @@ const SCHICHT_VERKEHR:=16
 func _schicht(ki:bool):
 	if ki:collision_layer=SCHICHT_VERKEHR;collision_mask=0
 	else:collision_layer=SCHICHT_AUTO;collision_mask=1|SCHICHT_AUTO|SCHICHT_VERKEHR
+
+# Optik austauschen (Tuning-Werkstatt): neue Karosserie, Räder neu zuordnen, Spur anpassen
+func neue_optik(v:Node3D):
+	var alt=visual;visual=v;add_child(v)
+	if alt:alt.queue_free()
+	rad_knoten=[]
+	var rd:Array=v.get_meta("raeder",[])
+	for i in min(rd.size(),wheels.size()):
+		var r=rd[i];var w:VehicleWheel3D=wheels[i]
+		w.position.x=r.p.x
+		var rn=v.get_node_or_null("Rad_"+("V" if r.vorne else "H")+("L" if r.links else "R"))
+		if rn:rad_knoten.append([rn,w,rn.position])
 
 func parken():
 	ki_ton_aus()

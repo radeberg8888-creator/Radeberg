@@ -2499,7 +2499,7 @@ func _rampen():
 			s+=2.5
 
 # ---------- Autos ----------
-const PARK_TYPEN:=["c_trabant","c_trabant","c_trabant","c_wartburg","c_wartburg","c_taxi","c_polizei","c_sport","c_trabant","c_wartburg"]
+const PARK_TYPEN:=["c_trabant","c_trabant","c_wartburg","c_wartburg","c_taxi","c_sport","c_jdm","c_kompakt","c_kompakt","c_e30","c_luxus","c_muscle","c_suv","c_trabant"]
 func _park(tf:Transform3D,typ:=""):
 	PARKEN.append([typ if typ!="" else PARK_TYPEN[rng.randi()%PARK_TYPEN.size()],tf])
 func _auto_zufall(tf:Transform3D):
@@ -2533,7 +2533,7 @@ func _parken():
 			if r==ns2 and s>180 and s<255:continue
 			if r.typ=="land" and p.x>205 and p.x<300:continue
 			for sd in [-1,1]:
-				if rng.randf()>0.5:continue
+				if rng.randf()>0.2:continue
 				var h=t*(-sd) if r.typ!="einbahn" else t
 				var c=p+rn*sd*(r.w-1.15)
 				if r.n=="ring" and (rn*sd).dot(p)>0:continue
@@ -2630,7 +2630,7 @@ func _schaustueck():
 	SHOW.C=C
 	var lat=r.w-1.15
 	if spiel_modus:
-		for e in [[196.0,"c_trabant"],[201.0,"c_trabant"],[207.2,"c_wartburg"],[213.6,"c_taxi"],[220.2,"c_polizei"],[227.4,"c_rtw"],[237.2,"c_feuerwehr"]]:
+		for e in [[201.0,"c_kompakt"],[208.0,"c_jdm"],[215.0,"c_e30"]]:
 			var c=C.call(e[0],lat);var h:Vector2=c[1]
 			_park(Transform3D(Basis(Vector3.UP,atan2(h.x,h.y)),Vector3(c[0].x,0.015,c[0].y)),e[1])
 		var f=C.call(190.0,r.w+1.7);var rn:Vector2=f[2]
@@ -3137,9 +3137,9 @@ func auto_koerper(T:Transform3D,lack:Material,D:Dictionary)->Array:
 		# an den Enden dichter (runde Nase/Heck)
 		var t=float(i)/(n-1);t=t-sin(t*TAU)*0.06
 		var z=lerp(zv,zh,t)
-		var u=_kub(K,z,1);var g=_kub(K,z,2);var o=_kub(K,z,3);var b=_kub(K,z,4);var db=_kub(K,z,5)
+		var u=_kub(K,z,1);var g=_kub(K,z,2);var o=_kub(K,z,3);var b=_kub(K,z,4)+_ausstell(z);var db=_kub(K,z,5)
 		for rd in D.raeder:
-			var dz=z-rd[0];var ra=rd[1]+0.07
+			var dz=z-rd[0];var ra=rd[1]+D.get("spalt",0.07)
 			if abs(dz)<ra:u=max(u,D.rad_y+sqrt(ra*ra-dz*dz)*0.92)
 		u=min(u,g-0.08)
 		# Enden: weich einziehen
@@ -3150,7 +3150,7 @@ func auto_koerper(T:Transform3D,lack:Material,D:Dictionary)->Array:
 	for rd in D.raeder:
 		var g=_kub(K,rd[0],2);var obenrad=D.rad_y+rd[1]
 		var frei=g-obenrad
-		if frei<0.1:push_warning("RAD STOESST bei z=%.2f: Kotfluegel %.2f, Radoberkante %.2f"%[rd[0],g,obenrad]);print("RAD STOESST z=",rd[0]," frei=",frei)
+		if frei<0.05:push_warning("RAD STOESST bei z=%.2f: Kotfluegel %.2f, Radoberkante %.2f"%[rd[0],g,obenrad]);print("RAD STOESST z=",rd[0]," frei=",frei)
 	# Unterboden/Radhäuser dunkel, damit man nicht durch die Ausschnitte sieht
 	for rd in D.raeder:
 		# Radhaus je Seite (nur außen, damit es nie durch eine tiefere Haubenmitte ragt)
@@ -3246,7 +3246,24 @@ func _kappe_teil(m:Material,T:Transform3D,c:Vector3,s:Vector2,vorn:bool,rund:=0.
 	else:lbox(m,T,Vector3(c.x,c.y,c.z+d*0.5),Vector3(s.x,s.y,abs(d)),0.012)
 
 # ---- Autos mit glatter Karosserie ----
-func _seite_x(K:Array,z:float)->float:return _kub(K,z,4)*1.012
+func _seite_x(K:Array,z:float)->float:return (_kub(K,z,4)+_ausstell(z))*1.012
+# Tuning: Kotflügelverbreiterung als weiche Beule um die Räder (wird vom Auto-Bau gesetzt)
+var _tu_breit:=0.0
+var _tu_raeder:=[]
+func _ausstell(z:float)->float:
+	if _tu_breit<=0.0:return 0.0
+	var m=0.0
+	for rd in _tu_raeder:m=max(m,exp(-pow((z-rd[0])/0.62,2.0)))
+	return _tu_breit*(0.35+0.65*m)
+# Tuning auf die Maßliste anwenden: Karosserie tiefer (Räder bleiben), Radlauf enger
+func _tune_K(K:Array,tu:Dictionary)->Array:
+	var t:float=tu.get("tief",0.0)
+	var o=[]
+	for r in K:o.append([r[0],r[1]-t,r[2]-t,r[3]-t,r[4],r[5]])
+	return o
+func _tune_start(tu:Dictionary,raeder:Array):
+	_tu_breit=tu.get("breit",0.0);_tu_raeder=raeder
+func _tune_ende():_tu_breit=0.0;_tu_raeder=[]
 func _tuerlinie(K:Array,T:Transform3D,z:float,u:float,g:float):
 	for sd in [-1,1]:lstab(M.dunkel,T,Vector3(sd*_seite_x(K,z)*1.001,u+0.08,z),Vector3(sd*_seite_x(K,z)*0.995,g-0.02,z),0.012,0.0)
 func _griff(K:Array,T:Transform3D,z:float,y:float):
@@ -3395,3 +3412,269 @@ func _seitenband(m:Material,T:Transform3D,K:Array,y0:float,y1:float,z0:float,z1:
 			var a=T*Vector3(x,y0,z);var b=T*Vector3(x,y1,z);var o=T.basis*Vector3(sd,0,0)
 			if prev!=null:_tri(s,prev[0],prev[1],b,o);_tri(s,prev[0],b,a,o)
 			prev=[a,b]
+
+
+# ================= Tuning-Teile (folgen der Karosserie) =================
+const FELGEN:=["stahl","fuenf","kreuz","mesh","tiefbett","turbine","zehn","drei","sechs","schale"]
+func _rad_tuning(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String,farbe:Color):
+	var ax=T.basis*Vector3(1,0,0);var C=T*c
+	var alt=null
+	if rad_capture:alt=[st,mats,zaehler];st={};mats={};zaehler={}
+	zyl(M.reifen,C-ax*br*0.5,C+ax*br*0.5,r,1.05)
+	var F=C+ax*seite*(br*0.5)
+	var fr=r*(0.6 if art=="stahl" else 0.76)
+	var fm=_toon(farbe,0.25);fm.metallic=0.5
+	zyl(M.reifen,F-ax*seite*0.02,F+ax*seite*0.006,r*0.93,1.0)
+	var tief=-0.03 if art in ["tiefbett","schale","mesh"] else 0.0
+	zyl(fm,F+ax*seite*(0.0),F+ax*seite*0.016,fr,1.0)
+	if art in ["tiefbett","schale"]:zyl(M.chrom,F+ax*seite*0.004,F+ax*seite*0.02,fr,1.0);zyl(M.dunkel,F+ax*seite*0.016,F+ax*seite*0.021,fr*0.86,1.0)
+	else:zyl(M.dunkel,F+ax*seite*0.012,F+ax*seite*0.02,fr*0.9,1.0)
+	var spk={"stahl":0,"fuenf":5,"kreuz":10,"mesh":16,"tiefbett":5,"turbine":12,"zehn":10,"drei":3,"sechs":6,"schale":8}[art]
+	var breite={"fuenf":0.3,"kreuz":0.1,"mesh":0.05,"tiefbett":0.22,"turbine":0.14,"zehn":0.12,"drei":0.38,"sechs":0.2,"schale":0.12}
+	for k in spk:
+		var a=TAU*k/spk;var o=(T.basis*Vector3(0,cos(a),sin(a)))
+		var bb=Basis(ax,o,ax.cross(o)).orthonormalized()
+		if art=="turbine":bb=bb*Basis(Vector3(1,0,0),0.5)
+		if art=="kreuz":bb=bb*Basis(Vector3(1,0,0),0.35 if k%2==0 else -0.35)
+		box(fm,F+o*fr*0.47+ax*seite*0.024,Vector3(0.02,fr*0.86,fr*breite[art]),bb,0.0)
+		if art=="mesh":
+			bb=Basis(ax,o,ax.cross(o)).orthonormalized()*Basis(Vector3(1,0,0),0.9)
+			box(fm,F+o*fr*0.47+ax*seite*0.024,Vector3(0.018,fr*0.86,fr*0.05),bb,0.0)
+	if art=="stahl":
+		for k in 6:
+			var a=TAU*(k+0.5)/6;var o=(T.basis*Vector3(0,cos(a),sin(a)))
+			kugel(M.dunkel,F+o*fr*0.68+ax*seite*0.02,Vector3(0.012,1,1)*fr*0.11,1.0)
+	zyl(M.chrom,F+ax*seite*0.018,F+ax*seite*0.04,fr*(0.3 if art!="stahl" else 0.38),1.06)
+	if rad_capture:
+		var rn=Node3D.new();rn.name="Rad_"+("V" if c.z>0 else "H")+("L" if c.x>0 else "R");welt.add_child(rn);rn.position=C
+		for k in st:
+			var mi=MeshInstance3D.new();mi.mesh=st[k].commit();mi.material_override=mats[k];rn.add_child(mi);mi.position=-C
+			if mats[k]==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		RAEDER.append({"p":C,"r":r,"vorne":c.z>0,"links":c.x>0})
+		st=alt[0];mats=alt[1];zaehler=alt[2]
+
+# alle vier Räder + Tuningteile; X0: halbe Spur
+func _raeder_tuning(T:Transform3D,RD:Array,rad_y:float,spur:float,br:float,art:String,tu:Dictionary):
+	var b=tu.get("breit",0.0)
+	var f=tu.get("felge",art);var fc:Color=tu.get("felgenfarbe",Color(0.82,0.83,0.85))
+	for sx in [-1,1]:
+		for rd in RD:
+			if f=="std":rad_neu(T,Vector3(sx*spur,rad_y,rd[0]),rd[1],br,sx,art)
+			else:_rad_tuning(T,Vector3(sx*(spur+b*0.9),rad_y,rd[0]),rd[1]+tu.get("zoll",0.0),br+b*0.8,sx,f,fc)
+
+func _tuning_teile(T:Transform3D,K:Array,lack:Material,RD:Array,tu:Dictionary):
+	var zv=K[0][0];var zh=K[K.size()-1][0]
+	var dunkel=M.dunkel
+	var X=T.basis*Vector3(1,0,0);var Y=T.basis*Vector3(0,1,0);var Z=T.basis*Vector3(0,0,1)
+	if tu.get("lippe",false):
+		# Frontlippe: folgt der Unterkante der Nase, steht vorn ein Stück vor
+		var u=_kub(K,zv-0.04,1);var b=_kub(K,zv-0.04,4)+_ausstell(zv)
+		loft(dunkel,[ring_s(T*Vector3(0,u-0.02,zv-0.25),X,Z,b*0.97,0.25,5.0,24),ring_s(T*Vector3(0,u-0.02,zv-0.21),X,Z,b*0.99,0.28,5.0,24),ring_s(T*Vector3(0,u+0.03,zv-0.2),X,Z,b*0.97,0.27,5.0,24)],true,0.015)
+	if tu.get("schweller",false):
+		# Seitenschweller zwischen den Rädern, in Wagenfarbe, bis knapp über den Boden
+		var z0=RD[0][0]-RD[0][1]-0.12;var z1=RD[1][0]+RD[1][1]+0.12
+		for sd in [-1,1]:
+			var Pts=[]
+			for k in 9:
+				var z=lerp(z0,z1,k/8.0);var x=sd*(_seite_x(K,z)+0.015);var u=_kub(K,z,1)
+				Pts.append([Vector3(x,u-0.06,z),Vector3(x,u+0.1,z)])
+			var s2=_st(lack,true);var o=T.basis*Vector3(sd,0,0)
+			for k in 8:
+				var a=Pts[k];var c=Pts[k+1]
+				_tri(s2,T*a[0],T*c[0],T*c[1],o);_tri(s2,T*a[0],T*c[1],T*a[1],o)
+				var unten=[a[0]-Vector3(sd*0.05,0,0),c[0]-Vector3(sd*0.05,0,0)]
+				_tri(s2,T*a[0],T*unten[0],T*unten[1],-Y);_tri(s2,T*a[0],T*unten[1],T*c[0],-Y)
+			lstab(dunkel,T,Pts[0][0]+Vector3(0,0.005,0),Pts[8][0]+Vector3(0,0.005,0),0.02,0.0)
+	if tu.get("diffusor",false):
+		var u=_kub(K,zh+0.04,1);var b=_kub(K,zh+0.04,4)
+		lbox(dunkel,T,Vector3(0,u-0.03,zh+0.12),Vector3(b*1.7,0.04,0.3),0.012)
+		for k in 5:lbox(dunkel,T,Vector3(-b*0.5+k*b*0.25,u-0.0,zh+0.06),Vector3(0.02,0.1,0.22),0.0)
+	match tu.get("spoiler",""):
+		"lippe":
+			var z=zh+0.08;var y=_oben_y(K,z,0.0)
+			lbox(lack,T,Vector3(0,y+0.03,z),Vector3(_kub(K,z,5)*1.8,0.04,0.12),0.012,Basis(Vector3(1,0,0),-0.25))
+		"ente":
+			var z=zh+0.12;var y=_oben_y(K,z,0.0)
+			loft(lack,[ring_s(T*Vector3(0,y-0.01,z+0.12),X,Z,_kub(K,z,5)*0.92,0.14,4.0,20),ring_s(T*Vector3(0,y+0.07,z-0.02),X,Z,_kub(K,z,5)*0.9,0.1,4.0,20),ring_s(T*Vector3(0,y+0.1,z-0.08),X,Z,_kub(K,z,5)*0.88,0.05,4.0,20)],true,0.015)
+		"dach":
+			# Dachspoiler über der Heckscheibe (Kompakte)
+			var z=-1.18;var y=_oben_y(K,z,0.0)
+			lbox(lack,T,Vector3(0,y+0.02,z-0.08),Vector3(_kub(K,z,5)*1.7,0.04,0.28),0.012,Basis(Vector3(1,0,0),0.2))
+		"gt":
+			var z=zh+0.28;var y=_oben_y(K,z,0.0)
+			lbox(dunkel,T,Vector3(0,y+0.36,z-0.05),Vector3(1.75,0.03,0.32),0.015,Basis(Vector3(1,0,0),-0.1))
+			for sd in [-1,1]:
+				lbox(dunkel,T,Vector3(sd*0.88,y+0.33,z-0.05),Vector3(0.02,0.16,0.38),0.012)
+				lbox(dunkel,T,Vector3(sd*0.5,y+0.17,z),Vector3(0.03,0.36,0.1),0.0,Basis(Vector3(1,0,0),0.2))
+		"fluegel":
+			var z=zh+0.2;var y=_oben_y(K,z,0.0)
+			lbox(lack,T,Vector3(0,y+0.2,z),Vector3(1.5,0.035,0.24),0.015,Basis(Vector3(1,0,0),-0.12))
+			for sd in [-1,1]:lbox(lack,T,Vector3(sd*0.55,y+0.1,z+0.02),Vector3(0.04,0.2,0.12),0.0)
+	if tu.has("neon"):
+		var nm=StandardMaterial3D.new();nm.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;nm.albedo_color=tu.neon
+		nm.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;nm.albedo_color.a=0.55;nm.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
+		var b=_kub(K,0.0,4)
+		box(nm,T*Vector3(0,0.012,(zv+zh)*0.5),Vector3(b*2.3,0.004,(zv-zh)*1.05),T.basis,0.0)
+		var leuchte=_toon(tu.neon);leuchte.emission_enabled=true;leuchte.emission=tu.neon;leuchte.emission_energy_multiplier=2.5
+		for sd in [-1,1]:lbox(leuchte,T,Vector3(sd*b*0.7,0.1,(zv+zh)*0.5),Vector3(0.03,0.03,(zv-zh)*0.6),0.0)
+	if tu.get("toenung",false):pass
+
+# ---------- Neue Autos (Comic, frei nachempfunden) ----------
+# Japanisches Sportcoupé (90er): kantig, flache Haube, rahmenlose Seitenscheiben, vier runde Rückleuchten
+func _jdm(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe)
+	var RD=[[1.4,0.32],[-1.22,0.32]]
+	var K=_tune_K([[2.27,0.31,0.62,0.66,0.84,0.76],[2.15,0.28,0.70,0.74,0.87,0.80],[1.5,0.28,0.79,0.83,0.875,0.82],[0.85,0.28,0.82,0.87,0.875,0.80],
+		[0.3,0.28,0.84,1.32,0.875,0.66],[-0.75,0.28,0.85,1.33,0.875,0.66],[-1.4,0.28,0.87,0.95,0.875,0.80],[-2.1,0.30,0.87,0.92,0.86,0.80],[-2.27,0.35,0.84,0.87,0.82,0.76]],tu)
+	_tune_start(tu,RD)
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.32,"spalt":0.07-tu.get("tief",0.0)*0.5,"glas":{"front":[0.85,0.3],"seite":[0.26,-0.72],"heck":[-0.78,-1.38]}})
+	for sd in [-1,1]:
+		_kappe_teil(M.dunkel,T,Vector3(sd*0.58,0.6-tu.get("tief",0.0),2.27),Vector2(0.4,0.12),true)
+		_kappe_teil(M.lampe,T,Vector3(sd*0.58,0.6-tu.get("tief",0.0),2.28),Vector2(0.36,0.08),true)
+		for dx in [0.38,0.66]:
+			var y=0.66-tu.get("tief",0.0)
+			zyl(M.dunkel,T*Vector3(sd*dx,y,-2.25),T*Vector3(sd*dx,y,-2.28),0.1,1.0)
+			zyl(M.rot_l,T*Vector3(sd*dx,y,-2.28),T*Vector3(sd*dx,y,-2.29),0.08,1.0)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.56-tu.get("tief",0.0),2.28),Vector2(0.6,0.07),true)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.42-tu.get("tief",0.0),2.27),Vector2(1.2,0.1),true)
+	_kappe_teil(M.weiss,T,Vector3(0,0.55-tu.get("tief",0.0),-2.28),Vector2(0.44,0.1),false)
+	_tuerlinie(K,T,0.85,K[3][1],K[3][2]);_griff(K,T,-0.3,0.76-tu.get("tief",0.0));_spiegel(K,T,0.72,0.88-tu.get("tief",0.0),lack)
+	if not tu.get("schweller",false):
+		for sd in [-1,1]:streifen(M.dunkel,T,sd*_seite_x(K,0.0)*1.002,0.4-tu.get("tief",0.0),0.05,1.9,-1.9,[1.4,-1.22],0.32,0.0)
+	_tuning_teile(T,K,lack,RD,tu)
+	for sx in [-1,1]:
+		for rd in RD:
+			if tu.has("felge"):_rad_tuning(T,Vector3(sx*(0.78+tu.get("breit",0.0)*0.9),0.32,rd[0]),rd[1],0.22+tu.get("breit",0.0)*0.8,sx,tu.felge,tu.get("felgenfarbe",Color(0.82,0.83,0.85)))
+			else:rad_neu(T,Vector3(sx*0.78,0.32,rd[0]),rd[1],0.22,sx,"alu")
+	_tune_ende()
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.8,0.004,4.5),T.basis,0.0)
+
+# Kompakter Fronttriebler (80er): kurz, Steilheck, runde Scheinwerfer, breite C-Säule
+func _kompakt(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe);var t=tu.get("tief",0.0)
+	var RD=[[1.25,0.29],[-1.22,0.29]]
+	var K=_tune_K([[2.0,0.31,0.62,0.66,0.80,0.74],[1.88,0.28,0.70,0.74,0.83,0.78],[1.3,0.28,0.80,0.85,0.835,0.79],[0.85,0.28,0.83,0.88,0.835,0.78],
+		[0.3,0.28,0.85,1.38,0.835,0.66],[-1.15,0.28,0.87,1.38,0.835,0.66],[-1.6,0.28,0.88,1.22,0.835,0.7],[-1.9,0.29,0.88,1.0,0.83,0.74],[-2.0,0.32,0.86,0.94,0.80,0.74]],tu)
+	_tune_start(tu,RD)
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.29,"spalt":0.07-t*0.5,"glas":{"front":[0.85,0.3],"seite":[0.25,-0.85],"heck":[-1.22,-1.85],"b":-0.45}})
+	for sd in [-1,1]:
+		zyl(M.chrom,T*Vector3(sd*0.56,0.6-t,1.995),T*Vector3(sd*0.56,0.6-t,2.02),0.13,1.08)
+		zyl(M.lampe,T*Vector3(sd*0.56,0.6-t,2.02),T*Vector3(sd*0.56,0.6-t,2.03),0.105,1.0)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.55,0.72-t,-2.0),Vector2(0.34,0.2),false)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.6-t,2.0),Vector2(0.72,0.2),true)
+	for k in 4:_kappe_teil(M.chrom,T,Vector3(0,0.53+k*0.045-t,2.012),Vector2(0.7,0.008),true)
+	_stossstange(T,2.02,0.4-t,0.8,M.dunkel,true);_stossstange(T,-2.02,0.42-t,0.8,M.dunkel,false)
+	_kappe_teil(M.weiss,T,Vector3(0,0.5-t,-2.02),Vector2(0.44,0.1),false)
+	_tuerlinie(K,T,0.86,K[3][1],K[3][2]);_tuerlinie(K,T,-0.48,K[3][1],K[3][2]+0.02);_griff(K,T,-0.35,0.78-t);_spiegel(K,T,0.75,0.9-t,lack)
+	_tuning_teile(T,K,lack,RD,tu)
+	for sx in [-1,1]:
+		for rd in RD:
+			if tu.has("felge"):_rad_tuning(T,Vector3(sx*(0.74+tu.get("breit",0.0)*0.9),0.29,rd[0]),rd[1],0.19+tu.get("breit",0.0)*0.8,sx,tu.felge,tu.get("felgenfarbe",Color(0.82,0.83,0.85)))
+			else:rad_neu(T,Vector3(sx*0.74,0.29,rd[0]),rd[1],0.19,sx,"stahl")
+	_tune_ende()
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.65,0.004,4.0),T.basis,0.0)
+
+# Deutsche Sportlimousine (80er, zweitürig): kantig, vier runde Scheinwerfer, schmaler Doppelgrill
+func _e30(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe);var t=tu.get("tief",0.0)
+	var RD=[[1.3,0.3],[-1.27,0.3]]
+	var K=_tune_K([[2.16,0.33,0.64,0.68,0.80,0.74],[2.06,0.29,0.72,0.76,0.82,0.78],[1.4,0.28,0.80,0.84,0.825,0.79],[0.85,0.28,0.82,0.87,0.825,0.78],
+		[0.3,0.28,0.84,1.36,0.825,0.66],[-0.9,0.28,0.85,1.37,0.825,0.66],[-1.45,0.28,0.86,0.91,0.825,0.79],[-2.06,0.30,0.86,0.89,0.82,0.78],[-2.16,0.35,0.84,0.87,0.79,0.75]],tu)
+	_tune_start(tu,RD)
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.3,"spalt":0.07-t*0.5,"glas":{"front":[0.85,0.32],"seite":[0.26,-0.86],"heck":[-0.92,-1.42]}})
+	_kappe_teil(M.dunkel,T,Vector3(0,0.62-t,2.16),Vector2(1.38,0.17),true)
+	for sd in [-1,1]:
+		for dx in [0.38,0.6]:
+			zyl(M.lampe,T*Vector3(sd*dx,0.62-t,2.165),T*Vector3(sd*dx,0.62-t,2.18),0.075,1.08)
+		_kappe_teil(M.chrom,T,Vector3(sd*0.075,0.63-t,2.17),Vector2(0.1,0.15),true)
+		_kappe_teil(M.dunkel,T,Vector3(sd*0.075,0.63-t,2.18),Vector2(0.07,0.12),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.5,0.7-t,-2.16),Vector2(0.48,0.15),false)
+		_kappe_teil(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*0.5,0.6-t,-2.16),Vector2(0.48,0.05),false)
+	_stossstange(T,2.18,0.42-t,0.82,M.dunkel,true);_stossstange(T,-2.18,0.44-t,0.82,M.dunkel,false)
+	_kappe_teil(M.weiss,T,Vector3(0,0.52-t,-2.18),Vector2(0.44,0.1),false)
+	_tuerlinie(K,T,0.86,K[3][1],K[3][2]);_tuerlinie(K,T,-0.78,K[3][1],K[3][2]+0.02);_griff(K,T,-0.6,0.77-t);_spiegel(K,T,0.72,0.88-t,lack)
+	for sd in [-1,1]:streifen(M.dunkel,T,sd*_seite_x(K,0.0)*1.003,0.58-t,0.04,1.9,-1.9,[1.3,-1.27],0.3,0.0)
+	_tuning_teile(T,K,lack,RD,tu)
+	for sx in [-1,1]:
+		for rd in RD:
+			if tu.has("felge"):_rad_tuning(T,Vector3(sx*(0.75+tu.get("breit",0.0)*0.9),0.3,rd[0]),rd[1],0.2+tu.get("breit",0.0)*0.8,sx,tu.felge,tu.get("felgenfarbe",Color(0.82,0.83,0.85)))
+			else:rad_neu(T,Vector3(sx*0.75,0.3,rd[0]),rd[1],0.2,sx,"alu")
+	_tune_ende()
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.7,0.004,4.3),T.basis,0.0)
+
+# Luxuslimousine: lang, hoch, viel Chrom, großer Kühlergrill
+func _luxus(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe)
+	var RD=[[1.62,0.34],[-1.45,0.34]]
+	var K=[[2.55,0.36,0.70,0.74,0.88,0.82],[2.42,0.32,0.78,0.82,0.93,0.88],[1.7,0.31,0.88,0.93,0.95,0.9],[1.0,0.31,0.92,0.98,0.95,0.86],
+		[0.35,0.31,0.94,1.46,0.95,0.72],[-1.2,0.31,0.96,1.47,0.95,0.72],[-1.85,0.31,0.98,1.06,0.95,0.86],[-2.42,0.33,0.98,1.03,0.93,0.88],[-2.55,0.38,0.95,0.99,0.89,0.84]]
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.34,"glas":{"front":[1.0,0.38],"seite":[0.3,-1.2],"heck":[-1.25,-1.82],"b":-0.42}})
+	_kappe_teil(M.chrom,T,Vector3(0,0.66,2.56),Vector2(0.56,0.3),true)
+	for k in 9:_kappe_teil(M.dunkel,T,Vector3(-0.24+k*0.06,0.66,2.57),Vector2(0.02,0.26),true)
+	zyl(M.chrom,T*Vector3(0,0.94,2.46),T*Vector3(0,0.99,2.47),0.035,1.1)
+	for sd in [-1,1]:
+		_kappe_teil(M.dunkel,T,Vector3(sd*0.65,0.7,2.555),Vector2(0.42,0.18),true)
+		_kappe_teil(M.lampe,T,Vector3(sd*0.65,0.7,2.565),Vector2(0.38,0.13),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.6,0.8,-2.555),Vector2(0.44,0.18),false)
+		streifen(M.chrom,T,sd*_seite_x(K,0.0)*1.003,0.52,0.03,2.3,-2.3,[1.62,-1.45],0.34,0.0)
+	_stossstange(T,2.58,0.45,0.9,M.chrom,true);_stossstange(T,-2.58,0.47,0.9,M.chrom,false)
+	_kappe_teil(M.weiss,T,Vector3(0,0.6,-2.58),Vector2(0.46,0.11),false)
+	_tuerlinie(K,T,1.0,0.31,0.92);_tuerlinie(K,T,-0.45,0.31,0.95);_tuerlinie(K,T,-1.7,0.31,0.97)
+	_griff(K,T,0.75,0.86);_griff(K,T,-0.62,0.88);_spiegel(K,T,0.9,0.98,lack)
+	for sx in [-1,1]:
+		for rd in RD:_rad_tuning(T,Vector3(sx*0.84,0.34,rd[0]),rd[1],0.23,sx,"zehn",Color(0.85,0.86,0.88))
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.95,0.004,5.1),T.basis,0.0)
+
+# Amerikanisches Muscle-Car: sehr lange Haube, kurzes Heck, breite Spur, Rallyestreifen
+func _muscle(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe)
+	var RD=[[1.55,0.34],[-1.33,0.35]]
+	var K=[[2.45,0.33,0.70,0.73,0.88,0.84],[2.3,0.30,0.78,0.82,0.94,0.9],[1.5,0.29,0.84,0.88,0.96,0.92],[0.4,0.29,0.86,0.92,0.96,0.88],
+		[-0.05,0.29,0.87,1.28,0.96,0.68],[-0.95,0.29,0.88,1.27,0.97,0.68],[-1.45,0.29,0.9,0.96,0.98,0.9],[-2.3,0.31,0.9,0.95,0.96,0.9],[-2.45,0.36,0.87,0.9,0.92,0.86]]
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.34,"glas":{"front":[0.4,-0.08],"seite":[-0.1,-0.9],"heck":[-1.0,-1.42]}})
+	# Rallyestreifen über Haube, Dach, Heck
+	var sm=_toon(Color(0.96,0.96,0.94))
+	for sd in [-1,1]:_dachband(sm,T,K,sd*0.06,sd*0.27,2.42,-2.42)
+	_kappe_teil(M.dunkel,T,Vector3(0,0.6,2.46),Vector2(1.5,0.22),true)
+	for sd in [-1,1]:
+		zyl(M.chrom,T*Vector3(sd*0.6,0.6,2.46),T*Vector3(sd*0.6,0.6,2.48),0.1,1.08);zyl(M.lampe,T*Vector3(sd*0.6,0.6,2.48),T*Vector3(sd*0.6,0.6,2.49),0.08,1.0)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.5,0.7,-2.46),Vector2(0.6,0.14),false)
+		for dx in [0.3,0.42]:zyl(M.chrom,T*Vector3(sd*dx,0.36,-2.42),T*Vector3(sd*dx,0.36,-2.52),0.045,1.1)
+	# Lufthutze
+	loft(M.dunkel,[ring_s(T*Vector3(0,_oben_y(K,1.2,0)+0.0,1.25),T.basis*Vector3(1,0,0),T.basis*Vector3(0,1,0),0.25,0.02,4.0,16),ring_s(T*Vector3(0,_oben_y(K,1.0,0)+0.08,0.95),T.basis*Vector3(1,0,0),T.basis*Vector3(0,1,0),0.25,0.08,4.0,16),ring_s(T*Vector3(0,_oben_y(K,0.7,0)+0.0,0.6),T.basis*Vector3(1,0,0),T.basis*Vector3(0,1,0),0.25,0.02,4.0,16)],true,0.015)
+	_stossstange(T,2.48,0.42,0.92,M.chrom,true);_stossstange(T,-2.48,0.44,0.92,M.chrom,false)
+	_tuerlinie(K,T,0.42,0.29,0.86);_griff(K,T,-0.25,0.8);_spiegel(K,T,0.35,0.92,lack)
+	for sx in [-1,1]:
+		for rd in RD:_rad_tuning(T,Vector3(sx*0.86,0.34,rd[0]),rd[1],0.26 if rd[0]>0 else 0.3,sx,"fuenf",Color(0.75,0.76,0.78))
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(2.0,0.004,4.9),T.basis,0.0)
+
+# Geländewagen / SUV: hoch, kastig, große Räder, Dachreling
+func _suv(T:Transform3D,farbe:Color,tu:={}):
+	var lack=_lack(farbe)
+	var RD=[[1.45,0.4],[-1.4,0.4]]
+	var K=[[2.35,0.48,0.88,0.92,0.88,0.84],[2.25,0.44,0.98,1.02,0.93,0.9],[1.5,0.44,1.06,1.1,0.95,0.9],[0.95,0.44,1.1,1.14,0.95,0.88],
+		[0.45,0.44,1.12,1.74,0.95,0.84],[-1.95,0.44,1.14,1.76,0.95,0.84],[-2.25,0.46,1.12,1.6,0.94,0.86],[-2.35,0.5,1.1,1.2,0.9,0.86]]
+	auto_koerper(T,lack,{"K":K,"raeder":RD,"rad_y":0.4,"glas":{"front":[0.95,0.48],"seite":[0.4,-1.9],"heck":[-2.05,-2.32],"b":-0.4}})
+	_kappe_teil(M.dunkel,T,Vector3(0,0.86,2.36),Vector2(1.0,0.28),true)
+	for k in 5:_kappe_teil(M.chrom,T,Vector3(0,0.76+k*0.05,2.37),Vector2(0.96,0.012),true)
+	for sd in [-1,1]:
+		_kappe_teil(M.lampe,T,Vector3(sd*0.68,0.88,2.36),Vector2(0.3,0.16),true)
+		_kappe_teil(M.rot_l,T,Vector3(sd*0.8,1.1,-2.35),Vector2(0.14,0.4),false)
+		lstab(M.chrom,T,Vector3(sd*0.66,1.8,0.3),Vector3(sd*0.66,1.8,-1.9),0.035,0.0)
+		for z in [0.25,-1.85]:lstab(M.chrom,T,Vector3(sd*0.66,1.76,z),Vector3(sd*0.66,1.8,z),0.04,0.0)
+		streifen(M.dunkel,T,sd*_seite_x(K,0.0)*1.003,0.6,0.16,2.2,-2.2,[1.45,-1.4],0.4,0.0)
+	_stossstange(T,2.38,0.6,0.92,M.dunkel,true);_stossstange(T,-2.38,0.62,0.92,M.dunkel,false)
+	zyl(M.dunkel,T*Vector3(0,1.1,-2.36),T*Vector3(0,1.1,-2.5),0.36,1.06);zyl(M.reifen,T*Vector3(0,1.1,-2.42),T*Vector3(0,1.1,-2.52),0.34,1.0)
+	_tuerlinie(K,T,0.95,0.44,1.1);_tuerlinie(K,T,-0.42,0.44,1.12);_griff(K,T,0.7,1.02);_griff(K,T,-0.65,1.04);_spiegel(K,T,0.85,1.12,lack)
+	for sx in [-1,1]:
+		for rd in RD:_rad_tuning(T,Vector3(sx*0.82,0.4,rd[0]),rd[1],0.28,sx,"sechs",Color(0.6,0.62,0.64))
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.95,0.004,4.7),T.basis,0.0)
+
+# Band auf der Oberseite (Haube–Dach–Heck), zwischen x0 und x1
+func _dachband(m:Material,T:Transform3D,K:Array,x0:float,x1:float,z0:float,z1:float):
+	var s2=_st(m,true);var n=60;var prev=null
+	for i in n+1:
+		var z=lerp(z0,z1,float(i)/n)
+		var a=Vector3(x0,_oben_y(K,z,x0)+0.008,z);var b=Vector3(x1,_oben_y(K,z,x1)+0.008,z)
+		if prev!=null:_tri(s2,T*prev[0],T*prev[1],T*b,T.basis*Vector3.UP);_tri(s2,T*prev[0],T*b,T*a,T.basis*Vector3.UP)
+		prev=[a,b]

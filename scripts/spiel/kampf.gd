@@ -151,7 +151,8 @@ func spieler_schritt(dt:float):
 			spiel.kam.yaw=lerp_angle(spiel.kam.yaw,w_yaw,zug);spiel.kam.pitch=lerp(spiel.kam.pitch,clamp(w_pitch,-60.0,30.0),zug)
 	var hilfe=_zielhilfe(von,fw,reich)
 	if hilfe!=null:punkt=hilfe
-	halter.zielen=zielt
+	halter.zielen=zielt and _laden<=0.0
+	halter.laden_t=(1.0-_laden/max(float(d.get("nachladen",1.5)),0.1)) if _laden>0.0 else -1.0
 	halter.ziel_richtung=(punkt-halter.muendung()).normalized() if zielt else sp.figur.global_transform.basis.z
 	if zielt:
 		var yaw=atan2(fw.x,fw.z)
@@ -531,6 +532,7 @@ func _effekte_bauen():
 	if ResourceLoader.exists("res://assets/sounds/schuss_gewehr.wav"):_sounds["mg"]=load("res://assets/sounds/schuss_gewehr.wav")
 	_sounds["schlag"]=_knall(0.08,2.5,0.4)
 	_sounds["laden"]=_klick()
+	if ResourceLoader.exists("res://assets/sounds/nachladen.wav"):_sounds["laden"]=load("res://assets/sounds/nachladen.wav")
 	for i in 10:
 		var a=AudioStreamPlayer3D.new();a.unit_size=12.0;a.max_distance=400.0;a.bus="Master";add_child(a);_spieler_audio.append(a)
 

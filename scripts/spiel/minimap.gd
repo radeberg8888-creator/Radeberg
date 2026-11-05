@@ -21,7 +21,7 @@ func _ready():
 		var b=JSON.parse_string(fb.get_as_text());X0=b.x0;Z0=b.z0;WX=b.x1-b.x0;WZ=b.z1-b.z0
 	tex=load("res://assets/ui/karte_basis.png")
 	var f=FileAccess.open("res://assets/ui/karte_icons.json",FileAccess.READ);icons=JSON.parse_string(f.get_as_text())
-	var cr=ColorRect.new();add_child(cr);cr.size=Vector2(R*2,R*2);cr.position=Vector2(0,0);cr.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var cr=ColorRect.new();add_child(cr);cr.size=Vector2(R*2,R*2);cr.position=Vector2(0,0);cr.mouse_filter=Control.MOUSE_FILTER_IGNORE;cr.show_behind_parent=true
 	rect_mat=ShaderMaterial.new();rect_mat.shader=load("res://shaders/minimap.gdshader");rect_mat.set_shader_parameter("map",tex);cr.material=rect_mat
 	size=Vector2(R*2,R*2)
 
@@ -40,7 +40,17 @@ func _punkt(p:Vector2,c:Color,r:float):
 	var q=w2m(p);var d=q-Vector2(R,R)
 	if d.length()<R-4:draw_circle(q,r,Color(0,0,0,0.8));draw_circle(q,r-1.5,c)
 
+var strassen:=[]
 func _draw():
+	# Straßen der Comic-Welt als Linien (Bild der Grundkarte hat nur Gelände)
+	for st in strassen:
+		var P:PackedVector2Array=st.P
+		if P[0].distance_to(mitte)>zoom*3.0 and P[P.size()-1].distance_to(mitte)>zoom*3.0 and P[P.size()/2].distance_to(mitte)>zoom*3.0:continue
+		var pts=PackedVector2Array()
+		for i in range(0,P.size(),2):
+			var q=w2m(P[i])
+			pts.append(Vector2(R,R)+(q-Vector2(R,R)).limit_length(R-3))
+		if pts.size()>1:draw_polyline(pts,Color(0.99,0.8,0.3) if st.typ=="autobahn" else Color(0.98,0.97,0.94),max(st.w*2.0/zoom*R,2.0))
 	draw_arc(Vector2(R,R),R,0,TAU,64,Color(0,0,0,0.85),5.0)
 	for i in icons:
 		var p=w2m(Vector2(i.x,i.z))
@@ -66,7 +76,8 @@ func _draw():
 		draw_circle(p2,9,Color(0,0,0));draw_circle(p2,7,Color(1,0.85,0.1))
 	# Spielerpfeil (zeigt immer nach oben = Blickrichtung)
 	var c=Vector2(R,R)
-	draw_colored_polygon(PackedVector2Array([c+Vector2(0,-11),c+Vector2(8,8),c+Vector2(0,4),c+Vector2(-8,8)]),Color(1,1,1))
+	var pf=PackedVector2Array([c+Vector2(0,-15),c+Vector2(11,11),c+Vector2(0,5),c+Vector2(-11,11)])
+	draw_colored_polygon(pf,Color(1,0.85,0.1));pf.append(pf[0]);draw_polyline(pf,Color(0,0,0),2.5)
 	# Norden
 	var n=Vector2(0,-1).rotated(-drehung)*(R-2)+c
 	draw_circle(n,10,Color(0,0,0,0.85));draw_string(ThemeDB.fallback_font,n+Vector2(-5,6),"N",HORIZONTAL_ALIGNMENT_LEFT,-1,15,Color(1,1,1))
