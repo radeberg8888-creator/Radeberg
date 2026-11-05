@@ -272,7 +272,7 @@ func ki_schritt(dt:float,hindernisse:Array):
 		var ahead=d.dot(fw)
 		if ahead<0:continue
 		var side=abs(d.dot(global_transform.basis.x))
-		if side<2.4:frei=min(frei,max(0.0,(dist-8.0)*0.9))
+		if side<1.9:frei=min(frei,max(0.0,(dist-8.0)*0.9))
 	ki_speed=move_toward(ki_speed,frei,dt*(6.0 if frei<ki_speed else 2.5))
 	ki_s+=ki_speed*dt*ki_dir
 	if _ki_ton:_ki_ton.pitch_scale=clamp(1.0+ki_speed/14.0,0.8,3.0)
@@ -304,6 +304,7 @@ func _ki_weiter():
 		ki_dir=-ki_dir;ki_s=clamp(ki_s,2.5,S.length(ki_road)-2.5)
 
 func _lane(r)->float:
+	if r.get("lane_x",-1.0)>0.0:return r.lane_x
 	if r.typ=="autobahn":return r.med+0.3+(r.w-0.5-r.med)*0.3
 	if r.typ=="allee":return r.med+(r.w-r.med)*0.35
 	if r.typ in ["gasse","rampe","land"]:return r.w*0.45

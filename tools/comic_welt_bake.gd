@@ -21,7 +21,7 @@ func _init():
 	var L=load("res://scripts/comic/stadt_lib.gd").new()
 	L.init_lib(stadt);L.spiel_modus=true;L.kachel=80.0
 	# Handy: Kugeln/Zylinder mit weniger Segmenten, kürzere Sichtweite
-	L.SPH.radial_segments=9;L.SPH.rings=5;L.CYL.radial_segments=8;L.weit_detail=300.0;L.weit_ink=130.0
+	L.SPH.radial_segments=9;L.SPH.rings=5;L.CYL.radial_segments=8;L.weit_detail=200.0;L.weit_ink=80.0
 	L._stadt();L._fertig()
 	print("STADT ",Time.get_ticks_msec()-t0," ms, Parkplätze ",L.PARKEN.size())
 	# ---- Gelände ----
@@ -93,7 +93,8 @@ func _init():
 			var pp=P[j-1].lerp(P[j],u)
 			Q.append(pp+off);Hh.append(H0+hf.call(pp,s));T.append((P[j]-P[j-1]).normalized())
 			tf.append(tunnel and hf.call(pp,s)<-6.5);el.append(false)
-		roads.append({"name":name,"typ":typ,"P":Q,"h":Hh,"T":T,"w":w,"sw":sw,"med":med,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.2,"closed":false})
+		var lane_x=w*0.36 if (sw>0.0 and typ in ["strasse","allee"]) else -1.0
+		roads.append({"lane_x":lane_x,"name":name,"typ":typ,"P":Q,"h":Hh,"T":T,"w":w,"sw":sw,"med":med,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.2,"closed":false})
 		return roads.size()-1
 	var fy=func(pp:Vector2,_s):return L.FY(pp.x,pp.y)+0.015
 	for r in L.R:
@@ -108,6 +109,17 @@ func _init():
 		neu.call(rp.n,"rampe",Pr,func(pp,s):return _interp(Sr,Hr,s)+L.FY(pp.x,pp.y)+0.01,rp.w,0.0,0.0)
 	var TS:PackedFloat32Array=L.TUN.S
 	neu.call("Stadttunnel","land",TUNP,func(_p,s):return _interp(TS,TUNH,s)+0.01,5.0,0.0,0.0,true)
+	# Höhen der Straßenpunkte an der wirklich gebauten Fahrbahn messen (Hügel, Rampen, Tunnel)
+	for k in 3:await physics_frame
+	var raum=W.get_world_3d().direct_space_state;var korr=0
+	for r in roads:
+		var Hh:PackedFloat32Array=r.h
+		for i in Hh.size():
+			var q:Vector2=r.P[i]
+			var hit=raum.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(q.x,Hh[i]+1.5,q.y),Vector3(q.x,Hh[i]-1.5,q.y)))
+			if hit and hit.normal.y>0.8 and abs(hit.position.y-Hh[i])>0.03 and abs(hit.position.y-Hh[i])<0.8:Hh[i]=hit.position.y+0.01;korr+=1
+		r.h=Hh
+	print("HOEHEN korrigiert ",korr)
 	var junctions=[]
 	for k in L.JN:
 		if idx.has(k.a) and idx.has(k.b):
@@ -194,8 +206,8 @@ func _gelaende(G0,H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float)
 						i=ii
 					k=kk
 				var mi=MeshInstance3D.new();mi.mesh=stt.commit();mi.material_override=mat;mi.name="Gelaende_%d_%d_%d"%[i0,k0,stufe];W.add_child(mi)
-				if stufe==1:mi.visibility_range_end=900.0
-				else:mi.visibility_range_begin=880.0;mi.visibility_range_end=7000.0;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				if stufe==1:mi.visibility_range_end=600.0
+				else:mi.visibility_range_begin=580.0;mi.visibility_range_end=7000.0;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			n_ch+=1
 	print("GELAENDE Kacheln ",n_ch)
 func _wasser():

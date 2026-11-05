@@ -319,6 +319,9 @@ func _physics_process(dt):
 			spieler.cam_yaw=kam.blick_yaw()
 			if spieler.steuern(st,dt):hud.zeige("Du bist ins Wasser gefallen")
 	var hind=verkehr.duplicate();hind.append(spieler if auto==null else auto)
+	var sp2=spieler.global_position
+	for c in geparkt:
+		if is_instance_valid(c) and c!=auto and c.global_position.distance_to(sp2)<160.0:hind.append(c)
 	for c in verkehr:c.ki_schritt(dt,hind)
 	if auto==null and not _entert:_anfahren_pruefen()
 
@@ -908,7 +911,7 @@ func einstellungen_anwenden():
 	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR
 	vp.scaling_3d_scale=[0.67,0.8,1.0][q]
 	vp.mesh_lod_threshold=[2.5,1.5,1.0][q]
-	Engine.max_fps=[45,60,60][q]
+	Engine.max_fps=[40,60,60][q]   # Teiler der Bildwiederholrate (120 Hz), sonst ungleichmäßige Bilder
 	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
 	if strom:strom.sicht_f=f;strom.sichtweite_anwenden()
 	var far=[900.0,1600.0,2600.0][int(st.e.sichtweite)]

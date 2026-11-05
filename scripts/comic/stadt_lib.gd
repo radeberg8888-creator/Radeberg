@@ -2381,6 +2381,19 @@ func _offen(p:Vector2,eigen)->bool:
 		var s=_s_von(HW.P,HW.S,p)
 		if _bei_s(HW.P,HW.S,s)[0].distance_to(p)<HW.w+1.2:return true
 	return false
+# liegt Punkt p (Höhe h) auf der Fläche einer anderen Hochfahrbahn? (dort darf keine Leitplanke stehen)
+func _auf_anderem_deck(p:Vector2,h:float,eigen)->bool:
+	if eigen!=null:
+		var s=_s_von(HW.P,HW.S,p)
+		if _bei_s(HW.P,HW.S,s)[0].distance_to(p)<HW.w+0.6 and abs(H_AB-h)<2.0:return true
+	for rp in RAMPEN:
+		if rp==eigen:continue
+		var bd=1e9;var bi=0
+		for i in rp.P.size():
+			var d=rp.P[i].distance_to(p)
+			if d<bd:bd=d;bi=i
+		if bd<rp.w+0.6 and abs(rp.H[bi]-h)<2.0:return true
+	return false
 func _deck(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mittel:bool,leitplanke:bool,eigen=null):
 	var alt_k=koll_an;koll_an=true;koll_kasten=true
 	_deck_k(P,H,w,dicke,mittel,leitplanke,eigen)
@@ -2400,8 +2413,8 @@ func _deck_k(P:PackedVector2Array,H:PackedFloat32Array,w:float,dicke:float,mitte
 		for sd in [-1,1]:
 			var e0=P[i]+N[i]*w*sd;var e1=P[i+1]+N[i+1]*w*sd;var o=Vector3(N[i].x*sd,0,N[i].y*sd)
 			_tri(seite,Vector3(e0.x,u0,e0.y),Vector3(e1.x,u1,e1.y),Vector3(e1.x,h1,e1.y),o);_tri(seite,Vector3(e0.x,u0,e0.y),Vector3(e1.x,h1,e1.y),Vector3(e0.x,h0,e0.y),o)
-			if leitplanke and (h0>0.7 or h1>0.7) and not (h0>H_AB-0.6 and _offen(P[i]+N[i]*(w+0.8)*sd,eigen)):
-				var m0=P[i]+N[i]*(w-0.25)*sd;var m1=P[i+1]+N[i+1]*(w-0.25)*sd;var mm=(m0+m1)*0.5;var dd=m1-m0
+			var m0=P[i]+N[i]*(w-0.25)*sd;var m1=P[i+1]+N[i+1]*(w-0.25)*sd;var mm=(m0+m1)*0.5;var dd=m1-m0
+			if leitplanke and (h0>0.7 or h1>0.7) and not (h0>H_AB-0.6 and _offen(P[i]+N[i]*(w+0.8)*sd,eigen)) and not _auf_anderem_deck(mm,(h0+h1)*0.5,eigen):
 				box(M.stein,Vector3(mm.x,(h0+h1)*0.5+0.42,mm.y),Vector3(0.45,0.85,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
 				box(M.linie,Vector3(mm.x,(h0+h1)*0.5+0.86,mm.y),Vector3(0.47,0.04,sqrt(dd.length_squared()+(h1-h0)*(h1-h0))+0.05),Basis(Vector3.UP,atan2(dd.x,dd.y))*Basis(Vector3.RIGHT,-atan2(h1-h0,dd.length())),0.0)
 		if h0>1.5:
@@ -2523,6 +2536,7 @@ func _parken():
 				if rng.randf()>0.5:continue
 				var h=t*(-sd) if r.typ!="einbahn" else t
 				var c=p+rn*sd*(r.w-1.15)
+				if r.n=="ring" and (rn*sd).dot(p)>0:continue
 				if not _park_frei(c):continue
 				_auto_zufall(Transform3D(Basis(Vector3.UP,atan2(h.x,h.y)),Vector3(c.x,0.015,c.y)))
 		# fahrende Autos auf der Fahrspur (im Spiel: echter Verkehr)
