@@ -99,9 +99,9 @@ jobs:
           timeout 1800 xvfb-run -a -s "-screen 0 640x480x24" $GODOT --rendering-method gl_compatibility --rendering-driver opengl3 --path . -s tools/comic_autos_bake.gd > build/autos.log 2>&1 || true
           grep -E "SCRIPT ERROR|c_" build/autos.log | head -20
           timeout 3600 xvfb-run -a -s "-screen 0 640x480x24" $GODOT --rendering-method gl_compatibility --rendering-driver opengl3 --path . -s tools/comic_welt_bake.gd > build/bake.log 2>&1 || true
-          grep -E "STADT|GELAENDE|KOLLISION|GESPEICHERT|SCRIPT ERROR" build/bake.log | head -30
+          grep -E "STADT|GHETTO|GELAENDE|KOLLISION|VIERTEL|GESPEICHERT|SCRIPT ERROR" build/bake.log | head -30
           ls -la assets/cache/comic/
-          test -f assets/cache/comic/welt.scn && test -f assets/cache/autos/c_trabant_gruen.scn
+          test -f assets/cache/comic/welt.scn && test -f assets/cache/comic/viertel_ghetto.scn && test -f assets/cache/autos/c_trabant_gruen.scn
 
       - name: Spieldaten-Paket exportieren und teilen
         run: |
@@ -109,7 +109,7 @@ jobs:
           $GODOT --headless --path . --export-pack "Android" build/daten.pck > build/pack.log 2>&1 || true
           tail -5 build/pack.log; ls -la build/daten.pck
           # Pflichtdateien müssen im Paket stecken (sonst baut das Handy die Welt selbst und ohne Gelände)
-          for f in cache/comic/welt.scn cache/comic/daten.bin cache/gelaende.bin; do
+          for f in cache/comic/welt.scn cache/comic/daten.bin cache/comic/viertel_ghetto.scn cache/gelaende.bin sounds/motor_vier_leer.wav; do
             grep -c -a "$f" build/daten.pck > /dev/null || { echo "FEHLT im Paket: $f"; exit 1; }
           done
           cd build && split -b 450000000 -d -a 2 daten.pck radeberg_daten.part && rm daten.pck && ls -la

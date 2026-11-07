@@ -50,13 +50,26 @@ KLASSEN = {
     # V8 Kreuzebene: tiefes Blubbern, ungleichmäßige Zündfolge
     "v8": dict(zuend=4, cyl=8, versatz=[0.0, 0.09, 0.25, 0.41, 0.5, 0.59, 0.75, 0.91], res=[(95, 1.0), (240, 0.8), (700, 0.35), (1800, 0.18)], dauer=0.009, rau=0.18, tief=1.0, zisch=0.12, lpf=1800, leer=850, hoch=7500),
     # Diesel-Sechszylinder (Feuerwehr, RTW): nageln
+    # Reihensechser mit Turbo (japanisches Sportcoupé): gleichmäßig, seidig, hell
+    "turbo6": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(210, 1.0), (620, 0.6), (1700, 0.3)], dauer=0.006, rau=0.08, tief=0.45, zisch=0.1, lpf=2400, leer=900, hoch=7800),
+    # Reihensechser Sauger (deutsche Sportlimousine): kernig, sonor
+    "reihe6": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(170, 1.0), (480, 0.7), (1300, 0.25)], dauer=0.007, rau=0.1, tief=0.55, zisch=0.08, lpf=1900, leer=850, hoch=7000),
+    # kleiner Vierzylinder (Kompakter): rau, brummig, Sportauspuff
+    "kompakt4": dict(zuend=2, cyl=4, versatz=[0.0, 0.5, 0.5, 0.0], res=[(190, 1.0), (560, 0.7), (1500, 0.3)], dauer=0.006, rau=0.2, tief=0.5, zisch=0.12, lpf=2000, leer=900, hoch=6800),
+    # leiser V8 (Luxuslimousine): tief, gedämpft
+    "v8leise": dict(zuend=4, cyl=8, versatz=[0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875], res=[(80, 1.0), (200, 0.6), (520, 0.2)], dauer=0.009, rau=0.06, tief=0.9, zisch=0.04, lpf=900, leer=650, hoch=6000),
+    # großer V8 (Muscle-Car): sehr tief, unruhiger Leerlauf, laut
+    "v8gross": dict(zuend=4, cyl=8, versatz=[0.0, 0.07, 0.25, 0.43, 0.5, 0.57, 0.75, 0.93], res=[(70, 1.0), (180, 0.9), (560, 0.4), (1500, 0.2)], dauer=0.011, rau=0.3, tief=1.0, zisch=0.15, lpf=1600, leer=750, hoch=6500),
+    # V6-Diesel (Geländewagen)
+    "v6diesel": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(120, 1.0), (400, 0.5), (2800, 0.2)], dauer=0.006, rau=0.18, tief=0.7, zisch=0.08, lpf=2000, leer=700, hoch=4500),
     "diesel": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(110, 1.0), (380, 0.6), (3200, 0.25)], dauer=0.006, rau=0.25, tief=0.7, zisch=0.1, lpf=2400, leer=650, hoch=2600),
 }
 
 # Motor v2: Verbrennungsstöße -> Auspuffrohr (Kammfilter mit Rohrlänge) -> Schalldämpfer,
 # dazu Ansaugrauschen im Takt der Zündungen und Mechanik (Zweitakt-Klingeln, Diesel-Nageln).
 ROHR = {"trabant": (1.6, 0.55, 2200, 0.004, "klingel"), "wartburg": (1.9, 0.6, 1800, 0.005, "klingel"),
-        "vier": (2.6, 0.5, 1100, 0.006, ""), "v8": (2.2, 0.72, 1500, 0.008, "blubber"), "diesel": (3.0, 0.55, 1300, 0.005, "nageln")}
+        "vier": (2.6, 0.5, 1100, 0.006, ""), "turbo6": (2.8, 0.5, 1700, 0.005, "turbo"), "reihe6": (2.6, 0.55, 1400, 0.006, ""),
+        "kompakt4": (2.2, 0.62, 1500, 0.005, "blubber"), "v8leise": (3.2, 0.4, 700, 0.009, ""), "v8gross": (2.0, 0.75, 1300, 0.01, "blubber"), "v6diesel": (3.0, 0.55, 1300, 0.005, "nageln"), "v8": (2.2, 0.72, 1500, 0.008, "blubber"), "diesel": (3.0, 0.55, 1300, 0.005, "nageln")}
 def motor_schleife(k, rpm, last=1.0, zyklen=None):
     c = KLASSEN[k]; L, g, lpf, puls, art = ROHR[k]
     zweitakt = k in ("trabant", "wartburg")
@@ -94,6 +107,9 @@ def motor_schleife(k, rpm, last=1.0, zyklen=None):
     if art == "nageln":    # Diesel: harter Klick
         L2 = int(0.01 * SR); ir = rng.normal(0, 1, L2) * np.exp(-np.arange(L2) / SR / 0.0012); ir = hp(ir, 2500)
         y += circ_conv(x, ir) / (np.max(np.abs(circ_conv(x, ir))) or 1) * 0.14
+    if art == "turbo":     # Turbolader: leises Pfeifen, steigt mit der Drehzahl
+        tt = np.arange(n) / SR; fpf = 2200 + rpm * 0.45; fpf = round(fpf * n / SR) / (n / SR)
+        y = y / (np.max(np.abs(y)) or 1) + np.sin(2 * np.pi * fpf * tt) * 0.03 * (rpm / 6000.0)
     if art == "blubber":   # V8: leichtes Sägen bei hoher Drehzahl
         y = np.tanh(y * (1.1 + rpm / 8000.0))
     y = np.tanh(y * 1.1)
@@ -154,7 +170,7 @@ def stadt(sek=60.0):
     y += bp(rng.normal(0, 1, n), 200, 1200) * 0.012 * (1 + 0.3 * np.sin(2 * np.pi * t / 13.0))
     # vorbeifahrende Autos (Anschwellen, leichtes Absinken der Tonhöhe)
     for k in range(int(sek / 4.5)):
-        mitte = rng.uniform(2, sek - 2); breite = rng.uniform(1.5, 3.5); laut = rng.uniform(0.3, 1.0)
+        mitte = rng.uniform(4, sek - 4); breite = rng.uniform(1.5, 3.5); laut = rng.uniform(0.3, 1.0)
         a = int((mitte - breite) * SR); b = int((mitte + breite) * SR); m = b - a; tt = np.arange(m) / SR
         env = np.exp(-((tt - breite) / (breite * 0.4)) ** 2) * laut
         f0 = rng.uniform(70, 140); f = f0 * (1.06 - 0.12 * (tt / (2 * breite)))
@@ -180,6 +196,8 @@ if __name__ == "__main__":
     for k, c in KLASSEN.items():
         wav("motor_%s_leer" % k, motor_schleife(k, c["leer"]))
         wav("motor_%s_hoch" % k, motor_schleife(k, c["hoch"] * 0.65))
+    probe2 = [("turbo6", "9_motor_sportcoupe_turbo6"), ("reihe6", "10_motor_sportlimousine_reihe6"), ("kompakt4", "11_motor_kompakter"), ("v8leise", "12_motor_luxuslimousine_v8"), ("v8gross", "13_motor_musclecar_v8"), ("v6diesel", "14_motor_gelaendewagen_diesel")]
+    for k, nm in probe2: mp3(nm, demo_hochdrehen(k))
     probe = [("trabant", "1_motor_trabant"), ("wartburg", "2_motor_wartburg"), ("vier", "3_motor_taxi_polizei"), ("v8", "4_motor_sportwagen"), ("diesel", "5_motor_feuerwehr_rtw")]
     for k, nm in probe: mp3(nm, demo_hochdrehen(k))
     salve = {}

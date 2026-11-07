@@ -192,6 +192,8 @@ func _process(dt):
 			4:get_tree().quit()
 		schritt+=1
 		return
+	if spiel.test_modus=="ghetto":
+		_ghetto_test(dt);return
 	if spiel.test_modus=="comic":
 		# Comic-Welt: Start, Laufen, nächstes geparktes Auto nehmen, fahren, aussteigen, Luftbilder
 		if schritt==3 or schritt==4:st.t_gas=1.0;st.t_move=Vector2.ZERO
@@ -330,3 +332,71 @@ func _tipp(rad,fach:int):
 	var a=(fach+0.5)*TAU/8.0
 	e.position=rad.size*0.5+Vector2(sin(a),-cos(a))*(rad.R+rad.R_innen)*0.5
 	return e
+
+# ---------- Ghetto-Prüfung: Boden unter allen Straßenpunkten, KI-Autos fahren alle Ghetto-Straßen ----------
+var gt_autos:=[]
+var gt_phase:=0
+func _gh_rect()->Rect2:
+	for v in spiel.welt.VIERTEL:
+		if v.name=="ghetto":return v.rect
+	return Rect2()
+func _ghetto_test(dt):
+	var W=spiel.welt;var S=W.S;var R=_gh_rect()
+	match gt_phase:
+		0:
+			if t<1.0:return
+			var a=Vector3(R.get_center().x,8.0,R.get_center().y)
+			spiel.spieler.global_position=a+Vector3(0,1,0)
+			W.viertel_jetzt(Vector2(a.x,a.z))
+			gt_phase=1;t=0
+		1:
+			if t<2.0:return
+			shot("ghetto_leer")
+			# Boden-Prüfung: jeder Straßenpunkt muss auf Fahrbahnhöhe Boden haben
+			var raum=spiel.get_world_3d().direct_space_state;var fehl=0;var n=0;var maxd=0.0
+			for r in S.roads:
+				for i in r.P.size():
+					var q:Vector2=r.P[i]
+					if not R.grow(30).has_point(q):continue
+					for lat in [0.0,r.w*0.7,-r.w*0.7]:
+						var nn=Vector2(-r.T[i].y,r.T[i].x);var p=q+nn*lat
+						var hit=raum.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(p.x,r.h[i]+3.0,p.y),Vector3(p.x,r.h[i]-3.0,p.y),1))
+						n+=1
+						if not hit:fehl+=1;print("BODEN FEHLT ",r.name," ",p)
+						else:
+							var d=abs(hit.position.y-r.h[i]);maxd=max(maxd,d)
+							if d>0.25:fehl+=1;print("BODEN HOEHE ",r.name," ",p," soll ",r.h[i]," ist ",hit.position.y)
+			print("GHETTO BODEN Punkte ",n," Fehler ",fehl," max. Abweichung ",snapped(maxd,0.01))
+			# KI-Autos auf alle Ghetto-Straßen (inkl. Zubringer)
+			var AUTO=load("res://scripts/spiel/fahrzeug.gd")
+			for r in S.roads:
+				var mitte:Vector2=r.P[r.P.size()/2]
+				if not R.grow(10).has_point(mitte) and r.name!="grove_zubringer":continue
+				var L=S.length(r)
+				for f in [0.2,0.6]:
+					for dir in [1,-1]:
+						var c=AUTO.new();spiel.add_child(c);c.setup(["c_wartburg_beige","c_muscle_orange","c_e30_gruen","c_kompakt_rot"][gt_autos.size()%4])
+						c.als_ki(r,L*f,dir,c._lane(r),S);spiel.verkehr.append(c)
+						gt_autos.append({"c":c,"r":r.name,"start":c.global_position,"weg":0.0,"alt":c.global_position,"steh":0.0,"maxsteh":0.0,"fall":false})
+			print("GHETTO KI-Autos ",gt_autos.size())
+			gt_phase=2;t=0
+		2:
+			for e in gt_autos:
+				var c=e.c
+				if not is_instance_valid(c) or not spiel.verkehr.has(c):continue
+				var p=c.global_position;e.weg+=p.distance_to(e.alt);var v=p.distance_to(e.alt)/max(dt,0.001);e.alt=p
+				if v<0.5:e.steh+=dt;e.maxsteh=max(e.maxsteh,e.steh)
+				else:e.steh=0.0
+				var g=W.G.h_at(p.x,p.z)
+				if p.y<g-0.5 or p.y<0.0:e.fall=true
+			if fmod(t,10.0)<dt:shot("ghetto_%d"%int(t))
+			if t<45.0:return
+			var fall=0;var steh=0;var wenig=0
+			var weg_=0
+			for e in gt_autos:
+				if not is_instance_valid(e.c):weg_+=1;continue
+				if e.fall:fall+=1;print("FAELLT ",e.r," ",e.c.global_position if is_instance_valid(e.c) else "")
+				if e.maxsteh>12.0:steh+=1;print("STEHT ",e.r," ",snapped(e.maxsteh,0.1),"s bei ",e.c.global_position if is_instance_valid(e.c) else "")
+				if e.weg<60.0:wenig+=1;print("WENIG WEG ",e.r," ",snapped(e.weg,0.1),"m")
+			print("GHETTO KI Ergebnis: Autos ",gt_autos.size()," (entfernt ",weg_,")"," gefallen ",fall," lange gestanden ",steh," <60m gefahren ",wenig)
+			get_tree().quit()

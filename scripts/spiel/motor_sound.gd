@@ -2,7 +2,9 @@ extends Node
 # Motorsound aus zwei Schleifen je Fahrzeugklasse (Leerlauf / hohe Drehzahl, tools/sounds_gen.py),
 # Tonhöhe folgt der Drehzahl, Gangwechsel, Überblendung zwischen den Schleifen. Dazu Hupe.
 const KLASSE:={"c_jdm":"vier","c_kompakt":"vier","c_e30":"vier","c_luxus":"v8","c_muscle":"v8","c_suv":"diesel","c_trabant":"trabant","c_wartburg":"wartburg","c_taxi":"vier","c_polizei":"vier","c_sport":"v8","c_rtw":"diesel","c_feuerwehr":"diesel"}
-const DREH:={"trabant":[900.0,4500.0,4],"wartburg":[850.0,4800.0,4],"vier":[800.0,6000.0,5],"v8":[850.0,7500.0,6],"diesel":[650.0,2600.0,5]}
+const DREH:={"trabant":[900.0,4500.0,4],"wartburg":[850.0,4800.0,4],"vier":[800.0,6000.0,5],"v8":[850.0,7500.0,6],"diesel":[650.0,2600.0,5],
+	"turbo6":[900.0,7800.0,5],"reihe6":[850.0,7000.0,5],"kompakt4":[900.0,6800.0,5],"v8leise":[650.0,6000.0,6],"v8gross":[750.0,6500.0,4],"v6diesel":[700.0,4500.0,6]}
+const VMAX:={"trabant":125.0,"wartburg":145.0,"vier":180.0,"v8":290.0,"diesel":120.0,"turbo6":235.0,"reihe6":205.0,"kompakt4":180.0,"v8leise":215.0,"v8gross":225.0,"v6diesel":175.0}
 var lo:AudioStreamPlayer;var hi:AudioStreamPlayer;var horn:AudioStreamPlayer
 var klasse:=""
 var rpm:=800.0
@@ -11,6 +13,8 @@ var hupe:=0.0
 static var _cache:={}
 
 static func klasse_von(kind:String)->String:
+	var CA=load("res://scripts/comic/comic_autos.gd")
+	if CA.LISTE.has(kind) and CA.LISTE[kind].size()>3 and ResourceLoader.exists("res://assets/sounds/motor_%s_leer.wav"%CA.LISTE[kind][3]):return CA.LISTE[kind][3]
 	for k in KLASSE:
 		if kind.begins_with(k):return KLASSE[k]
 	return "vier"
@@ -34,9 +38,9 @@ func waehle(kind:String):
 
 func setze(kmh:float,gas:float,an:bool):
 	if klasse=="":waehle("c_trabant")
-	var d=DREH[klasse];var leer:float=d[0];var maxr:float=d[1];var gaenge:int=d[2]
+	var d=DREH.get(klasse,DREH.vier);var leer:float=d[0];var maxr:float=d[1];var gaenge:int=d[2]
 	# Gang aus Geschwindigkeit, Drehzahl im Gang
-	var vmax={"trabant":125.0,"wartburg":145.0,"vier":180.0,"v8":290.0,"diesel":120.0}[klasse]
+	var vmax=VMAX.get(klasse,180.0)
 	var g=clamp(kmh/vmax*gaenge,0.0,gaenge-0.001);var gi=int(g);var f=g-gi
 	var ziel=leer+(maxr-leer)*(0.28+0.72*f)*(0.8+0.2*float(gi)/gaenge) if kmh>3.0 else leer+gas*(maxr*0.5-leer)
 	rpm=lerp(rpm,ziel,0.18)

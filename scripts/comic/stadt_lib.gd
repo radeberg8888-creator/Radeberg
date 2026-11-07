@@ -41,11 +41,21 @@ func bauen_probe():
 	print("FERTIG ",Time.get_ticks_msec()-t0," ms")
 
 # ---------------- Materialien ----------------
+var mat_cache:=false   # Viertel: gleiche Farbe = gleiches Material (weniger Zeichenaufrufe)
+var _mc:={}
 func _toon(c:Color,rough:=0.8)->StandardMaterial3D:
+	if mat_cache:
+		var k="t"+c.to_html()+str(rough)
+		if not _mc.has(k):mat_cache=false;_mc[k]=_toon(c,rough);mat_cache=true
+		return _mc[k]
 	var m=StandardMaterial3D.new();m.albedo_color=c;m.roughness=rough
 	m.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;m.specular_mode=BaseMaterial3D.SPECULAR_TOON
 	return m
 func _shader(code:String,params:={})->ShaderMaterial:
+	if mat_cache:
+		var k="s"+str(code.hash())+str(params)
+		if not _mc.has(k):mat_cache=false;_mc[k]=_shader(code,params);mat_cache=true
+		return _mc[k]
 	var s=Shader.new();s.code=code
 	var m=ShaderMaterial.new();m.shader=s
 	for k in params:m.set_shader_parameter(k,params[k])
@@ -197,6 +207,10 @@ var zaehler:={}
 # Kasten: Mitte, Größe, Drehung; Kontur als etwas größerer Kasten mit Rückseiten
 var BOX_FACES:PackedVector3Array
 var koll_kasten:=false
+func koll_box(c:Vector3,s:Vector3,b:=Basis()):
+	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
+	var xf=Transform3D(b*Basis().scaled(s),c)
+	for v in BOX_FACES:KOLL_F.append(xf*v)
 func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
 	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
@@ -954,7 +968,11 @@ func streifen(m:Material,T:Transform3D,x:float,y:float,d:float,z0:float,z1:float
 # Trabant 601 (Comic): rundliche Wanne, Kotflügel mit aufgesetzten Rundscheinwerfern, Grill als "Lächeln"
 # zwischen den Scheinwerfern, Nebelleuchten, Chromstoßstange mit schwarzen Gummihörnern, kleine Heckflossen,
 # große Fensterflächen mit dünnen Säulen, helles, flaches Dach mit Überstand.
-func _trabant(T:Transform3D,farbe:Color,dachfarbe:Color):
+const K_TRABANT:=[[1.83,0.32,0.62,0.70,0.74,0.70],[1.6,0.31,0.78,0.80,0.76,0.72],[0.8,0.31,0.86,0.90,0.77,0.72],[0.2,0.31,0.87,1.45,0.77,0.62],
+	[-1.0,0.31,0.87,1.45,0.77,0.62],[-1.5,0.31,0.86,0.92,0.76,0.70],[-1.83,0.34,0.82,0.86,0.74,0.70]]
+func _trabant(T:Transform3D,farbe:Color,dachfarbe:Color,tu:={}):
+	var T0=T;var tief:float=tu.get("tief",0.0)
+	T=Transform3D(T.basis,T.origin-T.basis*Vector3(0,tief,0))
 	var lack=_lack(farbe);var dach=_lack(dachfarbe)
 	var X=T.basis*Vector3(1,0,0);var Y=T.basis*Vector3(0,1,0);var Z=T.basis*Vector3(0,0,1)
 	# Wanne: Ringe quer zur Fahrtrichtung (z), abgerundetes Rechteck
@@ -1033,7 +1051,18 @@ func _trabant(T:Transform3D,farbe:Color,dachfarbe:Color):
 	zyl(M.metall,T*Vector3(0.45,0.25,-1.7),T*Vector3(0.45,0.25,-1.9),0.035,1.2)
 	# Räder: kleine 13-Zöller mit großer Chromkappe
 	for sx in [-1,1]:
-		for sz in [1.02,-1.02]:_rad(T,Vector3(sx*0.69,0.29,sz),0.29,0.16,sx,"stahl",lack,0.70)
+		for sz in [1.02,-1.02]:
+			if tu.has("felge"):_rad_tuning(T0,Vector3(sx*(0.69+tu.get("breit",0.0)*0.9),0.29,sz),0.29,0.16+tu.get("breit",0.0)*0.8,sx,tu.felge,tu.get("felgenfarbe",Color(0.82,0.83,0.85)))
+			else:_rad(T0,Vector3(sx*0.69,0.29,sz),0.29,0.16,sx,"stahl",lack,0.70)
+	if not tu.is_empty():
+		# Tuningteile am Trabant: Maßliste nur für die Anbauteile (die Wanne selbst ist von Hand gebaut)
+		var RD=[[1.02,0.29],[-1.02,0.29]]
+		_tune_start(tu,RD)
+		var t2=tu.duplicate()
+		if tu.get("breit",0.0)>0.0:t2["flares"]=true   # Trabant: Verbreiterung als aufgenietete Kotflügel
+		t2["_rad_y"]=0.29+tief;t2["_handgebaut"]=true
+		_tuning_teile(T,_tune_K(K_TRABANT,{}),lack,RD,t2)
+		_tune_ende()
 	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.45,0.004,3.4),T.basis,0.0)
 
 func _wartburg_alt(T:Transform3D,farbe:Color):
@@ -1401,6 +1430,7 @@ func _holzreihe(lauf:Vector3,o:Vector3,s0:float,ende:float):
 		box(M.hof,e+Vector3(0,0.03,0),Vector3(3.2,0.06,10.0) if abs(lauf.x)<0.5 else Vector3(10.0,0.06,3.2),Basis(),0.0)
 		s+=w+3.5
 
+var holz_ghetto:=false   # Ghetto: kein weißer Lattenzaun, verdorrter Rasen
 func _holzhaus(front:Vector3,w:float,aussen:Vector3,farbe:Color):
 	var oben=Vector3.UP;var rechts=oben.cross(aussen);var b=Basis(rechts,oben,aussen)
 	var holz=_shader(HOLZ,{"farbe":farbe})
@@ -1456,6 +1486,12 @@ func _holzhaus(front:Vector3,w:float,aussen:Vector3,farbe:Color):
 	zyl(_toon(Color(0.7,0.4,0.25)),P.call(vb*0.35,0.69,1.6),P.call(vb*0.35,1.05,1.6),0.22,1.15)
 	kugel(M.laub[1],P.call(vb*0.35,1.2,1.6),Vector3(0.3,0.25,0.3),1.06)
 	# Vorgarten: Rasen, Weg zur Treppe, Lattenzaun mit Tor
+	if holz_ghetto:
+		box(M.hof,P.call(0,0.07,(zurueck+vt+0.6)*0.5),Vector3(1.4,0.06,zurueck-vt-0.6),b,0.0)
+		box(M.metall,P.call(w*0.4,1.08,zurueck-0.1),Vector3(0.22,0.22,0.4),b,0.02)
+		zyl(M.holz,P.call(w*0.4,0,zurueck-0.1),P.call(w*0.4,1.0,zurueck-0.1),0.04,1.3)
+		box(M.weiss,P.call(w*0.5+0.25,1.5,-2.0),Vector3(0.45,0.55,0.8),b,0.025)
+		return
 	box(M.gras,P.call(0,0.03,zurueck*0.5+0.0),Vector3(w,0.06,zurueck),b,0.0)
 	box(M.hof,P.call(0,0.07,(zurueck+vt+0.6)*0.5),Vector3(1.4,0.06,zurueck-vt-0.6),b,0.0)
 	var zaun=M.weiss
@@ -1765,6 +1801,7 @@ func _stadt():
 	_strasse("gasse3",_kurve([Vector2(140,4),Vector2(147,101)]),2.2,"gasse")
 	_strasse("land",_kurve([Vector2(196,8),Vector2(260,10),Vector2(330,12),Vector2(460,12)]),6.0,"land",false,true)
 	_strasse("allee_west",_kurve([Vector2(-201,-20),Vector2(-250,-23),Vector2(-300,-20)]),5.5,"land",false,true)
+	_strasse("grove_zubringer",_kurve([Vector2(-130,171),Vector2(-128,235),Vector2(-130,300)]),5.0,"land",false,true)
 	_strasse("westring",_kurve([Vector2(-300,-298),Vector2(-306,-200),Vector2(-300,-110),Vector2(-300,-20),Vector2(-304,60),Vector2(-300,110),Vector2(-306,200),Vector2(-300,298)]),6.0,"land",false,true)
 	# langer Tunnel: U-Bogen unter der Westhälfte der Stadt, Portale am Westring
 	var tp=_kurve([Vector2(-294,-110),Vector2(-262,-110),Vector2(-210,-104),Vector2(-150,-88),Vector2(-80,-55),Vector2(-38,5),Vector2(-62,70),Vector2(-140,104),Vector2(-210,112),Vector2(-262,110),Vector2(-294,110)],2.5)
@@ -3462,33 +3499,74 @@ func _raeder_tuning(T:Transform3D,RD:Array,rad_y:float,spur:float,br:float,art:S
 			if f=="std":rad_neu(T,Vector3(sx*spur,rad_y,rd[0]),rd[1],br,sx,art)
 			else:_rad_tuning(T,Vector3(sx*(spur+b*0.9),rad_y,rd[0]),rd[1]+tu.get("zoll",0.0),br+b*0.8,sx,f,fc)
 
+func _stufe(tu:Dictionary,k:String)->int:
+	var v=tu.get(k,0)
+	if v is bool:return 1 if v else 0
+	return int(v)
 func _tuning_teile(T:Transform3D,K:Array,lack:Material,RD:Array,tu:Dictionary):
 	var zv=K[0][0];var zh=K[K.size()-1][0]
-	var dunkel=M.dunkel
+	var dunkel=M.dunkel;var karbon=_toon(Color(0.12,0.12,0.13),0.3)
 	var X=T.basis*Vector3(1,0,0);var Y=T.basis*Vector3(0,1,0);var Z=T.basis*Vector3(0,0,1)
-	if tu.get("lippe",false):
-		# Frontlippe: folgt der Unterkante der Nase, steht vorn ein Stück vor
+	var bmax=_kub(K,0.0,4)+_ausstell(RD[0][0])
+	var lv=_stufe(tu,"lippe")
+	if lv>=1:
+		# Frontlippe: folgt der Unterkante der Nase
 		var u=_kub(K,zv-0.04,1);var b=_kub(K,zv-0.04,4)+_ausstell(zv)
 		loft(dunkel,[ring_s(T*Vector3(0,u-0.02,zv-0.25),X,Z,b*0.97,0.25,5.0,24),ring_s(T*Vector3(0,u-0.02,zv-0.21),X,Z,b*0.99,0.28,5.0,24),ring_s(T*Vector3(0,u+0.03,zv-0.2),X,Z,b*0.97,0.27,5.0,24)],true,0.015)
-	if tu.get("schweller",false):
-		# Seitenschweller zwischen den Rädern, in Wagenfarbe, bis knapp über den Boden
+		if lv>=2:
+			# aggressiver Splitter: breite Platte weit nach vorn, seitliche Finnen, Canards
+			lbox(karbon,T,Vector3(0,u-0.045,zv+0.04),Vector3(b*2.08,0.025,0.34),0.015)
+			for sd in [-1,1]:
+				lbox(karbon,T,Vector3(sd*b*1.02,u+0.02,zv-0.06),Vector3(0.03,0.14,0.3),0.012)
+				for k in 2:lbox(karbon,T,Vector3(sd*(b*0.9),u+0.16+k*0.1,zv-0.02),Vector3(0.22,0.015,0.14),0.01,Basis(Vector3(0,0,1),sd*(0.25+k*0.1))*Basis(Vector3(1,0,0),-0.15))
+			# großer Lufteinlass-Rahmen
+			lbox(dunkel,T,Vector3(0,u+0.1,zv+0.012),Vector3(b*1.3,0.1,0.03),0.0)
+	var sv=_stufe(tu,"schweller")
+	if sv>=1:
 		var z0=RD[0][0]-RD[0][1]-0.12;var z1=RD[1][0]+RD[1][1]+0.12
 		for sd in [-1,1]:
 			var Pts=[]
 			for k in 9:
-				var z=lerp(z0,z1,k/8.0);var x=sd*(_seite_x(K,z)+0.015);var u=_kub(K,z,1)
-				Pts.append([Vector3(x,u-0.06,z),Vector3(x,u+0.1,z)])
+				var z=lerp(z0,z1,k/8.0);var x=sd*(_seite_x(K,z)+0.015+(0.02 if sv>=2 else 0.0));var u=_kub(K,z,1)
+				Pts.append([Vector3(x,u-(0.09 if sv>=2 else 0.06),z),Vector3(x,u+0.12,z)])
 			var s2=_st(lack,true);var o=T.basis*Vector3(sd,0,0)
 			for k in 8:
 				var a=Pts[k];var c=Pts[k+1]
 				_tri(s2,T*a[0],T*c[0],T*c[1],o);_tri(s2,T*a[0],T*c[1],T*a[1],o)
-				var unten=[a[0]-Vector3(sd*0.05,0,0),c[0]-Vector3(sd*0.05,0,0)]
+				var unten=[a[0]-Vector3(sd*0.07,0,0),c[0]-Vector3(sd*0.07,0,0)]
 				_tri(s2,T*a[0],T*unten[0],T*unten[1],-Y);_tri(s2,T*a[0],T*unten[1],T*c[0],-Y)
 			lstab(dunkel,T,Pts[0][0]+Vector3(0,0.005,0),Pts[8][0]+Vector3(0,0.005,0),0.02,0.0)
-	if tu.get("diffusor",false):
+			if sv>=2:lstab(karbon,T,Pts[0][0]+Vector3(sd*0.05,-0.005,0),Pts[8][0]+Vector3(sd*0.05,-0.005,0),0.03,0.008)
+	if tu.get("flares",false):
+		# aufgenietete Kotflügelverbreiterungen (Bögen um die Räder) mit Nieten
+		for rd in RD:
+			for sd in [-1,1]:
+				var x=sd*(_seite_x(K,rd[0])+0.02);var rr=rd[1]+0.1;var cy:float=tu.get("_rad_y",rd[1])
+				var prev=null
+				for k in 13:
+					var a=PI*k/12.0
+					var p=Vector3(x,cy+sin(a)*rr,rd[0]+cos(a)*rr)
+					if prev!=null:
+						var m=(p+prev)*0.5;var d=p-prev
+						lbox(lack,T,m+Vector3(sd*0.02,0,0),Vector3(0.07+tu.get("breit",0.0)*0.6,0.09,d.length()+0.02),0.012,Basis(Vector3(1,0,0),-atan2(d.y,d.z)))
+						kugel(M.chrom,T*(m+Vector3(sd*(0.06+tu.get("breit",0.0)*0.3),0,0)),Vector3(0.012,0.012,0.012),1.0)
+					prev=p
+	var dv=_stufe(tu,"diffusor")
+	if dv>=1:
 		var u=_kub(K,zh+0.04,1);var b=_kub(K,zh+0.04,4)
 		lbox(dunkel,T,Vector3(0,u-0.03,zh+0.12),Vector3(b*1.7,0.04,0.3),0.012)
-		for k in 5:lbox(dunkel,T,Vector3(-b*0.5+k*b*0.25,u-0.0,zh+0.06),Vector3(0.02,0.1,0.22),0.0)
+		var n=5 if dv<2 else 7;var hf=0.1 if dv<2 else 0.18
+		for k in n:lbox(karbon if dv>=2 else dunkel,T,Vector3(-b*0.6+k*b*1.2/(n-1),u-0.01+hf*0.5,zh+0.1),Vector3(0.02,hf,0.26),0.0)
+	if tu.get("haube",false):
+		# Motorhaube mit Lüftungsöffnungen (Karbon-Look)
+		for sd in [-1,1]:
+			for k in 4:
+				var z=zv-0.55-k*0.1;var x=sd*0.28
+				lbox(dunkel,T,Vector3(x,_oben_y(K,z,x)+0.008,z),Vector3(0.3,0.012,0.045),0.0,Basis(Vector3(1,0,0),0.12))
+	if tu.has("vinyl"):
+		var vm=_toon(tu.vinyl)
+		for sd in [-1,1]:_seitenband(vm,T,K,_kub(K,0.0,1)+0.12,_kub(K,0.0,1)+0.22,zv-0.15,zh+0.2,RD,0.012)
+		if not tu.get("_handgebaut",false):_dachband(vm,T,K,0.08,0.22,zv-0.05,zh+0.05);_dachband(vm,T,K,-0.22,-0.08,zv-0.05,zh+0.05)
 	match tu.get("spoiler",""):
 		"lippe":
 			var z=zh+0.08;var y=_oben_y(K,z,0.0)
@@ -3497,8 +3575,7 @@ func _tuning_teile(T:Transform3D,K:Array,lack:Material,RD:Array,tu:Dictionary):
 			var z=zh+0.12;var y=_oben_y(K,z,0.0)
 			loft(lack,[ring_s(T*Vector3(0,y-0.01,z+0.12),X,Z,_kub(K,z,5)*0.92,0.14,4.0,20),ring_s(T*Vector3(0,y+0.07,z-0.02),X,Z,_kub(K,z,5)*0.9,0.1,4.0,20),ring_s(T*Vector3(0,y+0.1,z-0.08),X,Z,_kub(K,z,5)*0.88,0.05,4.0,20)],true,0.015)
 		"dach":
-			# Dachspoiler über der Heckscheibe (Kompakte)
-			var z=-1.18;var y=_oben_y(K,z,0.0)
+			var z=-1.18 if zh>-2.05 else zh+0.7;var y=_oben_y(K,z,0.0)
 			lbox(lack,T,Vector3(0,y+0.02,z-0.08),Vector3(_kub(K,z,5)*1.7,0.04,0.28),0.012,Basis(Vector3(1,0,0),0.2))
 		"gt":
 			var z=zh+0.28;var y=_oben_y(K,z,0.0)
@@ -3506,6 +3583,14 @@ func _tuning_teile(T:Transform3D,K:Array,lack:Material,RD:Array,tu:Dictionary):
 			for sd in [-1,1]:
 				lbox(dunkel,T,Vector3(sd*0.88,y+0.33,z-0.05),Vector3(0.02,0.16,0.38),0.012)
 				lbox(dunkel,T,Vector3(sd*0.5,y+0.17,z),Vector3(0.03,0.36,0.1),0.0,Basis(Vector3(1,0,0),0.2))
+		"riesig":
+			# großer Zwei-Ebenen-Flügel mit riesigen Endplatten (Street-Racing-Stil)
+			var z=zh+0.32;var y=_oben_y(K,z,0.0);var bw=max(bmax*2.1,1.7)
+			lbox(lack,T,Vector3(0,y+0.55,z-0.06),Vector3(bw,0.04,0.46),0.016,Basis(Vector3(1,0,0),-0.14))
+			lbox(lack,T,Vector3(0,y+0.66,z-0.22),Vector3(bw-0.06,0.03,0.2),0.014,Basis(Vector3(1,0,0),-0.35))
+			for sd in [-1,1]:
+				lbox(dunkel,T,Vector3(sd*(bw*0.5+0.01),y+0.55,z-0.1),Vector3(0.025,0.34,0.62),0.014)
+				lbox(dunkel,T,Vector3(sd*0.45,y+0.27,z+0.02),Vector3(0.04,0.56,0.14),0.0,Basis(Vector3(1,0,0),0.25))
 		"fluegel":
 			var z=zh+0.2;var y=_oben_y(K,z,0.0)
 			lbox(lack,T,Vector3(0,y+0.2,z),Vector3(1.5,0.035,0.24),0.015,Basis(Vector3(1,0,0),-0.12))
@@ -3517,7 +3602,6 @@ func _tuning_teile(T:Transform3D,K:Array,lack:Material,RD:Array,tu:Dictionary):
 		box(nm,T*Vector3(0,0.012,(zv+zh)*0.5),Vector3(b*2.3,0.004,(zv-zh)*1.05),T.basis,0.0)
 		var leuchte=_toon(tu.neon);leuchte.emission_enabled=true;leuchte.emission=tu.neon;leuchte.emission_energy_multiplier=2.5
 		for sd in [-1,1]:lbox(leuchte,T,Vector3(sd*b*0.7,0.1,(zv+zh)*0.5),Vector3(0.03,0.03,(zv-zh)*0.6),0.0)
-	if tu.get("toenung",false):pass
 
 # ---------- Neue Autos (Comic, frei nachempfunden) ----------
 # Japanisches Sportcoupé (90er): kantig, flache Haube, rahmenlose Seitenscheiben, vier runde Rückleuchten

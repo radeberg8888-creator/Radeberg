@@ -6,7 +6,7 @@ const VH=preload("res://scripts/vehicles.gd")
 const AUTO=preload("res://scripts/spiel/fahrzeug.gd")
 var spiel
 
-const ORTE:=[["Tuning-Werkstatt","werkstatt"],["Zuhause (Ghetto)","zuhause"],["Downtown","downtown"],["Altstadt","altstadt"],["Strandviertel","strand"],["Sonnenhügel (Villen)","sonnenhuegel"],
+const ORTE:=[["Ghetto – Grove Street","grove"],["Tuning-Werkstatt","werkstatt"],["Zuhause (Ghetto)","zuhause"],["Downtown","downtown"],["Altstadt","altstadt"],["Strandviertel","strand"],["Sonnenhügel (Villen)","sonnenhuegel"],
 	["Sternviertel","stern"],["Neu-Kowloon","kowloon"],["Hauptbahnhof","bahnhof"],["Hafen","hafen"],["Flughafen","flugplatz"],["Ostvororte","vorort"],
 	["Staubwinkel (Wüste)","staubwinkel"],["Staubsee","see"],["Roter Canyon","canyon"],["Farmland","farm"],["Espenwald","espenwald"],
 	["Radeberg-Gipfel","berg"],["Nordbucht","nordbucht"],["Autobahn (Stadtring)","autobahn"],["Oststadt","oststadt"],["Südstadt","suedstadt"],["Docks","docks"],["Militärbasis (Tor)","militaer"],["Stausee","stausee"],["Wüste","wueste"]]
@@ -99,6 +99,7 @@ func teleport_ort(key:String):
 
 func teleport(p:Vector3):
 	var ziel=spiel.auto if spiel.auto!=null else spiel.spieler
+	if spiel.welt.has_method("viertel_jetzt"):spiel.welt.viertel_jetzt(Vector2(p.x,p.z));await spiel.get_tree().physics_frame;await spiel.get_tree().physics_frame
 	var y=_boden(Vector3(p.x,p.y,p.z))
 	if ziel==spiel.auto:
 		spiel.auto.global_position=Vector3(p.x,y+1.0,p.z);spiel.auto.linear_velocity=Vector3.ZERO;spiel.auto.angular_velocity=Vector3.ZERO

@@ -24,6 +24,14 @@ func _init():
 	L.SPH.radial_segments=9;L.SPH.rings=5;L.CYL.radial_segments=8;L.weit_detail=200.0;L.weit_ink=80.0
 	L._stadt();L._fertig()
 	print("STADT ",Time.get_ticks_msec()-t0," ms, Parkplätze ",L.PARKEN.size())
+	var nKF=L.KOLL_F.size();var nKN=L.KOLL_N.size();var nPF=L.PFOSTEN.size()
+	# ---- Viertel (eigene Szenen, werden im Spiel nach Entfernung geladen) ----
+	var gnode=Node3D.new();gnode.name="Viertel_ghetto";root.add_child(gnode);gnode.position=Vector3(CX,H0,CZ)
+	L.welt=gnode
+	var GL=load("res://scripts/comic/ghetto_lib.gd").new(L)
+	GL.strassen();L._kreuzungen();GL.bauen();L._fertig()
+	print("GHETTO ",Time.get_ticks_msec()-t0," ms, Parkplätze gesamt ",L.PARKEN.size())
+	var GR=Rect2(Vector2(GL.X0+CX,GL.Z0+CZ),Vector2(GL.X1-GL.X0,GL.Z1-GL.Z0))
 	# ---- Gelände ----
 	var G0=load("res://scripts/welt_gelaende.gd").new()
 	var nx=G0.rx;var nz=G0.rz;var X0=G0.X0;var Z0=G0.Z0;var ST=G0.STEP
@@ -33,6 +41,9 @@ func _init():
 		for i in nx:
 			var x=X0+i*ST-CX;var z=Z0+k*ST-CZ;var j=k*nx+i
 			var dx=max(abs(x)-RX,0.0);var dz=max(abs(z)-RZ,0.0);var d=sqrt(dx*dx+dz*dz)
+			var gx=max(max(GL.X0-x,x-GL.X1),0.0);var gzz=max(max(GL.Z0-z,z-GL.Z1),0.0);var dg=sqrt(gx*gx+gzz*gzz)
+			if x>GL.X0+0.1 and x<GL.X1-0.1 and z>GL.Z0-0.1 and z<GL.Z1-0.1:H[j]=H0+L.FY(x,z)-1.6;continue
+			if dg<d:d=dg
 			if abs(x)<RX-0.1 and abs(z)<RZ-0.1:H[j]=H0+L.FY(x,z)-1.6
 			elif d<0.1:H[j]=H0+L.KB
 			else:H[j]=lerp(H0+L.KB,H[j],smoothstep(0.0,260.0,d))
@@ -56,16 +67,10 @@ func _init():
 	var cs=CollisionShape3D.new();cs.shape=hm;kb.add_child(cs)
 	cs.scale=Vector3.ONE*ST;cs.position=Vector3(X0+(nx-1)*ST*0.5,0,Z0+(nz-1)*ST*0.5)
 	var sk=StaticBody3D.new();sk.name="KollisionStadt";stadt.add_child(sk)
-	var F=PackedVector3Array(L.KOLL_N)
-	for v in L.KOLL_F:F.append(Vector3(v.x,v.y+L.FY(v.x,v.z),v.z))
-	var stueck=60000*3;var a=0
-	while a<F.size():
-		var cp=ConcavePolygonShape3D.new();cp.backface_collision=true;cp.set_faces(F.slice(a,min(a+stueck,F.size())))
-		var c2=CollisionShape3D.new();c2.shape=cp;sk.add_child(c2);a+=stueck
-	for pf in L.PFOSTEN:
-		var cy=CylinderShape3D.new();cy.radius=pf[1];cy.height=pf[2]
-		var c3=CollisionShape3D.new();c3.shape=cy;sk.add_child(c3)
-		c3.position=Vector3(pf[0].x,pf[0].y+L.FY(pf[0].x,pf[0].z)+pf[2]*0.5,pf[0].z)
+	var F=_koll(sk,L,L.KOLL_N.slice(0,nKN),L.KOLL_F.slice(0,nKF),L.PFOSTEN.slice(0,nPF))
+	var gk=StaticBody3D.new();gk.name="KollisionViertel";gnode.add_child(gk)
+	var FG=_koll(gk,L,L.KOLL_N.slice(nKN),L.KOLL_F.slice(nKF),L.PFOSTEN.slice(nPF))
+	print("KOLLISION Ghetto Dreiecke ",FG.size()/3)
 	# Autobahn-Enden: Absperrung (Ausbau folgt)
 	for e in [0,L.HW.P.size()-1]:
 		var p:Vector2=L.HW.P[e];var t:Vector2=(L.HW.P[1]-L.HW.P[0] if e==0 else L.HW.P[e]-L.HW.P[e-1]).normalized()
@@ -100,7 +105,7 @@ func _init():
 	for r in L.R:
 		if r.typ=="tunnelrampe":continue
 		var typ={"einbahn":"strasse","rampe":"rampe"}.get(r.typ,r.typ)
-		var sw=0.0 if r.aussen else L.SWB
+		var sw=0.0 if r.aussen else (2.5 if r.get("gh",false) else L.SWB)
 		idx[r]=neu.call(r.n,typ,r.P,fy,r.w,sw,0.2 if r.typ=="allee" else 0.0)
 	var hw=L.HW
 	neu.call("Autobahn","autobahn",hw.P,func(_p,_s):return L.H_AB+0.01,hw.w,0.0,0.9)
@@ -150,7 +155,12 @@ func _init():
 					var zp=q+off-n*6.5
 					parken=parken.filter(func(e):return Vector2(e[1].origin.x,e[1].origin.z).distance_to(zp)>16.0)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
-		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2))}
+		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2)).merge(GR),
+		"viertel":[{"name":"ghetto","datei":ZIEL+"viertel_ghetto.scn","rect":GR}]}
+	_owner(gnode,gnode)
+	var pg=PackedScene.new();var eg1=pg.pack(gnode)
+	var eg2=ResourceSaver.save(pg,ZIEL+"viertel_ghetto.scn",ResourceSaver.FLAG_COMPRESS)
+	print("VIERTEL gespeichert ",error_string(eg1)," ",error_string(eg2))
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	# ---- speichern ----
 	_owner(W,W)
@@ -159,6 +169,18 @@ func _init():
 	print("GESPEICHERT ",error_string(e1)," ",error_string(e2)," Straßen ",roads.size()," Kreuzungen ",junctions.size()," Parkplätze ",parken.size()," ",(Time.get_ticks_msec()-t0)/1000.0," s")
 	quit()
 
+func _koll(sk:StaticBody3D,L,KN:Array,KF:Array,PF:Array)->PackedVector3Array:
+	var F=PackedVector3Array(KN)
+	for v in KF:F.append(Vector3(v.x,v.y+L.FY(v.x,v.z),v.z))
+	var stueck=60000*3;var a=0
+	while a<F.size():
+		var cp=ConcavePolygonShape3D.new();cp.backface_collision=true;cp.set_faces(F.slice(a,min(a+stueck,F.size())))
+		var c2=CollisionShape3D.new();c2.shape=cp;sk.add_child(c2);a+=stueck
+	for pf in PF:
+		var cy=CylinderShape3D.new();cy.radius=pf[1];cy.height=pf[2]
+		var c3=CollisionShape3D.new();c3.shape=cy;sk.add_child(c3)
+		c3.position=Vector3(pf[0].x,pf[0].y+L.FY(pf[0].x,pf[0].z)+pf[2]*0.5,pf[0].z)
+	return F
 static func _interp(S:PackedFloat32Array,H:PackedFloat32Array,s:float)->float:
 	var i=clampi(S.bsearch(s),1,S.size()-1)
 	return lerp(H[i-1],H[i],clamp((s-S[i-1])/max(S[i]-S[i-1],1e-4),0.0,1.0))

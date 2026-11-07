@@ -601,6 +601,7 @@ func _parker(p2:Vector2):
 			if (not is_instance_valid(c) or not geparkt.has(c)) and d>420.0:_parker_da.erase(i)
 			continue
 		if d>150.0 or d<25.0:continue
+		if welt.has_method("bereit") and not welt.bereit(Vector2(t.origin.x,t.origin.z)):continue
 		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.reset_physics_interpolation();c.parken();geparkt.append(c);_parker_da[i]=c
 		return   # höchstens ein Auto pro Durchgang (verteilt die Arbeit, kein Ruckeln)
 
@@ -612,6 +613,7 @@ func _spawn_auto(p2:Vector2):
 		var a=welt.S.at(r,s);var q:Vector2=a[0]
 		var d=q.distance_to(p2)
 		if d<110.0 or d>300.0:continue
+		if welt.has_method("bereit") and not welt.bereit(q):continue
 		if r.tunnel_flags[a[3]]:continue
 		var frei=true
 		for o in verkehr:
@@ -661,6 +663,7 @@ func _passanten_pflege(p:Vector3,dt:float):
 			var L=welt.S.length(r);var s=rng.randf()*L;var a=welt.S.at(r,s)
 			var d=a[0].distance_to(p2)
 			if d<40.0 or d>150.0 or welt.B.district(a[0])==null:continue
+			if welt.has_method("bereit") and not welt.bereit(a[0]):continue
 			e.r=r;e.s=s;e.dir=1 if rng.randf()<0.5 else -1;e.seite=1 if rng.randf()<0.5 else -1
 			n.visible=true;PE.play(n,"walk",rng.randf())
 		var r=e.r;var L=welt.S.length(r)
@@ -1077,8 +1080,10 @@ func _testlauf():
 # ---------------- Comic-Tuning-Werkstatt ----------------
 const CA=preload("res://scripts/comic/comic_autos.gd")
 const TU_TIEF:=[[0.0,"Serie"],[0.03,"Sport (-3 cm)"],[0.06,"Tief (-6 cm)"],[0.08,"Extrem (-8 cm)"]]
-const TU_BREIT:=[[0.0,"Serie"],[0.03,"Street (+3 cm)"],[0.06,"Widebody (+6 cm)"]]
-const TU_SPOILER:=[["","Keiner"],["lippe","Heckklappen-Lippe"],["ente","Entenbürzel"],["dach","Dachspoiler"],["fluegel","Flügel"],["gt","GT-Flügel"]]
+const TU_BREIT:=[[0.0,"Serie"],[0.03,"Street (+3 cm)"],[0.06,"Widebody (+6 cm)"],[0.12,"Extrem-Widebody (+12 cm)"]]
+const TU_STUFE:=[[0,"Aus"],[1,"Stufe 1"],[2,"Stufe 2 (extrem)"]]
+const TU_VINYL:=[[null,"Keins"],[Color(0.95,0.95,0.95),"Weiß"],[Color(0.1,0.1,0.12),"Schwarz"],[Color(0.95,0.2,0.15),"Rot"],[Color(0.2,0.6,1.0),"Blau"],[Color(1.0,0.85,0.2),"Gelb"],[Color(0.3,1.0,0.4),"Neongrün"]]
+const TU_SPOILER:=[["","Keiner"],["lippe","Heckklappen-Lippe"],["ente","Entenbürzel"],["dach","Dachspoiler"],["fluegel","Flügel"],["gt","GT-Flügel"],["riesig","Riesenflügel (NFS)"]]
 const TU_FELGEN:=[["std","Serie"],["fuenf","5-Speichen"],["kreuz","Kreuzspeichen"],["mesh","Mesh"],["tiefbett","Tiefbett"],["turbine","Turbine"],["zehn","10-Speichen"],["drei","3-Speichen"],["sechs","6-Speichen"],["schale","Schale"],["stahl","Stahl"]]
 const TU_FFARBE:=[[Color(0.82,0.83,0.85),"Silber"],[Color(0.95,0.78,0.25),"Gold"],[Color(0.1,0.1,0.11),"Schwarz"],[Color(0.95,0.95,0.95),"Weiß"],[Color(0.85,0.15,0.12),"Rot"],[Color(0.62,0.42,0.25),"Bronze"]]
 const TU_NEON:=[[null,"Aus"],[Color(0.2,0.6,1.0),"Blau"],[Color(1.0,0.2,0.3),"Rot"],[Color(0.3,1.0,0.4),"Grün"],[Color(0.75,0.3,1.0),"Lila"],[Color(0.2,1.0,0.95),"Türkis"],[Color(1.0,0.85,0.2),"Gelb"]]
@@ -1116,7 +1121,7 @@ func _comic_werkstatt():
 			var b=Button.new();b.text="%s:  %s   ›   ($%d)"%[titel,liste[i][1],preis];b.custom_minimum_size=Vector2(500,56);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
 			b.pressed.connect(func():
 				var t2=_ctu().duplicate();var nx=liste[(i+1)%liste.size()][0]
-				if nx==null or (nx is String and (nx=="" or nx=="std")):t2.erase(schl)
+				if nx==null or (nx is String and (nx=="" or nx=="std")) or (nx is int and nx==0):t2.erase(schl)
 				else:t2[schl]=nx
 				if _comic_umbauen(t2,null,preis):neu.call())
 		var schalter=func(titel:String,schl:String,preis:int):
@@ -1128,9 +1133,12 @@ func _comic_werkstatt():
 		var l2=Label.new();l2.text="Karosserie & Fahrwerk";w.add_child(l2)
 		zeile.call("Tieferlegung",TU_TIEF,"tief",800)
 		zeile.call("Kotflügel",TU_BREIT,"breit",1500)
-		schalter.call("Frontlippe","lippe",400)
-		schalter.call("Seitenschweller","schweller",500)
-		schalter.call("Heckdiffusor","diffusor",450)
+		zeile.call("Frontlippe",TU_STUFE,"lippe",400)
+		zeile.call("Seitenschweller",TU_STUFE,"schweller",500)
+		zeile.call("Heckdiffusor",TU_STUFE,"diffusor",450)
+		schalter.call("Kotflügel-Verbreiterung (genietet)","flares",700)
+		schalter.call("Motorhaube mit Lufthutze","haube",500)
+		zeile.call("Vinyl-Streifen",TU_VINYL,"vinyl",350)
 		zeile.call("Spoiler",TU_SPOILER,"spoiler",600)
 		var l3=Label.new();l3.text="Räder & Licht";w.add_child(l3)
 		zeile.call("Felgen",TU_FELGEN,"felge",900)

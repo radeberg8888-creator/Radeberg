@@ -54,6 +54,11 @@ func ort(key:String,salt:=0)->Vector3:
 	var r2=RandomNumberGenerator.new();r2.seed=hash(key)+salt
 	var off=Vector2(r2.randf_range(-60,60),r2.randf_range(-60,60)) if key!="werkstatt" else Vector2.ZERO
 	var comic="comic" in spiel.welt
+	if comic and key=="grove":
+		for r in spiel.welt.S.roads:
+			if r.name=="Grove Street":
+				var a=spiel.welt.S.at(r,spiel.welt.S.length(r)*0.55);var q:Vector2=a[0]
+				return Vector3(q.x,r.h[a[3]]+0.2,q.y)
 	if comic and key!="werkstatt":
 		# Comic-Welt: Orte der alten Karte gleichmäßig in der Stadt verteilen (fest je Name)
 		var rc:Rect2=spiel.welt.B.rect;var r3=RandomNumberGenerator.new();r3.seed=hash(key)
