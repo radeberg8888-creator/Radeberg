@@ -41,7 +41,8 @@ func _init():
 			var dm=SU.dm_welt(x+CX,z+CZ)
 			if dm<0.1:H[j]=H0-0.02;continue
 			if dm<60.0 and G0._nat(x+CX,z+CZ)>=1.0 and d>dm:H[j]=lerp(H0-0.02,H[j],smoothstep(0.0,60.0,dm));continue
-			if abs(x)<RX-0.1 and abs(z)<RZ-0.1:H[j]=H0+L.FY(x,z)-1.6
+			if abs(x)<RX-0.1 and abs(z)<RZ-0.1 and (RX-abs(x)<30.0 or RZ-abs(z)<30.0) and dm<45.0:H[j]=H0+L.FY(x,z)-0.01
+			elif abs(x)<RX-0.1 and abs(z)<RZ-0.1:H[j]=H0+L.FY(x,z)-1.6
 			elif d<0.1:H[j]=H0+L.KB
 			else:H[j]=lerp(H0+L.KB,H[j],smoothstep(0.0,260.0,d))
 	# unter dem offenen Tunneltrog absenken
@@ -154,7 +155,11 @@ func _init():
 	var st:Array=L.SHOW.start
 	var sp:Vector3=st[0]
 	var shops=[{"typ":"zuhause","c":Vector2(sp.x,sp.z)+off,"y":H0+L.FY(sp.x,sp.z)+L.KB,"yaw":st[1],"w":4.0,"d":-7.0}]
-	var ladenorte=[["werkstatt",0.3],["waffen",0.62],["kleider",0.8]]
+	var ladenorte=[["waffen",0.62],["kleider",0.8]]
+	if not SU.WERKSTATT.is_empty():
+		var wk=SU.WERKSTATT;var vor:Vector2=wk.vor+off
+		shops.append({"typ":"werkstatt","c":vor,"y":H0+L.KB,"yaw":wk.yaw+PI,"w":20.0,"d":0.0,"g":[wk.F.x+CX,wk.F.y+CZ,wk.yaw]})
+	else:ladenorte.push_front(["werkstatt",0.3])
 	for lo in ladenorte:
 		for r in L.R:
 			if r.n=="ew2":
@@ -186,7 +191,7 @@ func _sued(L,G0)->Dictionary:
 	var flach=Node3D.new();L.welt=flach
 	var alt=[L.kachel,L.weit_detail,L.weit_ink,L.spiel_modus]
 	L.spiel_modus=true
-	var AUSW=[Rect2(CX-RX-10,CZ-RZ-10,RX*2+20,RZ*2+20)]
+	var AUSW=[Rect2(CX-RX-3,CZ-RZ-3,RX*2+6,RZ*2+6)]
 	S.maske_bauen(SUED_RW,AUSW);S.dist_maske()
 	var aus=[];for a in AUSW:aus.append(Rect2(a.position-Vector2(CX,CZ),a.size))
 	S.laden("res://assets/data/karte_sued.json",Rect2(SUED_RW.position-Vector2(CX,CZ),SUED_RW.size),aus)
@@ -194,6 +199,7 @@ func _sued(L,G0)->Dictionary:
 	S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.hafenkante();S.flughafen()
 	var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
 	var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
+	S.werkstatt_reservieren(Vector2(-200,960))
 	S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse()
 	# bekannte Namen
 	var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
@@ -211,10 +217,11 @@ func _sued(L,G0)->Dictionary:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ZIEL+"kits/"))
 	var mats={}
 	for kn in K.KITS:
-		var m:ArrayMesh=K.KITS[kn].mesh
-		for si in m.get_surface_count():
-			var mt=m.surface_get_material(si)
-			if mt:mats[mt]=true
+		for m in [K.KITS[kn].mesh,K.KITS[kn].ink]:
+			if m==null:continue
+			for si in m.get_surface_count():
+				var mt=m.surface_get_material(si)
+				if mt:mats[mt]=true
 	for c in flach.get_children():
 		if c is MeshInstance3D and c.material_override:mats[c.material_override]=true
 	var nsh=0;var nm=0;var shs={}
@@ -229,6 +236,9 @@ func _sued(L,G0)->Dictionary:
 	for kn in K.KITS:
 		var pfad=ZIEL+"kits/"+kn+".res"
 		ResourceSaver.save(K.KITS[kn].mesh,pfad,ResourceSaver.FLAG_COMPRESS);K.KITS[kn].mesh.take_over_path(pfad)
+		if K.KITS[kn].ink!=null:
+			var pi=ZIEL+"kits/"+kn+"_ink.res"
+			ResourceSaver.save(K.KITS[kn].ink,pi,ResourceSaver.FLAG_COMPRESS);K.KITS[kn].ink.take_over_path(pi)
 	# Kacheln
 	var T={}
 	var kachel=func(key:Vector2i)->Node3D:
@@ -256,7 +266,7 @@ func _sued(L,G0)->Dictionary:
 		if not PK.has(key):PK[key]=[]
 		PK[key].append(pf)
 	for key in PL:
-		var tn=kachel.call(key);K.aufstellen(tn,PL[key],150.0,240.0)
+		var tn=kachel.call(key);K.aufstellen(tn,PL[key],150.0,140.0)
 		for p in PL[key]:
 			var k=K.KITS[p[0]]
 			for lb in k.labels:
@@ -282,7 +292,7 @@ func _sued(L,G0)->Dictionary:
 		_owner(tn,tn)
 		var datei=ZIEL+"sued_%d_%d.scn"%[key.x,key.y]
 		var ps=PackedScene.new();ps.pack(tn);ResourceSaver.save(ps,datei,ResourceSaver.FLAG_COMPRESS)
-		viertel.append({"name":tn.name,"datei":datei,"rect":Rect2(Vector2(key.x*KACHEL+CX,key.y*KACHEL+CZ),Vector2(KACHEL,KACHEL)),"ab":420.0,"weg":560.0})
+		viertel.append({"name":tn.name,"datei":datei,"rect":Rect2(Vector2(key.x*KACHEL+CX,key.y*KACHEL+CZ),Vector2(KACHEL,KACHEL)),"ab":480.0,"weg":620.0})
 		tn.free()
 	# Fernansicht (immer geladen)
 	var fern=Node3D.new();fern.name="SuedFern";W.add_child(fern);fern.position=Vector3(CX,H0,CZ)

@@ -40,8 +40,8 @@ func kit(name:String,w:float,d:float,builder:Callable)->Dictionary:
 			for si in c.mesh.get_surface_count():teile.append([c.mesh.surface_get_arrays(si),c.material_override])
 		elif c is Label3D:
 			labels.append({"text":c.text,"xf":c.transform,"px":c.pixel_size,"mod":c.modulate,"om":c.outline_modulate,"os":c.outline_size,"fs":c.font_size})
-	var mesh=_zusammen(teile)
-	var e={"mesh":mesh,"koll":PackedVector3Array(L.KOLL_F.slice(nKF)),"pf":L.PFOSTEN.slice(nPF),"park":L.PARKEN.slice(nPK),
+	var mesh=_zusammen(teile,false);var ink=_zusammen(teile,true)
+	var e={"mesh":mesh,"ink":ink if ink.get_surface_count()>0 else null,"koll":PackedVector3Array(L.KOLL_F.slice(nKF)),"pf":L.PFOSTEN.slice(nPF),"park":L.PARKEN.slice(nPK),
 		"labels":labels,"lod":LOD.duplicate(),"w":w,"d":d,"name":name}
 	L.KOLL_F.resize(nKF);L.PFOSTEN.resize(nPF);L.PARKEN.resize(nPK)
 	tmp.free()
@@ -90,10 +90,11 @@ func _gruppe(m:Material)->Array:   # [Schlüssel, Zielmaterial, vertexfarbe]
 		# Shader nutzen die Farbe nach source_color (sRGB->linear); Vertexfarbe liegt roh an -> vorher umrechnen
 		return ["s"+str(vm.get_instance_id()),vm,_farbe_von(m).srgb_to_linear()]
 	return ["m"+str(m.get_instance_id()),m,null]
-func _zusammen(teile:Array)->ArrayMesh:
+func _zusammen(teile:Array,nur_ink:bool)->ArrayMesh:
 	var G={}   # key -> [V,N,C,mat]
 	for t in teile:
 		var arr=t[0];var g=_gruppe(t[1]);var k=g[0]
+		if (k=="ink")!=nur_ink:continue
 		if not G.has(k):G[k]=[PackedVector3Array(),PackedVector3Array(),PackedColorArray(),g[1]]
 		var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX];var N=arr[Mesh.ARRAY_NORMAL];var I=arr[Mesh.ARRAY_INDEX]
 		var e=G[k];var col=g[2] if g[2]!=null else Color.WHITE
@@ -116,6 +117,7 @@ func _zusammen(teile:Array)->ArrayMesh:
 # ---------------- Aufstellen ----------------
 # Platzierungen: [kit_name, Transform3D (lokale Stadtkoordinaten)]
 # Ergebnis: Knoten mit MultiMeshInstances je 100-m-Feld und Variante, Sichtweite begrenzt.
+const INK_SICHT:=55.0   # Konturen nur nah (halbiert Dreiecke und Aufrufe in der Ferne)
 func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600.0)->Dictionary:
 	var F={}   # Vector2i -> {kit -> [xf]}
 	for p in platz:
@@ -134,6 +136,11 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 			var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.name=kn;fn.add_child(mmi)
 			mmi.visibility_range_end=sicht;mmi.visibility_range_end_margin=25.0
 			n_mm+=1
+			if k.get("ink")!=null:
+				var mi2=MultiMesh.new();mi2.transform_format=MultiMesh.TRANSFORM_3D;mi2.mesh=k.ink;mi2.instance_count=xs.size()
+				for i in xs.size():mi2.set_instance_transform(i,mm.get_instance_transform(i))
+				var mmk=MultiMeshInstance3D.new();mmk.multimesh=mi2;mmk.name=kn+"_ink";fn.add_child(mmk)
+				mmk.visibility_range_end=INK_SICHT;mmk.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return {"felder":F.size(),"multimesh":n_mm}
 
 # Fernansicht: Hauptkörper als Kästen mit Dach (flach oder Satteldach) und Fensterreihen, eine Fläche je Feld
@@ -151,13 +158,13 @@ func _fern_eintrag(e:Array,t:Transform3D,s:Vector3,wand:Color,dach:Color,giebel:
 		var n:Vector3=sd[0];var r:Vector3=sd[1];var o=n*sd[2];var hw=sd[3]
 		var sh=0.92 if abs(n.x)>0.5 else 1.0
 		_quad(e,P.call(o.x-r.x*hw,-h.y,o.z-r.z*hw),P.call(o.x+r.x*hw,-h.y,o.z+r.z*hw),P.call(o.x+r.x*hw,h.y,o.z+r.z*hw),P.call(o.x-r.x*hw,h.y,o.z-r.z*hw),nb*n,W*sh)
-		if fenster and s.y>=3.0:
-			var fc=Color(0.16,0.2,0.27);var y=-h.y+1.0
+		if fenster and s.y>=3.0 and e.size()>3:
+			var fe=e[3];var fc=Color(0.16,0.2,0.27);var y=-h.y+1.0
 			while y+1.4<h.y-0.3:
 				var x=-hw+1.4
 				while x+1.1<hw-0.6:
 					var q=o+n*0.06
-					_quad(e,P.call(q.x+r.x*x,y,q.z+r.z*x),P.call(q.x+r.x*(x+1.1),y,q.z+r.z*(x+1.1)),P.call(q.x+r.x*(x+1.1),y+1.3,q.z+r.z*(x+1.1)),P.call(q.x+r.x*x,y+1.3,q.z+r.z*x),nb*n,fc)
+					_quad(fe,P.call(q.x+r.x*x,y,q.z+r.z*x),P.call(q.x+r.x*(x+1.1),y,q.z+r.z*(x+1.1)),P.call(q.x+r.x*(x+1.1),y+1.3,q.z+r.z*(x+1.1)),P.call(q.x+r.x*x,y+1.3,q.z+r.z*x),nb*n,fc)
 					x+=2.8
 				y+=3.1
 	if giebel==0:
@@ -184,19 +191,20 @@ func fern(ziel:Node3D,platz:Array,feld:=600.0,sicht:=1800.0):
 	for p in platz:
 		var k=KITS[p[0]];var xf:Transform3D=p[1]
 		var key=Vector2i(int(floor(xf.origin.x/feld)),int(floor(xf.origin.z/feld)))
-		if not G.has(key):G[key]=[PackedVector3Array(),PackedVector3Array(),PackedColorArray()]
+		if not G.has(key):G[key]=[PackedVector3Array(),PackedVector3Array(),PackedColorArray(),[PackedVector3Array(),PackedVector3Array(),PackedColorArray()]]
 		for l in k.lod:
 			var s:Vector3=l[1]-Vector3(0.4,0.3,0.4)
 			var t:Transform3D=xf*l[0]*Transform3D(Basis(),Vector3(0,-0.15,0))
 			_fern_eintrag(G[key],t,s,l[2],l[3],l[4] if l.size()>4 else 0,l[5] if l.size()>5 else false)
 	for key in G:
-		var e=G[key]
-		if e[0].is_empty():continue
-		var a=[];a.resize(Mesh.ARRAY_MAX)
-		a[Mesh.ARRAY_VERTEX]=e[0];a[Mesh.ARRAY_NORMAL]=e[1];a[Mesh.ARRAY_COLOR]=e[2]
-		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,_fern_mat)
-		var mi=MeshInstance3D.new();mi.mesh=am;mi.name="Fern_%d_%d"%[key.x,key.y];ziel.add_child(mi)
-		mi.visibility_range_end=sicht;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for teil in [[G[key],sicht,""],[G[key][3],450.0,"F"]]:
+			var e=teil[0]
+			if e[0].is_empty():continue
+			var a=[];a.resize(Mesh.ARRAY_MAX)
+			a[Mesh.ARRAY_VERTEX]=e[0];a[Mesh.ARRAY_NORMAL]=e[1];a[Mesh.ARRAY_COLOR]=e[2]
+			var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,_fern_mat)
+			var mi=MeshInstance3D.new();mi.mesh=am;mi.name="Fern%s_%d_%d"%[teil[2],key.x,key.y];ziel.add_child(mi)
+			mi.visibility_range_end=teil[1];mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return G.size()
 
 # Kollision und Beschriftung der Platzierungen in einen Knoten (Kachel)

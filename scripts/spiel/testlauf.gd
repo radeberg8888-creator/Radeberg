@@ -13,6 +13,22 @@ func shot(name:String):
 	for c in spiel.verkehr.slice(0,3):print("   ki ",c.kind," ",c.global_position.snapped(Vector3.ONE*0.1)," v=",snapped(c.ki_speed,0.1))
 	if spiel.auto:print("  AUTO ",spiel.auto.global_position.snapped(Vector3.ONE*0.1)," kmh ",snapped(spiel.auto.kmh(),0.1))
 	print("LEISTUNG ",name," Aufrufe=",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke=",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte=",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)," Knoten=",Performance.get_monitor(Performance.OBJECT_NODE_COUNT)," Logik_ms=",snapped(Performance.get_monitor(Performance.TIME_PROCESS)*1000,0.1)," Physik_ms=",snapped(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000,0.1)," PROF ",spiel.prof if "prof" in spiel else "")
+	if spiel._arg("--zaehlen")!="":
+		var cam=get_viewport().get_camera_3d();var cp=cam.global_position;var Z={}
+		for n in get_tree().root.find_children("*","GeometryInstance3D",true,false):
+			if not n.is_visible_in_tree():continue
+			var d=n.global_position.distance_to(cp)
+			var rv=n.visibility_range_end
+			if rv>0 and d>rv+n.visibility_range_end_margin:continue
+			if d>1600:continue
+			var top=n;var pfad=""
+			while top.get_parent()!=null and top.get_parent()!=get_tree().root:
+				top=top.get_parent()
+			var k=top.name+"/"+n.get_class()+("/"+n.get_parent().name.left(10) if top!=n.get_parent() else "")
+			k=k.left(48)
+			Z[k]=Z.get(k,0)+1
+		var ks=Z.keys();ks.sort_custom(func(a,b):return Z[a]>Z[b])
+		for k in ks.slice(0,14):print("   ZAEHL ",Z[k]," ",k)
 	print("TESTBILD ",name," fps=",Engine.get_frames_per_second()," pos=",spiel.spieler.global_position," auto=",spiel.auto!=null," kmh=",spiel.auto.kmh() if spiel.auto else 0)
 
 var ui_schritt:=0
@@ -194,6 +210,8 @@ func _process(dt):
 		return
 	if spiel.test_modus=="ghetto":
 		_ghetto_test(dt);return
+	if spiel.test_modus=="werkstatt":
+		_werkstatt_test(dt);return
 	if spiel.test_modus=="comic":
 		# Comic-Welt: Start, Laufen, nächstes geparktes Auto nehmen, fahren, aussteigen, Luftbilder
 		if schritt==3 or schritt==4:st.t_gas=1.0;st.t_move=Vector2.ZERO
@@ -221,7 +239,7 @@ func _process(dt):
 		schritt+=1
 		return
 	if spiel.test_modus=="ost" or spiel.test_modus=="sued":
-		var P=[["ghetto",Vector2(-262,1040),Vector2(-180,1040)],["ghetto2",Vector2(-560,1150),Vector2(-480,1100)],["suedstadt",Vector2(250,1560),Vector2(330,1560)],["docks",Vector2(500,2090),Vector2(600,2090)],
+		var P=[["rand",Vector2(-300,812),Vector2(-300,880)],["rand2",Vector2(100,812),Vector2(100,900)],["ghetto",Vector2(-262,1040),Vector2(-180,1040)],["ghetto2",Vector2(-560,1150),Vector2(-480,1100)],["suedstadt",Vector2(250,1560),Vector2(330,1560)],["docks",Vector2(500,2090),Vector2(600,2090)],
 			["kai",Vector2(700,2200),Vector2(760,2300)],["industrie",Vector2(900,640),Vector2(980,640)],["hafen",Vector2(1500,820),Vector2(1580,820)],["strand",Vector2(-2100,700),Vector2(-2100,800)],["flughafen",Vector2(-2000,1925),Vector2(-2000,1860)]] if spiel.test_modus=="sued" else [["bruecke",Vector2(1900,-158),Vector2(2400,-140)],["kowloon",Vector2(2760,-385),Vector2(2760,-560)],["lindstadt",Vector2(2700,600),Vector2(2700,450)],
 			["dorf",Vector2(3600,495),Vector2(3700,480)],["canyon",Vector2(3990,-330),Vector2(4180,-470)],["moewenbach",Vector2(1110,-490),Vector2(1110,-560)],["nacht",Vector2(250,-350),Vector2(250,-500)]]
 		if t<2.5:return
@@ -403,3 +421,50 @@ func _ghetto_test(dt):
 				if e.weg<60.0:wenig+=1;print("WENIG WEG ",e.r," ",snapped(e.weg,0.1),"m")
 			print("GHETTO KI Ergebnis: Autos ",gt_autos.size()," (entfernt ",weg_,")"," gefallen ",fall," lange gestanden ",steh," <60m gefahren ",wenig)
 			get_tree().quit()
+
+# Werkstatt: vor das Tor, reinfahren, Menü, Fertig, rausfahren
+func _werkstatt_test(dt):
+	var g=spiel._garage
+	if g==null:print("WERKSTATT fehlt");get_tree().quit();return
+	var st=spiel.st
+	if schritt==0:
+		if t<2.0:return
+		var gb:Transform3D=g.global_transform
+		var vor=gb*Vector3(0,0,float(spiel._arg("--vor")) if spiel._arg("--vor")!="" else 14.0)
+		spiel.welt.viertel_jetzt(Vector2(vor.x,vor.z))
+		var c=spiel.AUTO.new();spiel.add_child(c);c.setup("c_muscle_orange")
+		c.global_transform=Transform3D(gb.basis*Basis(Vector3.UP,PI),vor+Vector3(0,1.0,0));spiel.einsteigen(c)
+		t=0;schritt=1;return
+	if schritt==1:
+		if t<2.0:return
+		print("  START y ",spiel.auto.global_position.y)
+		shot("werkstatt_vorn");t=0;schritt=2;return
+	if schritt==2:
+		st.t_gas=0.45
+		if t>1.5 and t<1.6:shot("werkstatt_tor")
+		if int(t*2)!=int((t-dt)*2):print("  FAHRT ",spiel.auto.global_position," kmh ",snapped(spiel.auto.kmh(),0.1))
+		if g.aktiv or t>12.0:st.t_gas=0.0;print("WERKSTATT drin ",g.aktiv);t=0;schritt=3
+		return
+	if schritt==3:
+		if t<4.0:return
+		shot("werkstatt_menue");print("WERKSTATT panel ",spiel.panel!=null);t=0;schritt=4;return
+	if schritt==4:
+		spiel.panel_zu();t=0;schritt=5;return
+	if schritt==5:
+		if t<3.5:return
+		shot("werkstatt_gedreht");print("WERKSTATT aktiv ",g.aktiv," frozen ",spiel.auto.freeze);t=0;schritt=6;return
+	if schritt==6:
+		if t<0.05:
+			var a=spiel.auto;var sp=a.get_world_3d().direct_space_state
+			for off in [Vector3.ZERO,Vector3(1,0,1.5),Vector3(-1,0,-1.5)]:
+				var q=PhysicsRayQueryParameters3D.create(a.global_position+off+Vector3(0,3,0),a.global_position+off-Vector3(0,3,0));q.exclude=[a.get_rid()];q.collision_mask=a.collision_mask
+				var h=sp.intersect_ray(q);print("  STRAHL ",off," ",h.get("position")," ",h.get("collider"))
+			for w in a.get_children():
+				if w is VehicleWheel3D:print("  RAD ",w.position," r ",w.wheel_radius," rest ",w.wheel_rest_length," travel ",w.suspension_travel," kontakt ",w.get_contact_body()," ",w.get_contact_point() if w.has_method("get_contact_point") else "")
+		st.t_gas=0.6
+		if int(t*4)!=int((t-dt)*4):
+			var a=spiel.auto;var wk=[]
+			for w in a.get_children():
+				if w is VehicleWheel3D:wk.append([w.is_in_contact(),snapped(w.get_rpm(),1),w.use_as_traction,w.engine_force])
+			print("  RAEDER det ",snapped(a.global_transform.basis.determinant(),0.01)," scale ",a.global_transform.basis.get_scale()," z ",a.global_transform.basis.z," vis ",a.visual.global_transform.basis.get_scale() if a.visual else ""," pos ",a.global_position," v ",a.linear_velocity," fz ",a.freeze," fm ",a.freeze_mode," mode ",PhysicsServer3D.body_get_mode(a.get_rid())," lock ",a.axis_lock_linear_x," sl ",a.sleeping," cs ",a.can_sleep," mass ",a.mass," cb ",a.collision_layer,"/",a.collision_mask)
+		if t>3.0:st.t_gas=0.0;shot("werkstatt_raus");print("WERKSTATT draussen ",g._lokal(spiel.auto.global_position));get_tree().quit()

@@ -769,6 +769,28 @@ func grundstuecke():
 				s+=k.w+0.6
 	print("SUED FAIL ",FAIL);print("SUED Grundstücke an Straßen ",PLATZ.size()," ",Time.get_ticks_msec()-t0," ms")
 # Hinterland: Originalhäuser als Vorlage, danach Füllstücke
+# Tuning-Werkstatt (Halle 20 x 26 m) an einer Ghetto-Straße reservieren; gebaut wird sie im Spiel (scripts/spiel/garage.gd)
+var WERKSTATT:={}
+func werkstatt_reservieren(nahe_welt:Vector2):
+	var ziel=nahe_welt-C;var best=null;var bd=1e9
+	for ri in ROADS.size():
+		var r=ROADS[ri]
+		if r.typ!="strasse" or r.n.begins_with("Hinter"):continue
+		var s=10.0
+		while s<r.S[-1]-10.0:
+			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1]
+			for sd in [-1,1]:
+				var n=Vector2(-t.y,t.x)*sd;var F=p+n*(r.w+r.sw+0.3)
+				var d=F.distance_to(ziel)
+				if d<bd and d<400.0 and _rechteck_ok(F,t,n,21.0,27.0) and not nah_kreuzung(F,14.0):bd=d;best=[F,t,n,r]
+			s+=6.0
+	if best==null:print("SUED Werkstatt: kein Platz!");return
+	var F:Vector2=best[0];var n:Vector2=best[2]
+	_belegen(F,best[1],n,21.0,27.0)
+	var aussen=-n
+	WERKSTATT={"F":F,"yaw":atan2(aussen.x,aussen.y),"vor":F+aussen*(best[3].sw+best[3].w*0.5)}
+	print("SUED Werkstatt bei ",F+C)
+
 # Blockinneres: Häuser an Original-Positionen, aber nur mit eigener Zufahrt bis zur Straße (läuft VOR der Straßenreihe,
 # damit dort Lücken für die Zufahrten bleiben)
 var WEGE:=[]   # {a, b, stil}
@@ -1069,7 +1091,7 @@ func parken_strasse():
 			if rng.randf()>0.22:continue
 			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var sd=[-1,1][rng.randi()%2];var n=Vector2(-t.y,t.x)*sd
 			var q=p+n*(r.w-1.15)
-			var ok=not nah_kreuzung(q,10.0)
+			var ok=not nah_kreuzung(q,10.0) and (WERKSTATT.is_empty() or q.distance_to(WERKSTATT.vor)>18.0)
 			for e in [q+t*2.4+n*1.0,q-t*2.4+n*1.0,q+t*2.4-n*1.0,q-t*2.4-n*1.0]:
 				var ns=naechst(e)
 				if ns[2]!=ri or ns[3]>r.w-0.15:ok=false

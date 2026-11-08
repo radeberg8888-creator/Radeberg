@@ -48,7 +48,7 @@ func setze(kmh:float,gas:float,an:bool):
 	var hoch_r=maxr*0.65
 	var m=clamp((rpm-leer)/(hoch_r-leer),0.0,1.0)
 	lo.pitch_scale=clamp(rpm/leer,0.5,4.0);hi.pitch_scale=clamp(rpm/hoch_r,0.3,2.5)
-	lo.volume_db=linear_to_db(max(lautst*(1.0-m),0.0001))-4.0;hi.volume_db=linear_to_db(max(lautst*m*(0.8+0.2*gas),0.0001))-4.0
+	lo.volume_db=linear_to_db(max(lautst*(1.0-m),0.0001))-11.0;hi.volume_db=linear_to_db(max(lautst*m*(0.8+0.2*gas),0.0001))-11.0
 	if an and not lo.playing:lo.play();hi.play()
 	if not an and lautst<0.01 and lo.playing:lo.stop();hi.stop()
 

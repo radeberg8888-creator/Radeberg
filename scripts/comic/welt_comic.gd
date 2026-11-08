@@ -36,13 +36,16 @@ class CA:
 	var shops:=[];var icons:=[];var villen:=[]
 
 func aus_cache():
+	# Schilder/Beschriftungen nur aus der Nähe zeichnen (jedes ist ein Zeichenaufruf)
+	for l in find_children("*","Label3D",true,false):
+		if l.visibility_range_end<=0.0 or l.visibility_range_end>90.0:l.visibility_range_end=90.0
 	var f=FileAccess.open(DATEN,FileAccess.READ);var d=f.get_var(false);f.close()
 	G=CG.new();G.heights=d.H;G.nx=d.nx;G.nz=d.nz;G.X0=d.X0;G.Z0=d.Z0;G.STEP=d.STEP
 	S=STR.new(G);S.roads=d.roads;S.junctions=d.junctions
 	B=CB.new();B.rect=d.rect
 	A=CA.new();A.shops=d.shops
 	PARKEN=d.parken
-	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB)})
+	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB),"baut":false,"weg_jetzt":false})
 	SUED_RECT=d.get("sued_rect",Rect2());IMMO=d.get("immo",[])
 
 # Viertel nachladen/entladen je nach Abstand der Kamera zum Viertel-Rechteck
@@ -56,8 +59,12 @@ func _process(dt:float):
 		if v.laed:
 			var st=ResourceLoader.load_threaded_get_status(v.datei)
 			if st==ResourceLoader.THREAD_LOAD_LOADED:
-				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();add_child(v.node);v.laed=false
-				break   # höchstens eine Kachel je Bild einsetzen (kein Ruckeln)
+				# Szene im Hintergrund-Thread aufbauen, nur das Einhängen passiert im Hauptthread
+				var ps:PackedScene=ResourceLoader.load_threaded_get(v.datei);v.laed=false;v.baut=true
+				WorkerThreadPool.add_task(func():
+					var n=ps.instantiate()
+					_eingesetzt.call_deferred(v,n))
+				break
 			elif st!=ResourceLoader.THREAD_LOAD_IN_PROGRESS:v.laed=false
 	if _vt>0.0:return
 	_vt=0.5
@@ -66,21 +73,37 @@ func _process(dt:float):
 	var p=Vector2(cam.global_position.x,cam.global_position.z)
 	for v in VIERTEL:
 		var d=_rect_abst(v.rect,p)
-		if v.node==null and not v.laed and d<v.ab and ResourceLoader.exists(v.datei):
+		if v.node==null and not v.laed and not v.baut and d<v.ab and ResourceLoader.exists(v.datei):
 			ResourceLoader.load_threaded_request(v.datei);v.laed=true
 		elif v.node!=null and d>v.weg:
 			v.node.queue_free();v.node=null
+func _eingesetzt(v,n:Node):
+	v.baut=false
+	if v.node!=null or v.get("weg_jetzt",false):
+		v.weg_jetzt=false;n.queue_free();return
+	v.node=n;add_child(n)
 # Sofort laden (Spielstart/Teleport), blockierend
 func viertel_jetzt(p:Vector2):
 	for v in VIERTEL:
 		if v.node==null and _rect_abst(v.rect,p)<v.ab:
+			if v.baut:v.weg_jetzt=true   # Hintergrund-Aufbau verwerfen, jetzt direkt
 			if v.laed:
 				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()
 			add_child(v.node)
 # Ist der Boden an dieser Stelle schon da? (Verkehr/Parker nur dann aufstellen)
+var _vgitter:={}   # 300-m-Zelle -> Viertel (schnelle Abfrage)
 func bereit(p:Vector2)->bool:
-	for v in VIERTEL:
+	if _vgitter.is_empty():
+		for v in VIERTEL:
+			var a=Vector2i(int(floor((v.rect.position.x-15.0)/300.0)),int(floor((v.rect.position.y-15.0)/300.0)))
+			var b=Vector2i(int(floor((v.rect.end.x+15.0)/300.0)),int(floor((v.rect.end.y+15.0)/300.0)))
+			for x in range(a.x,b.x+1):
+				for z in range(a.y,b.y+1):
+					var k=Vector2i(x,z)
+					if not _vgitter.has(k):_vgitter[k]=[]
+					_vgitter[k].append(v)
+	for v in _vgitter.get(Vector2i(int(floor(p.x/300.0)),int(floor(p.y/300.0))),[]):
 		if v.node==null and v.rect.grow(15.0).has_point(p):return false
 	return true
 

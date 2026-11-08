@@ -116,12 +116,19 @@ static func bereit(k:String)->bool:
 	return false
 var _spin:=0.0
 
+# Sichtweiten: Räder und Kleinteile nur nah zeichnen (jedes Teil ist ein eigener Zeichenaufruf)
+func sicht_grenzen(v:Node):
+	for n in v.find_children("*","GeometryInstance3D",true,false):
+		var nm:String=n.name
+		n.visibility_range_end=70.0 if nm.begins_with("Rad") else 240.0
+		if nm.begins_with("Rad"):n.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 func setup(k:String):
 	physics_interpolation_mode=Node.PHYSICS_INTERPOLATION_MODE_ON
 	kind=k
 	var t=vorlage(k)
 	visual=t.duplicate();add_child(visual)
 	if t.get_meta("front",1.0)<0:visual.rotation.y=PI
+	sicht_grenzen(visual)
 	ab=F.aabb(self)
 	var big=ab.size.z>7.0
 	mass=6500.0 if big else 1350.0
@@ -180,7 +187,7 @@ func _schicht(ki:bool):
 
 # Optik austauschen (Tuning-Werkstatt): neue Karosserie, Räder neu zuordnen, Spur anpassen
 func neue_optik(v:Node3D):
-	var alt=visual;visual=v;add_child(v)
+	var alt=visual;visual=v;add_child(v);sicht_grenzen(v)
 	if alt:alt.queue_free()
 	rad_knoten=[]
 	var rd:Array=v.get_meta("raeder",[])
@@ -207,7 +214,7 @@ func als_ki(road,s:float,dir:int,lane:float,road_sys):
 	if ResourceLoader.exists("res://assets/sounds/motor_vier_leer.wav"):
 		var MS=load("res://scripts/spiel/motor_sound.gd")
 		_ki_ton=AudioStreamPlayer3D.new();add_child(_ki_ton);_ki_ton.stream=MS.schleife("motor_%s_leer"%MS.klasse_von(kind))
-		_ki_ton.unit_size=5.0;_ki_ton.max_distance=70.0;_ki_ton.volume_db=-6.0;_ki_ton.attenuation_model=AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		_ki_ton.unit_size=5.0;_ki_ton.max_distance=70.0;_ki_ton.volume_db=-10.0;_ki_ton.attenuation_model=AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 		_ki_ton.play(randf()*1.0)
 var _ki_ton:AudioStreamPlayer3D=null
 func ki_ton_aus():
@@ -228,6 +235,7 @@ func fahren(st,dt:float):
 	var maxs=lerp(0.6,0.09,clamp(speed/200.0,0.0,1.0))
 	steering=move_toward(steering,-st.steer*maxs,dt*2.6)
 	var f=0.0;var b=0.0
+	if sleeping and (st.gas>0.05 or st.brake>0.05):sleeping=false   # schlafender Körper nimmt sonst keine Motorkraft an
 	if st.gas>0.05:
 		f=st.gas*kraft
 		if v<-0.5:b=st.gas*45.0;f=0.0

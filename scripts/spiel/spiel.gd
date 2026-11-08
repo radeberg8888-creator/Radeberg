@@ -85,7 +85,7 @@ func _ready():
 		load("res://scripts/comic/comic_figur.gd").aktiv=true
 		# Stadtgeräusche (leiser Verkehr, ferne Hupe, Vögel) als Schleife
 		var MS=load("res://scripts/spiel/motor_sound.gd")
-		var amb=AudioStreamPlayer.new();amb.name="Umgebung";add_child(amb);amb.stream=MS.schleife("umgebung_stadt");amb.volume_db=-1.0;amb.play()
+		var amb=AudioStreamPlayer.new();amb.name="Umgebung";add_child(amb);amb.stream=MS.schleife("umgebung_stadt");amb.volume_db=3.0;amb.play()
 	elif WELT.cache_da() and _arg("--neu")=="":
 		# fertig vorbereitete Welt laden (im Hintergrund, Ladebalken läuft weiter)
 		await _schritt("Welt wird geladen …",0.05)
@@ -292,6 +292,11 @@ func _shop(typ:String)->Dictionary:
 
 func _zonen():
 	for s in welt.A.shops:
+		if s.typ=="werkstatt" and s.has("g"):
+			# echte Werkstatt-Halle mit Rolltor (scripts/spiel/garage.gd)
+			_garage=load("res://scripts/spiel/garage.gd").new();_garage.spiel=self;add_child(_garage)
+			_garage.position=Vector3(s.g[0],s.y-0.15,s.g[1]);_garage.rotation.y=s.g[2];_garage.bauen()
+			continue
 		var fw=Vector3(sin(s.yaw),0,cos(s.yaw))
 		var p=Vector3(s.c.x,s.y,s.c.y)+fw*(s.d*0.5+1.8)
 		var txt={"werkstatt":"Werkstatt (mit Auto hineinfahren)","waffen":"Waffen Krause","kleider":"Kleiderladen Stoffwechsel","zuhause":"Zuhause – speichern",
@@ -587,21 +592,34 @@ func _verkehr_pflege(p:Vector3):
 	for c in verkehr.duplicate():
 		if Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>360.0:verkehr.erase(c);c.queue_free()
 	for c in geparkt.duplicate():
-		if c!=auto and is_instance_valid(c) and not (mis!=null and c==mis.auto_m) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>420.0:geparkt.erase(c);c.queue_free()
+		if c!=auto and is_instance_valid(c) and not (mis!=null and c==mis.auto_m) and Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>200.0:geparkt.erase(c);c.queue_free()
 	if verkehr.size()<_ziel_anzahl() and Engine.get_process_frames()%6==0:_spawn_auto(p2)
 	if "comic" in welt and Engine.get_process_frames()%4==0:_parker(p2)
 
 # Comic-Welt: geparkte Autos aus der Stadt-Datei in der Nähe des Spielers aufstellen
 var _parker_da:={}
+var _pgitter:={}   # 100-m-Zelle -> Parkplatz-Indizes
 func _parker(p2:Vector2):
-	for i in welt.PARKEN.size():
+	if _pgitter.is_empty():
+		for i in welt.PARKEN.size():
+			var o:Vector3=welt.PARKEN[i][1].origin;var k=Vector2i(int(floor(o.x/100.0)),int(floor(o.z/100.0)))
+			if not _pgitter.has(k):_pgitter[k]=[]
+			_pgitter[k].append(i)
+	# Aufräumen der Merkliste selten
+	if Engine.get_process_frames()%120==0:
+		for i in _parker_da.keys():
+			var c=_parker_da[i];var t0:Transform3D=welt.PARKEN[i][1]
+			if (not is_instance_valid(c) or not geparkt.has(c)) and Vector2(t0.origin.x,t0.origin.z).distance_to(p2)>420.0:_parker_da.erase(i)
+	var kz=Vector2i(int(floor(p2.x/100.0)),int(floor(p2.y/100.0)))
+	var kand=[]
+	for dx in range(-2,3):
+		for dz in range(-2,3):kand.append_array(_pgitter.get(kz+Vector2i(dx,dz),[]))
+	for i in kand:
 		var e=welt.PARKEN[i];var t:Transform3D=e[1]
 		var d=Vector2(t.origin.x,t.origin.z).distance_to(p2)
-		if _parker_da.has(i):
-			var c=_parker_da[i]
-			if (not is_instance_valid(c) or not geparkt.has(c)) and d>420.0:_parker_da.erase(i)
-			continue
-		if d>150.0 or d<25.0:continue
+		if _parker_da.has(i):continue
+		if d>130.0 or d<25.0:continue
+		if geparkt.size()>=26:return   # Obergrenze: jedes Auto kostet viele Zeichenaufrufe
 		if welt.has_method("bereit") and not welt.bereit(Vector2(t.origin.x,t.origin.z)):continue
 		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.reset_physics_interpolation();c.parken();geparkt.append(c);_parker_da[i]=c
 		return   # höchstens ein Auto pro Durchgang (verteilt die Arbeit, kein Ruckeln)
@@ -723,14 +741,23 @@ func _panel(titel:String)->VBoxContainer:
 	var vs=get_viewport().get_visible_rect().size
 	pc.position=Vector2(vs.x-560,max(10.0,vs.y*0.5-330));pc.size=Vector2(520,min(660.0,vs.y-20))
 	var v=VBoxContainer.new();v.add_theme_constant_override("separation",10);pc.add_child(v)
-	var l=Label.new();l.text=titel;l.add_theme_font_size_override("font_size",36);l.add_theme_color_override("font_color",Color(0.98,0.82,0.3));v.add_child(l)
+	# Kopfzeile mit Schließen-Knopf: jedes Menü lässt sich immer verlassen
+	var kopf=HBoxContainer.new();v.add_child(kopf)
+	var l=Label.new();l.text=titel;l.add_theme_font_size_override("font_size",36);l.add_theme_color_override("font_color",Color(0.98,0.82,0.3));l.size_flags_horizontal=Control.SIZE_EXPAND_FILL;kopf.add_child(l)
+	var x=Button.new();x.text=" ✕ ";x.custom_minimum_size=Vector2(64,56);x.add_theme_font_size_override("font_size",28);kopf.add_child(x)
+	x.pressed.connect(func():
+		if auto!=null:auto.brake=0.0
+		panel_zu())
 	return v
 
 func _btn(v:Control,t:String,f:Callable)->Button:
 	var b=Button.new();b.text=t;b.custom_minimum_size=Vector2(0,58);b.pressed.connect(f);v.add_child(b);return b
 
+var _garage=null
+var _wk_neu:=false
 func panel_zu():
 	if panel:panel.queue_free();panel=null
+	if _garage!=null and _garage.aktiv and not _wk_neu:_garage.raus()
 	hud.modus="auto" if auto!=null else "fuss"
 	kam.setze_ziel(auto if auto else spieler,auto!=null,[auto if auto else spieler])
 
@@ -1100,9 +1127,12 @@ func _comic_umbauen(tu:Dictionary,farbe=null,preis:=0)->bool:
 func _comic_werkstatt():
 	auto.engine_force=0;auto.brake=10.0
 	var v=_panel("RADEBERG CUSTOMS")
-	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(520,560);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var vs=get_viewport().get_visible_rect().size
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(500,min(660.0,vs.y-20)-170);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var fertig=Button.new();fertig.text="FERTIG – losfahren";fertig.custom_minimum_size=Vector2(0,60);v.add_child(fertig)
+	fertig.pressed.connect(func():auto.brake=0.0;panel_zu())
 	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;w.add_theme_constant_override("separation",6);sc.add_child(w)
-	var neu=func():panel_zu();_comic_werkstatt()
+	var neu=func():_wk_neu=true;panel_zu();_wk_neu=false;_comic_werkstatt()
 	var hat_lack=CA.LISTE.has(auto.kind) and (CA.LISTE[auto.kind][1] as Array).size()>0
 	if hat_lack:
 		var l=Label.new();l.text="Lack ($250)";w.add_child(l)

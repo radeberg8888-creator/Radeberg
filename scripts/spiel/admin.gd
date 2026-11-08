@@ -94,6 +94,8 @@ func teleport_ort(key:String):
 	var p:Vector3
 	if key=="zuhause":
 		var h=spiel._shop("zuhause");var fw=Vector3(sin(h.yaw),0,cos(h.yaw));p=Vector3(h.c.x,h.y+0.3,h.c.y)+fw*(h.d*0.5+3.5)
+	elif key=="werkstatt":
+		var h=spiel._shop("werkstatt");p=Vector3(h.c.x,h.y+0.3,h.c.y)
 	else:p=spiel.mis.ort(key,5)
 	teleport(p)
 
