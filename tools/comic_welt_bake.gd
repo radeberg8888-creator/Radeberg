@@ -25,15 +25,12 @@ func _init():
 	L._stadt();L._fertig()
 	print("STADT ",Time.get_ticks_msec()-t0," ms, Parkplätze ",L.PARKEN.size())
 	var nKF=L.KOLL_F.size();var nKN=L.KOLL_N.size();var nPF=L.PFOSTEN.size()
-	# ---- Viertel (eigene Szenen, werden im Spiel nach Entfernung geladen) ----
-	var gnode=Node3D.new();gnode.name="Viertel_ghetto";root.add_child(gnode);gnode.position=Vector3(CX,H0,CZ)
-	L.welt=gnode
-	var GL=load("res://scripts/comic/ghetto_lib.gd").new(L)
-	GL.strassen();L._kreuzungen();GL.bauen();L._fertig()
-	print("GHETTO ",Time.get_ticks_msec()-t0," ms, Parkplätze gesamt ",L.PARKEN.size())
-	var GR=Rect2(Vector2(GL.X0+CX,GL.Z0+CZ),Vector2(GL.X1-GL.X0,GL.Z1-GL.Z0))
-	# ---- Gelände ----
+	# ---- Untere Kartenhälfte: Kacheln (eigene Szenen, im Spiel nach Entfernung geladen) ----
 	var G0=load("res://scripts/welt_gelaende.gd").new()
+	var SD=_sued(L,G0)
+	var SU=SD.S
+	print("SUED fertig ",Time.get_ticks_msec()-t0," ms")
+	# ---- Gelände ----
 	var nx=G0.rx;var nz=G0.rz;var X0=G0.X0;var Z0=G0.Z0;var ST=G0.STEP
 	var H=PackedFloat32Array(G0._nh)
 	var TUNP:PackedVector2Array=L.TUN.P;var TUNH:PackedFloat32Array=L.TUN.H
@@ -41,9 +38,9 @@ func _init():
 		for i in nx:
 			var x=X0+i*ST-CX;var z=Z0+k*ST-CZ;var j=k*nx+i
 			var dx=max(abs(x)-RX,0.0);var dz=max(abs(z)-RZ,0.0);var d=sqrt(dx*dx+dz*dz)
-			var gx=max(max(GL.X0-x,x-GL.X1),0.0);var gzz=max(max(GL.Z0-z,z-GL.Z1),0.0);var dg=sqrt(gx*gx+gzz*gzz)
-			if x>GL.X0+0.1 and x<GL.X1-0.1 and z>GL.Z0-0.1 and z<GL.Z1-0.1:H[j]=H0+L.FY(x,z)-1.6;continue
-			if dg<d:d=dg
+			var dm=SU.dm_welt(x+CX,z+CZ)
+			if dm<0.1:H[j]=H0-0.02;continue
+			if dm<60.0 and G0._nat(x+CX,z+CZ)>=1.0 and d>dm:H[j]=lerp(H0-0.02,H[j],smoothstep(0.0,60.0,dm));continue
 			if abs(x)<RX-0.1 and abs(z)<RZ-0.1:H[j]=H0+L.FY(x,z)-1.6
 			elif d<0.1:H[j]=H0+L.KB
 			else:H[j]=lerp(H0+L.KB,H[j],smoothstep(0.0,260.0,d))
@@ -68,9 +65,6 @@ func _init():
 	cs.scale=Vector3.ONE*ST;cs.position=Vector3(X0+(nx-1)*ST*0.5,0,Z0+(nz-1)*ST*0.5)
 	var sk=StaticBody3D.new();sk.name="KollisionStadt";stadt.add_child(sk)
 	var F=_koll(sk,L,L.KOLL_N.slice(0,nKN),L.KOLL_F.slice(0,nKF),L.PFOSTEN.slice(0,nPF))
-	var gk=StaticBody3D.new();gk.name="KollisionViertel";gnode.add_child(gk)
-	var FG=_koll(gk,L,L.KOLL_N.slice(nKN),L.KOLL_F.slice(nKF),L.PFOSTEN.slice(nPF))
-	print("KOLLISION Ghetto Dreiecke ",FG.size()/3)
 	# Autobahn-Enden: Absperrung (Ausbau folgt)
 	for e in [0,L.HW.P.size()-1]:
 		var p:Vector2=L.HW.P[e];var t:Vector2=(L.HW.P[1]-L.HW.P[0] if e==0 else L.HW.P[e]-L.HW.P[e-1]).normalized()
@@ -129,6 +123,18 @@ func _init():
 	for k in L.JN:
 		if idx.has(k.a) and idx.has(k.b):
 			junctions.append({"p":k.p+off,"h":H0+L.FY(k.p.x,k.p.y),"r":k.r,"a":idx[k.a],"b":idx[k.b],"rail":false})
+	# Süd-Straßen (flach auf H0) + Kreuzungen
+	var basis=roads.size()
+	for r in SU.ROADS:
+		var Q=PackedVector2Array();var Hh=PackedFloat32Array();var T=PackedVector2Array();var tf=[];var el=[]
+		var P=PackedVector2Array()
+		for q in r.P:
+			if P.is_empty() or q.distance_to(P[P.size()-1])>0.5:P.append(q)
+		for i in P.size():
+			Q.append(P[i]+off);Hh.append(H0+0.04);T.append((P[min(i+1,P.size()-1)]-P[max(i-1,0)]).normalized());tf.append(false);el.append(false)
+		roads.append({"lane_x":r.w*0.36,"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":T,"w":r.w,"sw":r.sw,"med":0.2 if r.typ=="allee" else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true})
+	for j in SU.JUNC:
+		junctions.append({"p":j.p+off,"h":H0+0.04,"r":j.r,"a":basis+j.a,"b":basis+j.b,"rail":false})
 	# ---- Parkplätze, Läden ----
 	var parken=[]
 	var var_={"c_trabant":["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_trabant_rot"],"c_wartburg":["c_wartburg_beige","c_wartburg_blau","c_wartburg_gruen"],
@@ -139,6 +145,11 @@ func _init():
 		var k:String=e[0];var tf:Transform3D=e[1]
 		if var_.has(k):k=var_[k][rr.randi()%var_[k].size()]
 		var o=tf.origin;o.y+=L.FY(o.x,o.z)+H0+0.2;o.x+=CX;o.z+=CZ
+		parken.append([k,Transform3D(tf.basis,o)])
+	for e in SU.PARK:
+		var k:String=e[0];var tf:Transform3D=e[1]
+		if var_.has(k):k=var_[k][rr.randi()%var_[k].size()]
+		var o=tf.origin;o.y+=H0+0.2;o.x+=CX;o.z+=CZ
 		parken.append([k,Transform3D(tf.basis,o)])
 	var st:Array=L.SHOW.start
 	var sp:Vector3=st[0]
@@ -155,12 +166,8 @@ func _init():
 					var zp=q+off-n*6.5
 					parken=parken.filter(func(e):return Vector2(e[1].origin.x,e[1].origin.z).distance_to(zp)>16.0)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
-		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2)).merge(GR),
-		"viertel":[{"name":"ghetto","datei":ZIEL+"viertel_ghetto.scn","rect":GR}]}
-	_owner(gnode,gnode)
-	var pg=PackedScene.new();var eg1=pg.pack(gnode)
-	var eg2=ResourceSaver.save(pg,ZIEL+"viertel_ghetto.scn",ResourceSaver.FLAG_COMPRESS)
-	print("VIERTEL gespeichert ",error_string(eg1)," ",error_string(eg2))
+		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2)),"sued_rect":SD.rw,
+		"viertel":SD.viertel,"immo":SD.immo}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	# ---- speichern ----
 	_owner(W,W)
@@ -168,6 +175,129 @@ func _init():
 	var e2=ResourceSaver.save(ps,ZIEL+"welt.scn",ResourceSaver.FLAG_COMPRESS)
 	print("GESPEICHERT ",error_string(e1)," ",error_string(e2)," Straßen ",roads.size()," Kreuzungen ",junctions.size()," Parkplätze ",parken.size()," ",(Time.get_ticks_msec()-t0)/1000.0," s")
 	quit()
+
+const SUED_RW:=Rect2(-3000,340,4700,2310)
+const KACHEL:=300.0
+func _sued(L,G0)->Dictionary:
+	var t0=Time.get_ticks_msec()
+	var GL=load("res://scripts/comic/ghetto_lib.gd").new(L)
+	var K=load("res://scripts/comic/kit_lib.gd").new(L)
+	var S=load("res://scripts/comic/sued_lib.gd").new(L,GL,K,G0)
+	var flach=Node3D.new();L.welt=flach
+	var alt=[L.kachel,L.weit_detail,L.weit_ink,L.spiel_modus]
+	L.spiel_modus=true
+	var AUSW=[Rect2(CX-RX-10,CZ-RZ-10,RX*2+20,RZ*2+20)]
+	S.maske_bauen(SUED_RW,AUSW);S.dist_maske()
+	var aus=[];for a in AUSW:aus.append(Rect2(a.position-Vector2(CX,CZ),a.size))
+	S.laden("res://assets/data/karte_sued.json",Rect2(SUED_RW.position-Vector2(CX,CZ),SUED_RW.size),aus)
+	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
+	S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.hafenkante();S.flughafen()
+	S.grundstuecke()
+	var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
+	var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
+	S.hinterland(hs);S.fuellen();S.parken_strasse()
+	# bekannte Namen
+	var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
+	for nm in namen:
+		var ns=S.naechst(nm[1]-Vector2(CX,CZ))
+		if ns[2]>=0:S.ROADS[ns[2]].n=nm[0]
+	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
+	S.fahrbahnen();S.platten();L._fertig()
+	L.weit_detail=300.0;L.weit_ink=120.0
+	S.strassenrand();L._fertig()
+	var KF=L.KOLL_F.slice(n0);var PF=L.PFOSTEN.slice(p0)
+	L.KOLL_F.resize(n0);L.PFOSTEN.resize(p0)
+	L.kachel=alt[0];L.weit_detail=alt[1];L.weit_ink=alt[2];L.spiel_modus=alt[3]
+	# Materialien + Shader extern speichern: alle Kacheln/Bausätze teilen dieselben (sonst je Kachel neu kompiliert)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ZIEL+"kits/"))
+	var mats={}
+	for kn in K.KITS:
+		var m:ArrayMesh=K.KITS[kn].mesh
+		for si in m.get_surface_count():
+			var mt=m.surface_get_material(si)
+			if mt:mats[mt]=true
+	for c in flach.get_children():
+		if c is MeshInstance3D and c.material_override:mats[c.material_override]=true
+	var nsh=0;var nm=0;var shs={}
+	for mt in mats:
+		if mt.resource_path!="":continue
+		if mt is ShaderMaterial and mt.shader and mt.shader.resource_path=="" and not shs.has(mt.shader):
+			var sp=ZIEL+"kits/shader_%d.gdshader"%nsh;nsh+=1
+			ResourceSaver.save(mt.shader,sp);mt.shader.take_over_path(sp);shs[mt.shader]=true
+		var mp=ZIEL+"kits/mat_%d.res"%nm;nm+=1
+		ResourceSaver.save(mt,mp);mt.take_over_path(mp)
+	print("SUED Materialien extern ",nm," Shader ",nsh)
+	for kn in K.KITS:
+		var pfad=ZIEL+"kits/"+kn+".res"
+		ResourceSaver.save(K.KITS[kn].mesh,pfad,ResourceSaver.FLAG_COMPRESS);K.KITS[kn].mesh.take_over_path(pfad)
+	# Kacheln
+	var T={}
+	var kachel=func(key:Vector2i)->Node3D:
+		if not T.has(key):
+			var n=Node3D.new();n.name="Sued_%d_%d"%[key.x,key.y];n.position=Vector3(CX,H0,CZ);T[key]=n
+		return T[key]
+	var schl=func(v:Vector3)->Vector2i:return Vector2i(int(floor(v.x/KACHEL)),int(floor(v.z/KACHEL)))
+	for c in flach.get_children():
+		var teile=c.name.split("_");var key=Vector2i(int(teile[teile.size()-2]),int(teile[teile.size()-1]))
+		flach.remove_child(c);kachel.call(key).add_child(c)
+	flach.free()
+	var PL={}
+	for p in S.PLATZ:
+		var key=schl.call(p[1].origin)
+		if not PL.has(key):PL[key]=[]
+		PL[key].append(p)
+	var KK={}
+	for i in range(0,KF.size(),3):
+		var key=schl.call((KF[i]+KF[i+1]+KF[i+2])/3.0)
+		if not KK.has(key):KK[key]=PackedVector3Array()
+		KK[key].append_array([KF[i],KF[i+1],KF[i+2]])
+	var PK={}
+	for pf in PF:
+		var key=schl.call(pf[0])
+		if not PK.has(key):PK[key]=[]
+		PK[key].append(pf)
+	for key in PL:
+		var tn=kachel.call(key);K.aufstellen(tn,PL[key],150.0,240.0)
+		for p in PL[key]:
+			var k=K.KITS[p[0]]
+			for lb in k.labels:
+				var l=Label3D.new();l.text=lb.text;l.pixel_size=lb.px;l.modulate=lb.mod;l.outline_modulate=lb.om;l.outline_size=lb.os;l.font_size=lb.fs;l.shaded=false
+				l.visibility_range_end=55.0;l.transform=p[1]*lb.xf;tn.add_child(l)
+			for pf in k.pf:
+				if not PK.has(key):PK[key]=[]
+				PK[key].append([p[1]*pf[0],pf[1],pf[2]])
+		if not KK.has(key):KK[key]=PackedVector3Array()
+		KK[key].append_array(K.kollision(PL[key]))
+	var viertel=[]
+	for key in T:
+		var tn:Node3D=T[key]
+		var sk=StaticBody3D.new();sk.name="Kollision";tn.add_child(sk)
+		var F:PackedVector3Array=KK.get(key,PackedVector3Array())
+		var a=0
+		while a<F.size():
+			var cp=ConcavePolygonShape3D.new();cp.backface_collision=true;cp.set_faces(F.slice(a,min(a+180000,F.size())))
+			var c2=CollisionShape3D.new();c2.shape=cp;sk.add_child(c2);a+=180000
+		for pf in PK.get(key,[]):
+			var cy=CylinderShape3D.new();cy.radius=pf[1];cy.height=pf[2]
+			var c3=CollisionShape3D.new();c3.shape=cy;sk.add_child(c3);c3.position=pf[0]+Vector3(0,pf[2]*0.5,0)
+		_owner(tn,tn)
+		var datei=ZIEL+"sued_%d_%d.scn"%[key.x,key.y]
+		var ps=PackedScene.new();ps.pack(tn);ResourceSaver.save(ps,datei,ResourceSaver.FLAG_COMPRESS)
+		viertel.append({"name":tn.name,"datei":datei,"rect":Rect2(Vector2(key.x*KACHEL+CX,key.y*KACHEL+CZ),Vector2(KACHEL,KACHEL)),"ab":420.0,"weg":560.0})
+		tn.free()
+	# Fernansicht (immer geladen)
+	var fern=Node3D.new();fern.name="SuedFern";W.add_child(fern);fern.position=Vector3(CX,H0,CZ)
+	K.fern(fern,S.PLATZ,600.0,2200.0)
+	# kaufbare Gebäude
+	var immo=[];var zn={"lager":0,"autohandel":0}
+	for im in S.IMMO:
+		var xf:Transform3D=im.xf;var zp=xf*Vector3(0,0,1.2)
+		zn[im.art]+=1
+		var ort={"ghetto":"Ghetto","sued":"Südstadt","docks":"Docks","industrie":"Industrie","hafen":"Hafen","strand":"Strand","flug":"Flughafen"}.get(im.stil,"Süd")
+		immo.append({"art":im.art,"id":"%s_%d"%[im.art,zn[im.art]],"ort":ort,"p":Vector3(zp.x+CX,H0+L.KB+0.05,zp.z+CZ),"yaw":atan2(xf.basis.z.x,xf.basis.z.z)})
+	L.welt=W.get_node("Stadt")
+	print("SUED Kacheln ",viertel.size()," Bausätze ",K.KITS.size()," Immobilien ",immo.size()," ",Time.get_ticks_msec()-t0," ms")
+	return {"S":S,"viertel":viertel,"immo":immo,"rw":SUED_RW}
 
 func _koll(sk:StaticBody3D,L,KN:Array,KF:Array,PF:Array)->PackedVector3Array:
 	var F=PackedVector3Array(KN)

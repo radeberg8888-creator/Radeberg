@@ -220,8 +220,9 @@ func _process(dt):
 			8:get_tree().quit()
 		schritt+=1
 		return
-	if spiel.test_modus=="ost":
-		var P=[["bruecke",Vector2(1900,-158),Vector2(2400,-140)],["kowloon",Vector2(2760,-385),Vector2(2760,-560)],["lindstadt",Vector2(2700,600),Vector2(2700,450)],
+	if spiel.test_modus=="ost" or spiel.test_modus=="sued":
+		var P=[["ghetto",Vector2(-262,1040),Vector2(-180,1040)],["ghetto2",Vector2(-560,1150),Vector2(-480,1100)],["suedstadt",Vector2(250,1560),Vector2(330,1560)],["docks",Vector2(500,2090),Vector2(600,2090)],
+			["kai",Vector2(700,2200),Vector2(760,2300)],["industrie",Vector2(900,640),Vector2(980,640)],["hafen",Vector2(1500,820),Vector2(1580,820)],["strand",Vector2(-2100,700),Vector2(-2100,800)],["flughafen",Vector2(-2000,1925),Vector2(-2000,1860)]] if spiel.test_modus=="sued" else [["bruecke",Vector2(1900,-158),Vector2(2400,-140)],["kowloon",Vector2(2760,-385),Vector2(2760,-560)],["lindstadt",Vector2(2700,600),Vector2(2700,450)],
 			["dorf",Vector2(3600,495),Vector2(3700,480)],["canyon",Vector2(3990,-330),Vector2(4180,-470)],["moewenbach",Vector2(1110,-490),Vector2(1110,-560)],["nacht",Vector2(250,-350),Vector2(250,-500)]]
 		if t<2.5:return
 		t=0
@@ -229,6 +230,7 @@ func _process(dt):
 		if ui_schritt>_ab:shot(P[ui_schritt-1][0])
 		if ui_schritt>=P.size():get_tree().quit();return
 		var e=P[ui_schritt];var p:Vector2=e[1];var z:Vector2=e[2]
+		if spiel.welt.has_method("viertel_jetzt"):spiel.welt.viertel_jetzt(p)
 		var h=spiel.welt.G.h_at(p.x,p.y)
 		var hit=spiel.kampf._ray(Vector3(p.x,400,p.y),Vector3(p.x,-50,p.y),[])
 		if hit:h=hit.position.y
@@ -337,9 +339,10 @@ func _tipp(rad,fach:int):
 var gt_autos:=[]
 var gt_phase:=0
 func _gh_rect()->Rect2:
-	for v in spiel.welt.VIERTEL:
-		if v.name=="ghetto":return v.rect
-	return Rect2()
+	# Testgebiet in der unteren Kartenhälfte: --ort=x,z (Welt), sonst Ghetto
+	var a=spiel._arg("--ort");var c=Vector2(-250,1000)
+	if a!="":var t=a.split(",");c=Vector2(float(t[0]),float(t[1]))
+	return Rect2(c-Vector2(220,220),Vector2(440,440))
 func _ghetto_test(dt):
 	var W=spiel.welt;var S=W.S;var R=_gh_rect()
 	match gt_phase:
@@ -371,7 +374,7 @@ func _ghetto_test(dt):
 			var AUTO=load("res://scripts/spiel/fahrzeug.gd")
 			for r in S.roads:
 				var mitte:Vector2=r.P[r.P.size()/2]
-				if not R.grow(10).has_point(mitte) and r.name!="grove_zubringer":continue
+				if not R.grow(10).has_point(mitte) or not r.get("sued",false):continue
 				var L=S.length(r)
 				for f in [0.2,0.6]:
 					for dir in [1,-1]:

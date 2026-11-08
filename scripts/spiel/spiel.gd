@@ -276,6 +276,7 @@ func _spieler():
 	if "comic" in welt:
 		mini.strassen=welt.S.roads;mini.icons=[]
 		for s in welt.A.shops:mini.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y})
+		for im in welt.get("IMMO") if welt.get("IMMO")!=null else []:mini.icons.append({"typ":im.art,"x":im.p.x,"z":im.p.z})
 	motor=MOTOR.new();add_child(motor)
 	mis=MIS.new();mis.spiel=self;add_child(mis)
 	kampf=KAMPF.new();kampf.spiel=self;add_child(kampf);kampf.setup_spieler()

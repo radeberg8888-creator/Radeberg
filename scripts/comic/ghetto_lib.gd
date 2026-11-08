@@ -20,6 +20,7 @@ var LOTS:=0
 const TAGS:=["RBG","KING","187","SKRT","YO!","DOPE","CREW","ZONE","OST","BOOM","GROVE","KRIEG","ROST","NOFX","GHETTO","SÜD"]
 const SPRAY:=[Color(0.95,0.2,0.6),Color(0.2,0.8,0.95),Color(0.98,0.85,0.1),Color(0.4,0.95,0.3),Color(0.95,0.45,0.1),Color(0.6,0.3,0.95),Color(0.95,0.95,0.95)]
 var _mat:={}
+var ohne_tags:=false   # Bausatz: keine Label3D-Tags (zu viele Instanzen)
 
 func _init(lib):
 	L=lib;rng.seed=4711
@@ -342,6 +343,27 @@ func parken():
 				if not L._park_frei(c):continue
 				L._park(Transform3D(Basis(Vector3.UP,atan2(h.x,h.y)),Vector3(c.x,0.015,c.y)),["c_wartburg","c_muscle","c_e30","c_luxus","c_trabant","c_trabant","c_kompakt","c_suv"][rng.randi()%8])
 
+# Laden mit Front an P(0,0,0), Breite lw, Tiefe ld (für den Bezirks-Generator)
+func ecke_bau(P:Callable,lw:float,ld:float,aussen:Vector3,yaw:float):
+	var c=P.call(0,0,ld*0.5)
+	var wand=L.M.ziegel[rng.randi()%L.M.ziegel.size()] if rng.randf()<0.6 else L.M.putz[rng.randi()%L.M.putz.size()]
+	var b=Y(yaw);var H=4.4
+	L.box(wand,c+Vector3(0,H*0.5,0),Vector3(lw-0.6,H,ld),b,0.05)
+	L.box(L.M.stein_d,c+Vector3(0,H+0.2,0),Vector3(lw-0.3,0.4,ld+0.3),b,0.04)
+	L.koll_box(c+Vector3(0,H*0.5,0),Vector3(lw-0.6,H,ld),b)
+	var f=P.call(0,0,0)
+	L.box(L.M.glas[2],f+Vector3(0,1.6,0)+aussen*0.03,Vector3(lw-4.0,2.0,0.05),b,0.0)
+	var x=-(lw-4.0)*0.5
+	while x<(lw-4.0)*0.5:L.box(L.M.metall,f+b*Vector3(x,1.6,0.08),Vector3(0.05,2.0,0.05),b,0.0);x+=0.3
+	L.box(L.M.dunkel,f+b*Vector3((lw-2.2)*0.5,1.15,0.03),Vector3(1.1,2.3,0.05),b,0.0)
+	var namen=["SPÄTI","LIQUOR","PFANDLEIHE","WASCHSALON","HAARSTUDIO","KIOSK","DÖNER","WETTEN","HANDY-REPARATUR","24/7","CHICKEN","SCHECKS EINLÖSEN"]
+	var schild=T([Color(0.85,0.15,0.12),Color(0.15,0.3,0.6),Color(0.95,0.75,0.1),Color(0.1,0.1,0.12)][rng.randi()%4])
+	L.box(schild,f+Vector3(0,3.5,0)+aussen*0.15,Vector3(lw-1.2,0.9,0.2),b,0.03)
+	label(namen[rng.randi()%namen.size()],f+Vector3(0,3.5,0)+aussen*0.27,b,0.0085,Color(1,1,0.92),Color(0.05,0.05,0.05))
+	var seite=b*Vector3(1,0,0)
+	graffiti(c+seite*((lw-0.6)*0.5+0.06)+Vector3(0,2.0,0),seite,1.0)
+	muellsack(c+seite*((lw-0.6)*0.5+0.8)+aussen*2.0)
+
 # ---------- Bausteine ----------
 # Fahrbahn als Viereckstreifen entlang der Linie (wenige Dreiecke, mit Kollision)
 func streifen(P:PackedVector2Array,w:float):
@@ -375,7 +397,7 @@ func graffiti(c:Vector3,aussen:Vector3,gr:=1.0):
 		var q=c+r*rng.randf_range(-breite*0.4,breite*0.4)+Vector3(0,gr*rng.randf_range(-0.4,0.4),0)
 		L.mesh(T(SPRAY[rng.randi()%SPRAY.size()]),L.SPH,Transform3D(b*Basis().scaled(Vector3(gr*0.5,gr*0.45,0.03)),q+aussen*0.025),1.0)
 	L.box(T(f2),c+r*rng.randf_range(-breite*0.3,breite*0.3)-Vector3(0,gr*0.6,0)+aussen*0.03,Vector3(0.05,gr*rng.randf_range(0.3,0.7),0.01),b,0.0)
-	if gr>=0.6:label(tag,c+aussen*0.06,b,gr*0.0105,f1,Color(0.06,0.04,0.05))
+	if gr>=0.6 and not ohne_tags:label(tag,c+aussen*0.06,b,gr*0.0105,f1,Color(0.06,0.04,0.05))
 func wellblech(c:Vector3,w:float,h:float,yaw:float,col:Color):
 	var b=Y(yaw);L.box(T(col),c+Vector3(0,h*0.5,0),Vector3(w,h,0.06),b,0.03)
 	var dk=T(col*0.72);var x=-w*0.5+0.15
@@ -430,15 +452,19 @@ func kabel(a:Vector3,e:Vector3,durch:=0.9):
 	for k in range(1,n+1):
 		var t=float(k)/n;var q=a.lerp(e,t)-Vector3(0,durch*4.0*t*(1.0-t),0)
 		L.zyl(L.M.linie,prev,q,0.02,1.0);prev=q
-# Wrack: einfacher Kasten-Körper auf Steinen (kein echtes Auto, spart Zeichenaufrufe)
+# Wrack: echte Karosserie ohne Räder, aufgebockt auf Steinen, ausgeblichener/rostiger Lack
 func auto_wrack(p:Vector3,yaw:float):
-	var b=Y(yaw);var lack=T([Color(0.5,0.35,0.25),Color(0.35,0.4,0.45),Color(0.45,0.45,0.3),Color(0.2,0.18,0.16)][rng.randi()%4])
-	L.box(lack,p+b*Vector3(0,0.75,0),Vector3(1.7,0.6,4.0),b,0.03)
-	L.box(lack,p+b*Vector3(0,1.3,-0.2),Vector3(1.5,0.55,2.0),b,0.03)
-	L.box(L.M.dunkel,p+b*Vector3(0,1.3,-0.2),Vector3(1.52,0.4,1.7),b,0.0)
-	for z in [-1.3,1.3]:
-		for x in [-0.75,0.75]:
-			L.box(L.M.stein_d,p+b*Vector3(x,0.22,z),Vector3(0.35,0.44,0.35),b,0.02)
-	if rng.randf()<0.5:L.zyl(L.M.reifen,p+b*Vector3(0.87,0.35,1.3),p+b*Vector3(0.95,0.35,1.3),0.33,1.1)
-	L.box(T(Color(0.55,0.3,0.16)),p+b*Vector3(0.86,0.8,0.5),Vector3(0.02,0.4,1.2),b,0.0)
-	L.koll_box(p+b*Vector3(0,0.8,0),Vector3(1.7,1.6,4.0),b)
+	var art=["_wartburg","_e30","_muscle","_kompakt"][rng.randi()%4]
+	var lack=[Color(0.55,0.42,0.32),Color(0.42,0.46,0.5),Color(0.5,0.5,0.38),Color(0.36,0.3,0.26),Color(0.6,0.55,0.45)][rng.randi()%5]
+	var b=Y(yaw);var TT=Transform3D(b,p+Vector3(0,0.28,0))
+	var alt=[L.rad_capture,L.rad_weg];L.rad_capture=true;L.rad_weg=true
+	if art=="_wartburg":L._wartburg(TT,lack)
+	else:L.call(art,TT,lack,{})
+	L.rad_capture=alt[0];L.rad_weg=alt[1]
+	for z in [-1.35,1.35]:
+		for x in [-0.6,0.6]:
+			L.box(L.M.stein_d,p+b*Vector3(x,0.2,z),Vector3(0.38,0.4,0.38),b,0.02)
+	if rng.randf()<0.6:
+		var rz=rng.randf_range(-1,1);L.zyl(L.M.reifen,p+b*Vector3(1.5,0,rz),p+b*Vector3(1.5,0.24,rz),0.33,1.1)
+	L.koll_box(p+b*Vector3(0,0.8,0),Vector3(1.8,1.6,4.2),b)
+func _rost()->StandardMaterial3D:return T(Color(0.5,0.27,0.14))

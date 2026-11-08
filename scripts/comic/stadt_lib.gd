@@ -92,7 +92,8 @@ void fragment(){
 	float rechts=1.0-smoothstep(0.02,0.04,(1.0-f.x)*bw);
 	c*=1.0+0.22*oben-0.28*unten-0.12*rechts;
 	vec3 fg=fuge*0.92;
-	ALBEDO=mix(c,fg,mortar);
+	float aa=smoothstep(0.015,0.05,length(fwidth(uv)));   // Ferne: Muster ausblenden statt Flimmern
+	ALBEDO=mix(mix(c,fg,mortar),mix(farbe,fg,0.2),aa);
 	ROUGHNESS=0.95;
 }
 """
@@ -116,7 +117,8 @@ void fragment(){
 	float fuge=1.0-smoothstep(0.012,0.022,e);
 	vec3 c=farbe*(0.9+0.16*h21(id));
 	c*=1.0+0.12*(1.0-smoothstep(0.02,0.05,(1.0-f.y)*gr))-0.12*(1.0-smoothstep(0.02,0.05,f.y*gr));
-	ALBEDO=mix(c,farbe*0.62,fuge); ROUGHNESS=0.9;
+	float aa=smoothstep(0.012,0.04,length(fwidth(wp.xz)));
+	ALBEDO=mix(mix(c,farbe*0.62,fuge),farbe*0.9,aa); ROUGHNESS=0.9;
 }
 """
 const ASPHALT:=KOPF+"""
@@ -876,6 +878,8 @@ func _rad(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String,felge:Ma
 				kugel(M.chrom,F+o+ax*seite*0.02,Vector3(0.03,0.03,0.03),1.0)
 		_:
 			zyl(M.chrom,F,F+ax*seite*0.025,r*0.5,1.0)
+	if rad_capture and rad_weg:
+		st=alt[0];mats=alt[1];zaehler=alt[2];return
 	if rad_capture:
 		var rn=Node3D.new();rn.name="Rad_"+("V" if c.z>0 else "H")+("L" if c.x>0 else "R");welt.add_child(rn);rn.position=C
 		for k in st:
@@ -884,6 +888,7 @@ func _rad(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String,felge:Ma
 		RAEDER.append({"p":C,"r":r,"vorne":c.z>0,"links":c.x>0})
 		st=alt[0];mats=alt[1];zaehler=alt[2]
 var rad_capture:=false
+var rad_weg:=false   # Wrack: Räder weglassen
 var RAEDER:=[]
 func _kabine(T:Transform3D,secs:Array,lack:Material,dachm:Material,dach_secs:Array,b_saeule:=true,c_dick:=0.09):
 	if _glas_auto==null:_glas_auto=_shader(GLAS,{"farbe":Color(0.2,0.33,0.43)})
@@ -3268,6 +3273,8 @@ func rad_neu(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String):
 			kugel(M.dunkel,F+o*fr*0.68+ax*seite*0.02,Vector3(0.012,1,1)*fr*0.11,1.0)
 	zyl(M.chrom,F+ax*seite*0.018,F+ax*seite*0.04,fr*0.38,1.06)
 	kugel(M.dunkel,F+ax*seite*0.042,Vector3(0.01,1,1)*fr*0.1,1.0)
+	if rad_capture and rad_weg:
+		st=alt[0];mats=alt[1];zaehler=alt[2];return
 	if rad_capture:
 		var rn=Node3D.new();rn.name="Rad_"+("V" if c.z>0 else "H")+("L" if c.x>0 else "R");welt.add_child(rn);rn.position=C
 		for k in st:
@@ -3482,6 +3489,8 @@ func _rad_tuning(T:Transform3D,c:Vector3,r:float,br:float,seite:int,art:String,f
 			var a=TAU*(k+0.5)/6;var o=(T.basis*Vector3(0,cos(a),sin(a)))
 			kugel(M.dunkel,F+o*fr*0.68+ax*seite*0.02,Vector3(0.012,1,1)*fr*0.11,1.0)
 	zyl(M.chrom,F+ax*seite*0.018,F+ax*seite*0.04,fr*(0.3 if art!="stahl" else 0.38),1.06)
+	if rad_capture and rad_weg:
+		st=alt[0];mats=alt[1];zaehler=alt[2];return
 	if rad_capture:
 		var rn=Node3D.new();rn.name="Rad_"+("V" if c.z>0 else "H")+("L" if c.x>0 else "R");welt.add_child(rn);rn.position=C
 		for k in st:

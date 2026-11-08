@@ -59,7 +59,10 @@ func ort(key:String,salt:=0)->Vector3:
 			if r.name=="Grove Street":
 				var a=spiel.welt.S.at(r,spiel.welt.S.length(r)*0.55);var q:Vector2=a[0]
 				return Vector3(q.x,r.h[a[3]]+0.2,q.y)
-	if comic and key!="werkstatt":
+	var sr:Rect2=spiel.welt.SUED_RECT if comic and "SUED_RECT" in spiel.welt else Rect2()
+	if comic and key=="ghetto":p=Vector2(-250,1000)
+	if comic and key!="werkstatt" and sr.size.x>0 and sr.grow(-40).has_point(p):pass   # untere Kartenhälfte: Originalort gibt es wirklich
+	elif comic and key!="werkstatt":
 		# Comic-Welt: Orte der alten Karte gleichmäßig in der Stadt verteilen (fest je Name)
 		var rc:Rect2=spiel.welt.B.rect;var r3=RandomNumberGenerator.new();r3.seed=hash(key)
 		p=rc.position+Vector2(r3.randf_range(0.12,0.88)*rc.size.x,r3.randf_range(0.12,0.88)*rc.size.y);off=off*0.5

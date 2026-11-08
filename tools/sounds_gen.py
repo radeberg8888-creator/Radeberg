@@ -46,20 +46,20 @@ KLASSEN = {
     # Zweitakt-Dreizylinder: etwas voller
     "wartburg": dict(zuend=3, cyl=3, versatz=[0.0, 0.333, 0.667], res=[(300, 1.0), (950, 0.6), (2300, 0.3)], dauer=0.005, rau=0.28, tief=0.25, zisch=0.2, lpf=2600, leer=850, hoch=4800),
     # Viertakt-Vierzylinder: ruhig, rund (Taxi/Polizei)
-    "vier": dict(zuend=2, cyl=4, versatz=[0.0, 0.5, 0.5, 0.0], res=[(160, 1.0), (520, 0.5), (1400, 0.15)], dauer=0.007, rau=0.1, tief=0.5, zisch=0.08, lpf=1400, leer=800, hoch=6000),
+    "vier": dict(zuend=2, cyl=4, versatz=[0.0, 0.25, 0.5, 0.75], res=[(160, 1.0), (520, 0.5), (1400, 0.15)], dauer=0.007, rau=0.1, tief=0.5, zisch=0.08, lpf=1400, leer=800, hoch=6000),
     # V8 Kreuzebene: tiefes Blubbern, ungleichmäßige Zündfolge
-    "v8": dict(zuend=4, cyl=8, versatz=[0.0, 0.09, 0.25, 0.41, 0.5, 0.59, 0.75, 0.91], res=[(95, 1.0), (240, 0.8), (700, 0.35), (1800, 0.18)], dauer=0.009, rau=0.18, tief=1.0, zisch=0.12, lpf=1800, leer=850, hoch=7500),
+    "v8": dict(zuend=4, cyl=8, versatz=[0.0, 0.135, 0.25, 0.365, 0.5, 0.635, 0.75, 0.865], res=[(95, 1.0), (240, 0.8), (700, 0.35), (1800, 0.18)], dauer=0.009, rau=0.18, tief=1.0, zisch=0.12, lpf=1800, leer=850, hoch=7500),
     # Diesel-Sechszylinder (Feuerwehr, RTW): nageln
     # Reihensechser mit Turbo (japanisches Sportcoupé): gleichmäßig, seidig, hell
     "turbo6": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(210, 1.0), (620, 0.6), (1700, 0.3)], dauer=0.006, rau=0.08, tief=0.45, zisch=0.1, lpf=2400, leer=900, hoch=7800),
     # Reihensechser Sauger (deutsche Sportlimousine): kernig, sonor
     "reihe6": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(170, 1.0), (480, 0.7), (1300, 0.25)], dauer=0.007, rau=0.1, tief=0.55, zisch=0.08, lpf=1900, leer=850, hoch=7000),
     # kleiner Vierzylinder (Kompakter): rau, brummig, Sportauspuff
-    "kompakt4": dict(zuend=2, cyl=4, versatz=[0.0, 0.5, 0.5, 0.0], res=[(190, 1.0), (560, 0.7), (1500, 0.3)], dauer=0.006, rau=0.2, tief=0.5, zisch=0.12, lpf=2000, leer=900, hoch=6800),
+    "kompakt4": dict(zuend=2, cyl=4, versatz=[0.0, 0.25, 0.5, 0.75], res=[(190, 1.0), (560, 0.7), (1500, 0.3)], dauer=0.006, rau=0.2, tief=0.5, zisch=0.12, lpf=2000, leer=900, hoch=6800),
     # leiser V8 (Luxuslimousine): tief, gedämpft
     "v8leise": dict(zuend=4, cyl=8, versatz=[0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875], res=[(80, 1.0), (200, 0.6), (520, 0.2)], dauer=0.009, rau=0.06, tief=0.9, zisch=0.04, lpf=900, leer=650, hoch=6000),
     # großer V8 (Muscle-Car): sehr tief, unruhiger Leerlauf, laut
-    "v8gross": dict(zuend=4, cyl=8, versatz=[0.0, 0.07, 0.25, 0.43, 0.5, 0.57, 0.75, 0.93], res=[(70, 1.0), (180, 0.9), (560, 0.4), (1500, 0.2)], dauer=0.011, rau=0.3, tief=1.0, zisch=0.15, lpf=1600, leer=750, hoch=6500),
+    "v8gross": dict(zuend=4, cyl=8, versatz=[0.0, 0.135, 0.25, 0.365, 0.5, 0.635, 0.75, 0.865], res=[(70, 1.0), (180, 0.9), (560, 0.4), (1500, 0.2)], dauer=0.011, rau=0.3, tief=1.0, zisch=0.15, lpf=1600, leer=750, hoch=6500),
     # V6-Diesel (Geländewagen)
     "v6diesel": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(120, 1.0), (400, 0.5), (2800, 0.2)], dauer=0.006, rau=0.18, tief=0.7, zisch=0.08, lpf=2000, leer=700, hoch=4500),
     "diesel": dict(zuend=3, cyl=6, versatz=[0, 1/6, 2/6, 3/6, 4/6, 5/6], res=[(110, 1.0), (380, 0.6), (3200, 0.25)], dauer=0.006, rau=0.25, tief=0.7, zisch=0.1, lpf=2400, leer=650, hoch=2600),

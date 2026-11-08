@@ -33,6 +33,15 @@ func setup():
 		if int(e.preis)==0:besitz[e.id]=true
 	for e in d.get("geschaefte",[]):
 		var x=e.duplicate();x["p"]=spiel.mis.ort(e.ort,hash(e.id)+3);geschaefte.append(x)
+	# Generierte kaufbare Gebäude der unteren Kartenhälfte (Lagerhallen, Autohandel)
+	if "IMMO" in spiel.welt:
+		for im in spiel.welt.IMMO:
+			var x={"id":im.id,"art":im.art,"p":im.p}
+			if im.art=="lager":
+				x["titel"]="Lagerhalle %s"%im.ort;x["preis"]=150000 if im.ort!="Hafen" else 190000
+			else:
+				x["titel"]="Autohandel %s"%im.ort;x["preis"]=110000
+			geschaefte.append(x)
 	for x in immobilien:
 		spiel.zonen.append({"typ":"immobilie","p":x.p,"r":2.2,"text":x.titel,"d":x})
 		_schild(x.p,x.titel,Color(0.2,0.85,0.35))
@@ -98,7 +107,9 @@ func geschaeft_menue(x:Dictionary):
 		info.text="%s\nKasse: $%s   (Einnahmen einmal pro Spieltag)"%[_bilanz(x),_f(int(kasse.get(x.id,0)))]
 		if kasse.get(x.id,0)>0:
 			spiel._btn(v,"KASSE LEEREN  +$"+_f(int(kasse[x.id])),func():spiel.geld+=int(kasse[x.id]);kasse[x.id]=0;spiel.hud.zeige("Einnahmen abgeholt",1.5);geschaeft_menue(x))
-		if x.id=="taxizentrale":
+		if x.get("art","")=="lager":_lager_menue(v,x,p)
+		elif x.get("art","")=="autohandel":_handel_menue(v,x,p)
+		elif x.id=="taxizentrale":
 			if p.fahrer<int(b.fahrer_max):spiel._btn(v,"Taxi + Fahrer einstellen  $"+_f(int(b.taxi_preis)),func():
 				if spiel._zahlen(int(b.taxi_preis)):p.fahrer+=1;spiel.hud.zeige("Fahrer %d eingestellt"%p.fahrer,1.5);geschaeft_menue(x))
 		elif x.id=="logistik":
@@ -115,7 +126,46 @@ func geschaeft_menue(x:Dictionary):
 				break
 	spiel._btn(v,"SCHLIESSEN",spiel.panel_zu)
 
+# ---------- Lagerhalle: Geschäftsart frei wählbar ----------
+const LAGER_ART:={"drogen":["Drogenumschlag","Hohe Einnahmen – aber Razzien bringen Fahndungsstufe 2.",[2500,5000],0.15,2.0],
+	"schwarz":["Schwarzmarkt (Hehlerware)","Gestohlene Ware umschlagen – ab und zu schaut die Polizei vorbei.",[1500,3200],0.08,1.0],
+	"logistik":["Ehrliches Lagergeschäft","Wenig, aber sicheres Geld.",[600,1300],0.0,0.0]}
+func _lager_menue(v,x,p):
+	var art:String=p.get("art","")
+	if art=="":
+		var t=Label.new();t.text="Was soll in der Halle laufen?";v.add_child(t)
+		for k in LAGER_ART:
+			var e=LAGER_ART[k]
+			spiel._btn(v,"%s – %s"%[e[0],e[1]],func():p["art"]=k;spiel.hud.zeige("Lagerhalle: %s"%e[0],2.5);geschaeft_menue(x))
+		return
+	if p.mitarbeiter<6:spiel._btn(v,"Leute einstellen (+20 %% Umsatz)  $8.000",func():
+		if spiel._zahlen(8000):p.mitarbeiter+=1;geschaeft_menue(x))
+	spiel._btn(v,"Geschäftsart wechseln",func():p["art"]="";geschaeft_menue(x))
+func _handel_menue(v,x,p):
+	if p.fahrer<6:spiel._btn(v,"Autodieb anheuern (1 Auto/Tag)  $5.000",func():
+		if spiel._zahlen(5000):p.fahrer+=1;spiel.hud.zeige("Autodieb %d klaut jetzt für dich"%p.fahrer,2.0);geschaeft_menue(x))
+	var c=spiel.auto if spiel.auto!=null else spiel._naechstes_auto(14.0)
+	if c!=null and c.global_position.distance_to(x.p)<25.0:
+		var preis=_ankauf(c.kind)
+		spiel._btn(v,"Dieses Auto verkaufen (%s)  +$%s"%[c.kind,_f(preis)],func():
+			if spiel.auto==c:spiel.aussteigen_sofort()
+			spiel.geparkt.erase(c);spiel.verkehr.erase(c);c.queue_free();spiel.geld+=preis
+			if randf()<0.2:spiel.kampf.verbrechen(1.0);spiel.hud.zeige("Der Käufer hat dich verpfiffen!",2.5)
+			else:spiel.hud.zeige("Verkauft für $%s"%_f(preis),2.0)
+			spiel.panel_zu())
+	else:
+		var t=Label.new();t.text="Fahr ein Auto auf den Hof, um es zu verkaufen.";v.add_child(t)
+func _ankauf(kind:String)->int:
+	for e in AUTOHAUS+PREMIUM:
+		if e[0]==kind or kind.begins_with(str(e[0])):return int(e[2]*0.35)
+	if "luxus" in kind or "sport" in kind:return 9000
+	if "muscle" in kind or "jdm" in kind or "suv" in kind:return 5000
+	return 2200
+
 func _beschreibung(x)->String:
+	match x.get("art",""):
+		"lager":return "Leere Lagerhalle mit Toren und Rampe. Nach dem Kauf entscheidest du, was darin läuft: Drogen, Schwarzmarkt oder ehrliche Logistik."
+		"autohandel":return "Hof mit Büro. Heuer Autodiebe an, die Wagen klauen – oder verkauf hier selbst geklaute Autos."
 	match x.id:
 		"taxizentrale":return "Stell Fahrer ein – jedes Taxi bringt täglich Umsatz. Deine Taxis fahren in der Stadt."
 		"logistik":return "Lager mit Rampe: Stapler laden Paletten, LKW liefern aus. Mehr Personal = mehr Aufträge."
@@ -123,6 +173,10 @@ func _beschreibung(x)->String:
 
 func _bilanz(x)->String:
 	var p=personal.get(x.id,{})
+	if x.get("art","")=="lager":
+		var a=LAGER_ART.get(p.get("art",""),null)
+		return ("Geschäft: %s   Leute: %d"%[a[0],p.get("mitarbeiter",0)]) if a else "Noch kein Geschäft gewählt."
+	if x.get("art","")=="autohandel":return "Autodiebe: %d   (jeder bringt täglich einen Wagen)"%p.get("fahrer",0)
 	match x.id:
 		"taxizentrale":return "Taxis/Fahrer: %d   Lohn je Fahrer/Tag: $150"%p.get("fahrer",0)
 		"logistik":return "Lagerarbeiter %d  •  Stapler %d  •  LKW %d"%[p.get("mitarbeiter",0),p.get("stapler",0),p.get("lkw",0)]
@@ -145,6 +199,15 @@ func _abrechnen():
 		if not besitz.has(x.id):continue
 		var b=x.get("betrieb",{});var p=personal.get(x.id,{});var e=0
 		var bonus=1.0+0.12*p.get("upgrades",[]).size()
+		if x.get("art","")=="lager":
+			var a=LAGER_ART.get(p.get("art",""),null)
+			if a:
+				e=int(randi_range(a[2][0],a[2][1])*(1.0+0.2*p.get("mitarbeiter",0)))
+				if randf()<a[3]:spiel.kampf.verbrechen(a[4]);spiel.hud.zeige("RAZZIA in deiner %s!"%x.titel,4.0)
+			kasse[x.id]=kasse.get(x.id,0)+e;summe+=e;continue
+		if x.get("art","")=="autohandel":
+			for i in p.get("fahrer",0):e+=randi_range(2000,6000)-700
+			kasse[x.id]=kasse.get(x.id,0)+e;summe+=e;continue
 		match x.id:
 			"taxizentrale":e=int(p.get("fahrer",0)*(randi_range(250,450)-150)*bonus)
 			"logistik":e=int((p.get("mitarbeiter",0)*90+p.get("stapler",0)*260+p.get("lkw",0)*700)*bonus)
