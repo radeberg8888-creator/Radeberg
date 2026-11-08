@@ -62,6 +62,11 @@ func _ready():
 	ui=CanvasLayer.new();ui.layer=10;add_child(ui)
 	_theme()
 	_ladebildschirm()
+	if _arg("--ladebild")!="":
+		for k in 3:
+			await get_tree().create_timer(2.5).timeout
+			get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/ladebild_%d.png"%k)
+		get_tree().quit();return
 	_letzter_start=_alter_log()
 	_letzte_sitzung=FileAccess.get_file_as_string("user://lauf_log.txt").strip_edges()
 	if test_modus=="":await _hauptmenue()
@@ -152,15 +157,51 @@ func _theme():
 	pn.content_margin_left=26;pn.content_margin_right=26;pn.content_margin_top=20;pn.content_margin_bottom=20
 	theme_ui.set_stylebox("panel","PanelContainer",pn)
 
+# Ladebildschirm wie im großen Vorbild: Comic-Artworks, langsam gezoomt/geschwenkt, weich überblendet
+var _lade_bilder:=[]
+var _lade_i:=0
 func _ladebildschirm():
 	lade=Control.new();lade.set_anchors_preset(Control.PRESET_FULL_RECT);ui.add_child(lade)
-	var bg=TextureRect.new();bg.texture=load("res://assets/ui/karte_basis.png");bg.set_anchors_preset(Control.PRESET_FULL_RECT);bg.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;bg.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;lade.add_child(bg)
-	var dim=ColorRect.new();dim.color=Color(0,0,0,0.55);dim.set_anchors_preset(Control.PRESET_FULL_RECT);lade.add_child(dim)
-	var t=Label.new();t.text="RADEBERG";t.add_theme_font_size_override("font_size",96);t.add_theme_color_override("font_color",Color(0.98,0.82,0.3))
-	t.set_anchors_preset(Control.PRESET_CENTER_TOP);t.position=Vector2(-260,140);t.size=Vector2(520,120);t.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lade.add_child(t)
-	lade_bar=ProgressBar.new();lade_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);lade_bar.position=Vector2(-400,-160);lade_bar.size=Vector2(800,26);lade_bar.max_value=1.0;lade_bar.show_percentage=false;lade.add_child(lade_bar)
-	lade_text=Label.new();lade_text.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);lade_text.position=Vector2(-400,-120);lade_text.size=Vector2(800,40);lade_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lade_text.add_theme_font_size_override("font_size",26);lade.add_child(lade_text)
-	var tip=Label.new();tip.text="Tipp: In den Einstellungen kannst du mit Handy-Neigung lenken. Xbox-Controller werden automatisch erkannt.";tip.set_anchors_preset(Control.PRESET_CENTER_BOTTOM);tip.position=Vector2(-600,-70);tip.size=Vector2(1200,40);tip.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tip.add_theme_font_size_override("font_size",20);tip.add_theme_color_override("font_color",Color(0.8,0.8,0.8));lade.add_child(tip)
+	var schwarz=ColorRect.new();schwarz.color=Color(0,0,0);schwarz.set_anchors_preset(Control.PRESET_FULL_RECT);lade.add_child(schwarz)
+	var namen=["grove","jagd","strand","lauf","boss","tuning"]
+	namen.shuffle()
+	for n in namen:
+		var tx=load("res://assets/ui/lade/lade_%s.jpg"%n)
+		if tx:_lade_bilder.append(tx)
+	var vs=get_viewport().get_visible_rect().size
+	for i in 2:
+		var tr=TextureRect.new();tr.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;tr.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+		tr.size=vs;tr.position=Vector2.ZERO;tr.pivot_offset=vs*0.5;tr.modulate.a=0.0;lade.add_child(tr);tr.name="Bild%d"%i
+	# Schriftzug unten links, Ladebalken dünn darunter
+	var logo=Label.new();logo.text="RADEBERG";logo.add_theme_font_size_override("font_size",120);logo.add_theme_color_override("font_color",Color(1,1,1))
+	logo.add_theme_color_override("font_outline_color",Color(0,0,0));logo.add_theme_constant_override("outline_size",28)
+	logo.add_theme_color_override("font_shadow_color",Color(0,0,0,0.6));logo.add_theme_constant_override("shadow_offset_x",6);logo.add_theme_constant_override("shadow_offset_y",6)
+	logo.position=Vector2(60,vs.y-250);lade.add_child(logo)
+	var unter=Label.new();unter.text="STADT DER SÜNDE · ZWISCHEN WÜSTE UND HAFEN";unter.add_theme_font_size_override("font_size",24);unter.add_theme_color_override("font_color",Color(1,0.85,0.3))
+	unter.add_theme_color_override("font_outline_color",Color(0,0,0));unter.add_theme_constant_override("outline_size",10);unter.position=Vector2(68,vs.y-110);lade.add_child(unter)
+	lade_bar=ProgressBar.new();lade_bar.position=Vector2(0,vs.y-10);lade_bar.size=Vector2(vs.x,10);lade_bar.max_value=1.0;lade_bar.show_percentage=false;lade.add_child(lade_bar)
+	var sb=StyleBoxFlat.new();sb.bg_color=Color(1,0.82,0.25);lade_bar.add_theme_stylebox_override("fill",sb)
+	var sb2=StyleBoxFlat.new();sb2.bg_color=Color(0,0,0,0.5);lade_bar.add_theme_stylebox_override("background",sb2)
+	lade_text=Label.new();lade_text.position=Vector2(vs.x-760,vs.y-62);lade_text.size=Vector2(720,40);lade_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;lade_text.add_theme_font_size_override("font_size",22)
+	lade_text.add_theme_color_override("font_outline_color",Color(0,0,0));lade_text.add_theme_constant_override("outline_size",8);lade.add_child(lade_text)
+	var tipps=["Tipp: In der Werkstatt Radeberg Customs fährst du einfach durchs Rolltor.","Tipp: Lagerhallen am Hafen kannst du kaufen – Drogen, Schwarzmarkt oder ehrliches Geschäft.","Tipp: Neu lackieren schüttelt die Polizei ab.","Tipp: In den Einstellungen kannst du mit Handy-Neigung lenken. Xbox-Controller werden automatisch erkannt.","Tipp: Autodiebe für deinen Autohandel bringen jeden Tag einen Wagen."]
+	var tip=Label.new();tip.text=tipps[randi()%tipps.size()];tip.position=Vector2(vs.x-1000,40);tip.size=Vector2(960,40);tip.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;tip.add_theme_font_size_override("font_size",20)
+	tip.add_theme_color_override("font_outline_color",Color(0,0,0));tip.add_theme_constant_override("outline_size",8);lade.add_child(tip)
+	_lade_naechstes()
+
+func _lade_naechstes():
+	if lade==null or not is_instance_valid(lade) or _lade_bilder.is_empty():return
+	var a:TextureRect=lade.get_node("Bild%d"%(_lade_i%2))
+	a.texture=_lade_bilder[_lade_i%_lade_bilder.size()];a.modulate.a=0.0
+	lade.move_child(a,2)   # über dem anderen Bild, unter Schrift
+	var z0=1.0+randf()*0.04;var z1=1.14+randf()*0.06;var dx=randf_range(-50,50)
+	a.scale=Vector2(z0,z0);a.position=Vector2(dx,0)
+	var tw=a.create_tween().set_parallel(true)
+	tw.tween_property(a,"modulate:a",1.0,1.4)
+	tw.tween_property(a,"scale",Vector2(z1,z1),8.5).set_trans(Tween.TRANS_LINEAR)
+	tw.tween_property(a,"position",Vector2(-dx,0),8.5).set_trans(Tween.TRANS_LINEAR)
+	_lade_i+=1
+	get_tree().create_timer(7.0).timeout.connect(_lade_naechstes)
 
 # Hauptmenü: normales Spiel oder Admin-/Testmodus
 signal _gewaehlt
