@@ -18,9 +18,9 @@ func _init(lib):
 	_vc_mat.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;_vc_mat.specular_mode=BaseMaterial3D.SPECULAR_TOON
 
 # Hauptbaukörper eintragen: Kollision + Fernansicht (Kasten, leicht eingerückt damit er im Detailmodell verschwindet)
-func haupt(c:Vector3,s:Vector3,b:Basis,farbe:Color,dach:=Color(0,0,0,0)):
+func haupt(c:Vector3,s:Vector3,b:Basis,farbe:Color,dach:=Color(0,0,0,0),giebel:=0,fenster:=true):
 	L.koll_box(c,s,b)
-	LOD.append([Transform3D(b,c),s,farbe,dach])
+	LOD.append([Transform3D(b,c),s,farbe,dach,giebel,fenster])
 
 func kit(name:String,w:float,d:float,builder:Callable)->Dictionary:
 	var tmp=Node3D.new()
@@ -136,31 +136,65 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 			n_mm+=1
 	return {"felder":F.size(),"multimesh":n_mm}
 
-# Fernansicht: alle Hauptkörper als Kästen mit Vertexfarben, eine Fläche je Feld (groß)
+# Fernansicht: Hauptkörper als Kästen mit Dach (flach oder Satteldach) und Fensterreihen, eine Fläche je Feld
+var _fern_mat:StandardMaterial3D
+func _quad(e:Array,a:Vector3,b:Vector3,c:Vector3,d:Vector3,n:Vector3,col:Color):
+	for v in [a,b,c,a,c,d]:e[0].append(v);e[1].append(n);e[2].append(col)
+func _fern_eintrag(e:Array,t:Transform3D,s:Vector3,wand:Color,dach:Color,giebel:int,fenster:bool):
+	var h=s*0.5;var nb=t.basis.orthonormalized()
+	var P=func(x,y,z):return t*Vector3(x,y,z)
+	var W=wand*0.88;W.a=1.0
+	var D=dach if dach.a>0.0 else wand*0.62;D.a=1.0
+	# Seiten
+	var seiten=[[Vector3(0,0,1),Vector3(1,0,0),h.z,h.x],[Vector3(0,0,-1),Vector3(-1,0,0),h.z,h.x],[Vector3(1,0,0),Vector3(0,0,-1),h.x,h.z],[Vector3(-1,0,0),Vector3(0,0,1),h.x,h.z]]
+	for sd in seiten:
+		var n:Vector3=sd[0];var r:Vector3=sd[1];var o=n*sd[2];var hw=sd[3]
+		var sh=0.92 if abs(n.x)>0.5 else 1.0
+		_quad(e,P.call(o.x-r.x*hw,-h.y,o.z-r.z*hw),P.call(o.x+r.x*hw,-h.y,o.z+r.z*hw),P.call(o.x+r.x*hw,h.y,o.z+r.z*hw),P.call(o.x-r.x*hw,h.y,o.z-r.z*hw),nb*n,W*sh)
+		if fenster and s.y>=3.0:
+			var fc=Color(0.16,0.2,0.27);var y=-h.y+1.0
+			while y+1.4<h.y-0.3:
+				var x=-hw+1.4
+				while x+1.1<hw-0.6:
+					var q=o+n*0.06
+					_quad(e,P.call(q.x+r.x*x,y,q.z+r.z*x),P.call(q.x+r.x*(x+1.1),y,q.z+r.z*(x+1.1)),P.call(q.x+r.x*(x+1.1),y+1.3,q.z+r.z*(x+1.1)),P.call(q.x+r.x*x,y+1.3,q.z+r.z*x),nb*n,fc)
+					x+=2.8
+				y+=3.1
+	if giebel==0:
+		_quad(e,P.call(-h.x,h.y,-h.z),P.call(h.x,h.y,-h.z),P.call(h.x,h.y,h.z),P.call(-h.x,h.y,h.z),nb*Vector3.UP,D)
+	else:
+		# Satteldach: First entlang z (giebel 2) oder x (giebel 1), Höhe 0.45 * Spannweite
+		var lz=giebel==2;var span=h.x if lz else h.z;var fh=span*0.6;var u=0.4
+		if lz:
+			for sx in [-1,1]:
+				_quad(e,P.call(sx*(h.x+u),h.y-0.2,-h.z-u),P.call(sx*(h.x+u),h.y-0.2,h.z+u),P.call(0,h.y+fh,h.z+u),P.call(0,h.y+fh,-h.z-u),nb*Vector3(sx,1.2,0).normalized(),D*(1.0 if sx>0 else 0.85))
+			for sz in [-1,1]:
+				var a=P.call(-h.x,h.y,sz*h.z);var b=P.call(h.x,h.y,sz*h.z);var c=P.call(0,h.y+fh-0.2,sz*h.z)
+				for v in [a,b,c]:e[0].append(v);e[1].append(nb*Vector3(0,0,sz));e[2].append(W)
+		else:
+			for sz in [-1,1]:
+				_quad(e,P.call(-h.x-u,h.y-0.2,sz*(h.z+u)),P.call(h.x+u,h.y-0.2,sz*(h.z+u)),P.call(h.x+u,h.y+fh,0),P.call(-h.x-u,h.y+fh,0),nb*Vector3(0,1.2,sz).normalized(),D*(1.0 if sz>0 else 0.85))
+			for sx in [-1,1]:
+				var a=P.call(sx*h.x,h.y,-h.z);var b=P.call(sx*h.x,h.y,h.z);var c=P.call(sx*h.x,h.y+fh-0.2,0)
+				for v in [a,b,c]:e[0].append(v);e[1].append(nb*Vector3(sx,0,0));e[2].append(W)
 func fern(ziel:Node3D,platz:Array,feld:=600.0,sicht:=1800.0):
+	if _fern_mat==null:
+		_fern_mat=_vc_mat.duplicate();_fern_mat.cull_mode=BaseMaterial3D.CULL_DISABLED
 	var G={}
-	var box=BoxMesh.new();var bf=box.get_faces()
 	for p in platz:
 		var k=KITS[p[0]];var xf:Transform3D=p[1]
 		var key=Vector2i(int(floor(xf.origin.x/feld)),int(floor(xf.origin.z/feld)))
 		if not G.has(key):G[key]=[PackedVector3Array(),PackedVector3Array(),PackedColorArray()]
-		var e=G[key]
 		for l in k.lod:
-			var lt:Transform3D=l[0];var s:Vector3=l[1]-Vector3(0.5,0.4,0.5)
-			var t=xf*lt*Transform3D(Basis().scaled(s),Vector3(0,-0.2,0))
-			for i in range(0,bf.size(),3):
-				var a=t*bf[i];var b=t*bf[i+1];var c=t*bf[i+2]
-				var n=(b-a).cross(c-a).normalized()
-				var col:Color=l[2]
-				if n.y>0.5 and l[3].a>0.0:col=l[3]
-				col=col*(1.0 if n.y>0.5 else (0.85 if abs(n.x)>abs(n.z) else 0.95))
-				e[0].append(a);e[1].append(-n);e[2].append(col);e[0].append(b);e[1].append(-n);e[2].append(col);e[0].append(c);e[1].append(-n);e[2].append(col)
+			var s:Vector3=l[1]-Vector3(0.4,0.3,0.4)
+			var t:Transform3D=xf*l[0]*Transform3D(Basis(),Vector3(0,-0.15,0))
+			_fern_eintrag(G[key],t,s,l[2],l[3],l[4] if l.size()>4 else 0,l[5] if l.size()>5 else false)
 	for key in G:
 		var e=G[key]
 		if e[0].is_empty():continue
 		var a=[];a.resize(Mesh.ARRAY_MAX)
 		a[Mesh.ARRAY_VERTEX]=e[0];a[Mesh.ARRAY_NORMAL]=e[1];a[Mesh.ARRAY_COLOR]=e[2]
-		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,_vc_mat)
+		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,_fern_mat)
 		var mi=MeshInstance3D.new();mi.mesh=am;mi.name="Fern_%d_%d"%[key.x,key.y];ziel.add_child(mi)
 		mi.visibility_range_end=sicht;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return G.size()

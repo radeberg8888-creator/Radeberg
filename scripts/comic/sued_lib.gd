@@ -368,7 +368,7 @@ func _k_holz(w:float,d:float,farbe:Color,i:int,lang:bool):
 	_boden(w,d,gras)
 	var hw=8.6;var hx=-(w-hw)*0.5
 	L.holz_ghetto=true;L._holzhaus(_P(hx,0,0),hw,AUSSEN,farbe);L.holz_ghetto=false
-	K.haupt(_P(hx,3.4,9.0),Vector3(hw,6.2,9.0),Basis(),farbe,Color(0.45,0.4,0.42))
+	K.haupt(_P(hx,3.3,9.0),Vector3(hw,5.6,9.0),Basis(),farbe,Color(0.42,0.38,0.4),2)
 	L.koll_box(_P(hx,0.35,3.4),Vector3(hw-1.0,0.7,2.2))
 	var holz=T(Color(0.5,0.38,0.24))
 	for sx in [-1,1]:
@@ -421,7 +421,7 @@ func _k_kirche():
 	_boden(20,28,Color(0.5,0.52,0.32))
 	var wand=L._shader(L.PUTZ,{"farbe":Color(0.92,0.9,0.84)})
 	var c=_P(0,0,14.0)
-	L.box(wand,c+Vector3(0,3.5,0),Vector3(12,7,20),Basis(),0.05);K.haupt(c+Vector3(0,3.5,0),Vector3(12,7,20),Basis(),Color(0.92,0.9,0.84),Color(0.45,0.3,0.25))
+	L.box(wand,c+Vector3(0,3.5,0),Vector3(12,7,20),Basis(),0.05);K.haupt(c+Vector3(0,3.5,0),Vector3(12,7,20),Basis(),Color(0.92,0.9,0.84),Color(0.45,0.3,0.25),2,false)
 	var dach=T(Color(0.45,0.3,0.25))
 	for sx in [-1,1]:L.box(dach,c+Vector3(sx*3.2,8.6,0),Vector3(7.6,0.25,21),Basis(Vector3(0,0,1),-sx*0.62),0.03)
 	L.box(wand,_P(0,6,4.0),Vector3(4,12,4),Basis(),0.05);L.koll_box(_P(0,6,4.0),Vector3(4,12,4))
@@ -482,7 +482,7 @@ func _k_lager(i:int,kauf:bool):
 	for sd in [[Vector3(0,0,1),40,0.0],[Vector3(0,0,-1),40,PI],[Vector3(1,0,0),24,PI*0.5],[Vector3(-1,0,0),24,-PI*0.5]]:
 		GL.wellblech(c+sd[0]*(12.0 if abs(sd[0].z)>0 else 20.0)-Vector3(0,0,0),sd[1],8.0,sd[2],farbe)
 	L.box(T(farbe*0.95),c+Vector3(0,4,0),Vector3(39.8,8,23.8),Basis(),0.0)
-	K.haupt(c+Vector3(0,4.5,0),Vector3(40,9,24),Basis(),farbe,Color(0.5,0.3,0.25))
+	K.haupt(c+Vector3(0,4.0,0),Vector3(40,8,24),Basis(),farbe,Color(0.5,0.3,0.25),1,false)
 	var dach=T(Color(0.5,0.3,0.25))
 	for sd in [-1,1]:L.box(dach,c+Vector3(0,9.3,sd*6.2),Vector3(41,0.25,12.8),Basis(Vector3(1,0,0),sd*0.2),0.03)
 	for k in 3:
@@ -512,7 +512,7 @@ func _k_container(i:int):
 	for j in 3:
 		var h=[1,2,3,4,2,3][(i+j*2)%6];hmax=max(hmax,h)
 		for k in h:container(_P(0,k*2.6,1.5+j*2.6),0.0,farben[(i*3+j*5+k)%farben.size()])
-	K.haupt(_P(0,hmax*1.3,4.1),Vector3(12.2,hmax*2.6,7.8),Basis(),farben[i%farben.size()])
+	K.haupt(_P(0,hmax*1.3,4.1),Vector3(12.2,hmax*2.6,7.8),Basis(),farben[i%farben.size()],Color(0,0,0,0),0,false)
 func _k_buero():
 	L.box(L.M.hof,_P(0,-0.06,5),Vector3(12,0.14,10),Basis(),0.0)
 	for k in 2:container(_P(0,k*2.6,5),0.0,[Color(0.92,0.92,0.9),Color(0.3,0.5,0.75)][k])
@@ -554,7 +554,7 @@ func _k_schiff():
 func _k_halle(i:int):
 	L.box(L.M.hof,_P(0,-0.06,17),Vector3(44,0.14,34),Basis(),0.0)
 	var h=_P(0,0,19);var wand=L.M.ziegel[i%L.M.ziegel.size()]
-	L.box(wand,h+Vector3(0,5,0),Vector3(40,10,28),Basis(),0.05);K.haupt(h+Vector3(0,5,0),Vector3(40,10,28),Basis(),Color(0.62,0.33,0.25),Color(0.35,0.33,0.33))
+	L.box(wand,h+Vector3(0,5,0),Vector3(40,10,28),Basis(),0.05);K.haupt(h+Vector3(0,5,0),Vector3(40,10,28),Basis(),Color(0.62,0.33,0.25),Color(0.35,0.33,0.33),0,false)
 	for k in 4:
 		var z0=-14.0+k*7.0;var z1=z0+7.0
 		var p=func(x,y,z):return h+Vector3(x,y,z)
@@ -659,8 +659,10 @@ func _k_flieger():
 # ---------------- Grundstücke ----------------
 var FAIL:={"rect":0,"occ":0,"maske":0,"frei":0}
 func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
-	var x=-w*0.5
-	while x<=w*0.5+0.01:
+	var xs=[];var x0=-w*0.5+0.7
+	while x0<w*0.5-0.7:xs.append(x0);x0+=2.0
+	xs.append(w*0.5-0.7)
+	for x in xs:
 		var z=0.3
 		while z<=d+0.01:
 			var p=F+t*x+n*z
@@ -669,11 +671,10 @@ func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
 			if not maske(p):FAIL.maske+=1;return false
 			if z>0.5 and frei(p)<-0.2:FAIL.frei+=1;return false
 			z+=2.0
-		x+=2.0
 	return true
 func _belegen(F:Vector2,t:Vector2,n:Vector2,w:float,d:float):
-	var x=-w*0.5-0.5
-	while x<=w*0.5+0.5:
+	var x=-w*0.5+0.3
+	while x<=w*0.5-0.3:
 		var z=0.0
 		while z<=d+0.5:_occ(F+t*x+n*z);z+=1.0
 		x+=1.0
@@ -693,7 +694,7 @@ func _typ(st:String,ecke:bool,r)->String:
 		"ghetto":
 			if r.typ=="gasse":return "brache" if x<0.5 else "holz_kurz"
 			if ecke and x<0.7:return "laden"
-			if haupt:return ["block","block","laden","laden","werbung","holz_lang"][rng.randi()%6]
+			if haupt:return ["holz_lang","holz_lang","holz_lang","block","laden","werbung","holz_kurz"][rng.randi()%7]
 			if x<0.08:return "block"
 			if x<0.14:return "brache"
 			if x<0.16:return "kirche"
@@ -758,9 +759,9 @@ func grundstuecke():
 				if wunsch in ["lager_kauf","autohandel"] and not _immo_frei(F,wunsch):wunsch="lager" if wunsch=="lager_kauf" else "block"
 				for typ in _kette(st,wunsch):
 					var kn=_wahl(st,typ);var kk=K.KITS[kn]
-					if _rechteck_ok(F+tt*kk.w*0.5,tt,n,kk.w,kk.d):kit=kn;k=kk;break
+					if _rechteck_ok(F+t*kk.w*0.5,tt,n,kk.w,kk.d):kit=kn;k=kk;break
 				if kit=="":s+=2.0;continue
-				var Fm=F+tt*k.w*0.5
+				var Fm=F+t*k.w*0.5
 				_belegen(Fm,tt,n,k.w,k.d)
 				var xf=_setzen(kit,Fm,tt,n)
 				if kit.begins_with("lager_kauf") or kit.begins_with("autohandel"):
@@ -768,21 +769,48 @@ func grundstuecke():
 				s+=k.w+0.6
 	print("SUED FAIL ",FAIL);print("SUED Grundstücke an Straßen ",PLATZ.size()," ",Time.get_ticks_msec()-t0," ms")
 # Hinterland: Originalhäuser als Vorlage, danach Füllstücke
+# Blockinneres: Häuser an Original-Positionen, aber nur mit eigener Zufahrt bis zur Straße (läuft VOR der Straßenreihe,
+# damit dort Lücken für die Zufahrten bleiben)
+var WEGE:=[]   # {a, b, stil}
 func hinterland(haeuser:Array):
-	var n0=PLATZ.size()
+	var n0=PLATZ.size();var ohne=0
 	for hw in haeuser:
 		var p:Vector2=hw-C
 		if not RECT.grow(-5).has_point(p) or _belegt(p) or not maske(p):continue
-		var ns=naechst(p);if ns[2]<0 or ns[3]>120.0:continue
+		if frei(p)<34.0:continue          # vorne baut die Straßenreihe
+		var ns=naechst(p);if ns[2]<0 or ns[3]>110.0:continue
 		var nv:Vector2=(p-ns[0]).normalized();if nv.length()<0.5:continue
-		var st=stil(p);var typ={"ghetto":"holz_kurz","sued":"reihe","docks":"container","industrie":"container","hafen":"container","strand":"haus","flug":"busch"}[st]
+		var st=stil(p)
+		if st=="flug":continue
+		var typ={"ghetto":"holz_kurz","sued":"reihe","docks":"container","industrie":"container","hafen":"container","strand":"haus"}[st]
 		var kit=_wahl(st,typ);var k=K.KITS[kit]
 		var tt=Vector2(-nv.y,nv.x)
-		if tt.dot(Vector2.UP.rotated(0))>2.0:tt=-tt
 		var F=p-nv*k.d*0.5
 		if not _rechteck_ok(F,tt,nv,k.w,k.d):continue
+		# Zufahrt: vom Grundstück (bei Holzhäusern von der Einfahrt) gerade zur nächsten Straße
+		var ex=(k.w-3.4)*0.5 if kit.begins_with("gh_holz") else 0.0
+		var A=F+Vector2(-nv.y,nv.x)*ex
+		var nr=naechst(A);if nr[2]<0:ohne+=1;continue
+		var r=ROADS[nr[2]];var dir:Vector2=(nr[0]-A).normalized();var Lg=A.distance_to(nr[0])-r.w
+		if Lg>95.0 or dir.dot(-nv)<0.6:ohne+=1;continue
+		var ok=true;var q0=0.6
+		while q0<Lg:
+			var q=A+dir*q0
+			for lat in [-1.6,0.0,1.6]:
+				var qq=q+Vector2(-dir.y,dir.x)*lat
+				if not maske(qq) or _belegt(qq):ok=false
+			var nq=naechst(q)
+			if nq[2]!=nr[2] and frei(q)<1.0:ok=false
+			if not ok:break
+			q0+=1.5
+		if not ok:ohne+=1;continue
 		_belegen(F,tt,nv,k.w,k.d);_setzen(kit,F,tt,nv)
-	print("SUED Hinterhäuser ",PLATZ.size()-n0)
+		var q1=0.0
+		while q1<=Lg:
+			for lat in [-1.8,-0.6,0.6,1.8]:_occ(A+dir*q1+Vector2(-dir.y,dir.x)*lat)
+			q1+=1.0
+		WEGE.append({"a":A,"b":A+dir*(Lg+0.2),"stil":st})
+	print("SUED Hinterhäuser ",PLATZ.size()-n0," ohne Zufahrt verworfen ",ohne)
 func fuellen():
 	var n0=PLATZ.size();var x=RECT.position.x+3.0
 	while x<RECT.end.x:
@@ -931,6 +959,15 @@ func _flaeche(poly:PackedVector2Array,y:float,m:Material):
 	for i in range(0,idx.size(),3):
 		var a=poly[idx[i]];var b=poly[idx[i+1]];var c=poly[idx[i+2]]
 		L._tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)
+func wege():
+	var dreck=L._toon(Color(0.4,0.34,0.25))
+	for w in WEGE:
+		var a:Vector2=w.a;var b:Vector2=w.b;var d=(b-a).normalized();var n=Vector2(-d.y,d.x)*1.5
+		var m=dreck if w.stil=="ghetto" else (L.M.pflaster if w.stil in ["sued","strand"] else L.M.hof)
+		var so=L._st(m,true);var y=KB+0.012
+		var P=[a+n,b+n,b-n,a-n]
+		L._tri(so,Vector3(P[0].x,y,P[0].y),Vector3(P[1].x,y,P[1].y),Vector3(P[2].x,y,P[2].y),Vector3.UP)
+		L._tri(so,Vector3(P[0].x,y,P[0].y),Vector3(P[2].x,y,P[2].y),Vector3(P[3].x,y,P[3].y),Vector3.UP)
 func platten():
 	BODEN={"ghetto":L._toon(Color(0.44,0.43,0.28)),"sued":L.M.gras,"docks":L.M.hof,"industrie":L.M.hof,"hafen":L.M.hof,"strand":L._toon(Color(0.85,0.76,0.55)),"flug":L._toon(Color(0.47,0.55,0.32))}
 	var t=Time.get_ticks_msec();var n=0

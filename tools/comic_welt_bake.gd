@@ -192,17 +192,16 @@ func _sued(L,G0)->Dictionary:
 	S.laden("res://assets/data/karte_sued.json",Rect2(SUED_RW.position-Vector2(CX,CZ),SUED_RW.size),aus)
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
 	S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.hafenkante();S.flughafen()
-	S.grundstuecke()
 	var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
 	var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
-	S.hinterland(hs);S.fuellen();S.parken_strasse()
+	S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse()
 	# bekannte Namen
 	var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
 	for nm in namen:
 		var ns=S.naechst(nm[1]-Vector2(CX,CZ))
 		if ns[2]>=0:S.ROADS[ns[2]].n=nm[0]
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
-	S.fahrbahnen();S.platten();L._fertig()
+	S.fahrbahnen();S.platten();S.wege();L._fertig()
 	L.weit_detail=300.0;L.weit_ink=120.0
 	S.strassenrand();L._fertig()
 	var KF=L.KOLL_F.slice(n0);var PF=L.PFOSTEN.slice(p0)
