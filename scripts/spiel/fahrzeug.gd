@@ -47,7 +47,8 @@ var _crash_t:=0.0
 var _eigen:=false
 var _splitter:=false
 func _physics_process(dt):
-	if freeze or modus=="ki":_v_alt=Vector3.ZERO;return
+	if freeze or modus=="ki":_v_alt=Vector3.ZERO;_staub_aus();return
+	_staub_schritt(dt)
 	_crash_t=max(0.0,_crash_t-dt)
 	var dv=linear_velocity-_v_alt
 	var verlust=_v_alt.length()-linear_velocity.length()   # Aufprall bremst ab (Anschieben/Teleport zählt nicht)
@@ -56,6 +57,52 @@ func _physics_process(dt):
 	if verlust>6.0 and st>6.0 and _crash_t<=0.0 and dt>0.0:
 		_crash_t=0.25
 		aufprall(min(st,verlust*1.3),dv/st)
+# ---------------- Staub auf Schotter, Sandwegen und im Gelände ----------------
+var _staub:CPUParticles3D=null
+var _staub_t:=0.0
+var _staub_menge:=0.0
+func _staub_aus():
+	if _staub:_staub.emitting=false
+func _staub_schritt(dt:float):
+	_staub_t-=dt
+	if _staub_t>0.0:
+		if _staub:_staub.emitting=_staub_menge>0.05 and kmh()>12.0
+		return
+	_staub_t=0.25
+	var sp=get_parent()
+	if sp==null or not ("auto" in sp) or sp.auto!=self or not ("welt" in sp):_staub_menge=0.0;return
+	var W=sp.welt;var p=global_position;var p2=Vector2(p.x,p.z)
+	var art=1.0   # 0 = kein Staub (Asphalt), 1 = Gelände/Feldweg
+	var S=W.get("S")
+	if S and S.has_method("_near") and not S.hash_.is_empty():
+		var n=S._near(p2,25.0,-1)
+		if not n.is_empty():
+			var r=S.roads[n[0]]
+			if n[2]<r.w+0.6:
+				var b=r.get("belag","asphalt")
+				art=0.0 if b=="asphalt" else (1.0 if b=="sand" else 0.7)
+	if art>=1.0 and W.get("G") and W.G.has_method("soil"):
+		var so:Color=W.G.soil(p.x,p.z,p.y,0.0)
+		art=clamp(0.25+so.b*1.2+(1.0-so.r-so.g-so.b-so.a)*0.8,0.25,1.0)   # Sand/trocken staubt stark, Gras wenig
+		if p.y<sp.welt.G.h_at(p.x,p.z)-1.0:art=0.0
+	_staub_menge=art
+	if art<=0.05:_staub_aus();return
+	if _staub==null:
+		_staub=CPUParticles3D.new();add_child(_staub)
+		_staub.amount=60;_staub.lifetime=2.2;_staub.local_coords=false
+		_staub.emission_shape=CPUParticles3D.EMISSION_SHAPE_BOX;_staub.emission_box_extents=Vector3(ab.size.x*0.45,0.1,0.3)
+		_staub.direction=Vector3(0,0.6,-1);_staub.spread=35.0;_staub.initial_velocity_min=1.0;_staub.initial_velocity_max=3.0;_staub.gravity=Vector3(0,0.35,0)
+		_staub.damping_min=1.0;_staub.damping_max=2.0;_staub.scale_amount_min=1.0;_staub.scale_amount_max=3.0
+		var kurve=Curve.new();kurve.add_point(Vector2(0,0.3));kurve.add_point(Vector2(0.3,1.0));kurve.add_point(Vector2(1,1.6));_staub.scale_amount_curve=kurve
+		var grad=Gradient.new();grad.set_color(0,Color(0.8,0.7,0.53,0.7));grad.set_color(1,Color(0.84,0.77,0.64,0.0));_staub.color_ramp=grad
+		var sm=SphereMesh.new();sm.radius=0.5;sm.height=1.0;sm.radial_segments=6;sm.rings=3
+		var m=StandardMaterial3D.new();m.vertex_color_use_as_albedo=true;m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;m.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+		sm.material=m;_staub.mesh=sm
+		_staub.position=Vector3(ab.get_center().x,ab.position.y+0.25,ab.position.z+0.2)   # hinter der Hinterachse
+	var f=clamp(_staub_menge*(0.4+kmh()/80.0),0.25,1.2)   # mehr Tempo/lockerer Boden -> dickere Wolke
+	_staub.scale_amount_min=1.0*f;_staub.scale_amount_max=3.0*f
+	_staub.emitting=kmh()>12.0
+
 func aufprall(staerke:float,richtung_welt:Vector3,andere=null):
 	# richtung_welt: Kraftrichtung auf das Auto (zeigt vom Hindernis weg) -> Stoßstelle liegt auf der Gegenseite
 	if wrack:return

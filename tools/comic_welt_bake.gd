@@ -147,7 +147,7 @@ func _init():
 		for i in P.size():
 			if i>0 and P[i].distance_to(P[i-1])<0.5:continue
 			Q.append(P[i]+off);Hh.append(H0+r.Y[i]+0.07);T.append((P[min(i+1,P.size()-1)]-P[max(i-1,0)]).normalized());tf.append(false);el.append(false)
-		roads.append({"lane_x":r.w*(0.5 if r.orig=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":T,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true})
+		roads.append({"lane_x":r.w*(0.5 if r.orig=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":T,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true,"belag":r.get("belag","asphalt")})
 	for j in NO.JUNC:
 		junctions.append({"p":j.p+off,"h":H0+NO.hy(j.p)+0.07,"r":j.r,"a":basis_n+j.a,"b":basis_n+j.b,"rail":false})
 	# ---- Parkplätze, Läden ----

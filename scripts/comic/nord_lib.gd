@@ -138,7 +138,92 @@ func laden(datei:String,rect_lokal:Rect2,aus:Array):
 		elif r.typ in LAND_TYPEN:
 			for st in _stuecke_frei(P):_neu_n(st,r.typ,false)
 	_raster_sperren()
+	_enden_verbinden()
+	_belag_bestimmen()
+	_knoten_angleichen()
 	print("NORD Straßen ",ROADS.size()," Sonder ",SONDER.size())
+
+# ---------------- Straßennetz: Enden, Belag, Höhen an Knoten ----------------
+func _rang(ri:int)->int:   # Vorfahrt beim Höhenangleich: kleinere Zahl = bestimmt die Höhe
+	var r=ROADS[ri]
+	if r.orig=="autobahn":return 0
+	if r.orig=="rampe":return 1
+	if r.get("belag","asphalt")=="asphalt" and not r.stadt:return 2
+	if r.stadt:return 3
+	return 4 if r.get("belag","")=="schotter" else 5
+func _vor(rj:int,ri:int)->bool:return _rang(rj)<_rang(ri) or (_rang(rj)==_rang(ri) and rj<ri)
+func _y_fremd(p:Vector2,ri:int,rand:float)->float:
+	# niedrigste Fahrbahnhöhe einer vorrangigen Straße, die den Punkt überdeckt (INF = keine)
+	var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)));var y=INF
+	for i in [-1,0,1]:
+		for j in [-1,0,1]:
+			for sg in SEG.get(k+Vector2i(i,j),[]):
+				if sg.x==ri or not _vor(sg.x,ri):continue
+				var r=ROADS[sg.x]
+				if not r.has("Y") or sg.y+1>=r.P.size():continue
+				var a:Vector2=r.P[sg.y];var b:Vector2=r.P[sg.y+1]
+				var t=clamp((p-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
+				if p.distance_to(a.lerp(b,t))<r.w+rand:y=min(y,lerp(r.Y[sg.y],r.Y[sg.y+1],t))
+	return y
+func _ende_frei(ri:int,p:Vector2)->bool:
+	var n=naechst(p,ri)
+	return n[2]<0 or n[3]>ROADS[n[2]].w+3.0
+func _enden_verbinden():
+	# lose Straßenenden mit der nächsten Straße verbinden (Schotterweg), wenn sie nah genug ist
+	var n0=ROADS.size();var neu=0
+	for ri in n0:
+		var r=ROADS[ri]
+		if r.orig=="autobahn" or r.P.size()<2:continue
+		for ende in [0,r.P.size()-1]:
+			var p:Vector2=r.P[ende]
+			if not _ende_frei(ri,p):continue
+			var n=naechst(p,ri)
+			if n[2]<0 or n[2]>=n0 or n[3]>70.0 or n[3]<4.0:continue
+			if ROADS[n[2]].orig=="autobahn":continue
+			var ziel:Vector2=n[0];var L2=p.distance_to(ziel);var ok=true;var Q=PackedVector2Array()
+			var k=0
+			while k<=int(ceil(L2/4.0)):
+				var q=p.lerp(ziel,min(1.0,k*4.0/L2))
+				if _ausgenommen(q+C):ok=false;break
+				Q.append(q);k+=1
+			if not ok or Q.size()<2:continue
+			_neu_n(Q,"piste",false);ROADS[ROADS.size()-1]["belag"]="schotter";neu+=1
+	print("NORD Verbinder ",neu)
+func _belag_bestimmen():
+	var n_s=0;var n_sand=0
+	for ri in ROADS.size():
+		var r=ROADS[ri]
+		if r.has("belag"):n_s+=1;continue
+		r["belag"]="asphalt"
+		if r.stadt or r.orig in ["autobahn","rampe"]:continue
+		var mitte:Vector2=r.P[r.P.size()/2]+C;var b=_boden_art(mitte)
+		if r.orig=="piste":
+			r["belag"]="sand" if b[2]+b[4]>0.5 else "schotter"
+		elif r.S[-1]<500.0 and (_ende_frei(ri,r.P[0]) or _ende_frei(ri,r.P[r.P.size()-1])):
+			r["belag"]="sand" if b[2]+b[4]>0.6 else "schotter"   # kurze Stichstraßen: Feld-/Sandweg
+		if r.belag=="schotter":n_s+=1
+		elif r.belag=="sand":n_sand+=1
+	print("NORD Belag Schotter ",n_s," Sand ",n_sand)
+func _knoten_angleichen():
+	# Wo eine Straße auf eine vorrangige trifft/sie kreuzt: genau deren Höhe übernehmen, 15 m sanft auslaufen
+	var n=0
+	for ri in ROADS.size():
+		var r=ROADS[ri]
+		if not r.has("Y"):continue
+		var Y:PackedFloat32Array=r.Y;var fest=[]
+		for i in r.P.size():
+			var yf=_y_fremd(r.P[i],ri,0.5)
+			if yf<INF:fest.append([i,yf])
+		if fest.is_empty():continue
+		var Y2=Y.duplicate()
+		for i in r.P.size():
+			var g=0.0;var yz=0.0;var bd=1e9
+			for f in fest:
+				var d=abs(r.S[i]-r.S[f[0]])
+				if d<bd:bd=d;yz=f[1]
+			if bd<15.0:Y2[i]=lerp(yz,Y[i],smoothstep(0.0,15.0,bd))
+		r.Y=Y2;n+=1
+	print("NORD Knoten angeglichen ",n)
 func _stuecke_frei(P:PackedVector2Array)->Array:   # nur Ausschlüsse/Wasser, keine Maske
 	var aus=[];var cur=PackedVector2Array()
 	for p in P:
@@ -328,6 +413,13 @@ func kits_bauen():
 	_kit("nord","wachturm","nd_wachturm",5.0,5.0,func():_k_wachturm())
 	_kit("nord","kaserne","nd_kaserne",34.0,14.0,func():_k_kaserne())
 	_kit("nord","jet","nd_jet",16.0,18.0,func():_k_jet())
+	# Knast und Militär dichter: Verwaltung, Sporthof, Torhaus, Hubschrauberplatz, Tanklager, Containerreihe
+	_kit("nord","knast_haupt","nd_knast_haupt",64.0,24.0,func():_k_knast_haupt())
+	_kit("nord","sporthof","nd_sporthof",34.0,26.0,func():_k_sporthof())
+	_kit("nord","torhaus","nd_torhaus",22.0,12.0,func():_k_torhaus())
+	_kit("nord","heliplatz","nd_heliplatz",26.0,26.0,func():_k_heliplatz())
+	_kit("nord","tanklager","nd_tanklager",30.0,18.0,func():_k_tanklager())
+	_kit("nord","container","nd_container_reihe",40.0,8.0,func():_k_containerreihe())
 	_kit("nord","panzer","nd_panzer",5.0,8.0,func():_k_panzer())
 	_kit("nord","radar","nd_radar",12.0,12.0,func():_k_radar())
 	_kit("nord","wrackflieger","nd_wrackflieger",30.0,32.0,func():_k_wrackflieger())
@@ -608,6 +700,80 @@ func _k_zellenblock():
 			L.box(T(Color(0.15,0.15,0.18)),c+Vector3(x,2.2+e*3.4,7.03),Vector3(0.9,1.2,0.05),Basis(),0.0)
 			for st in 3:L.box(L.M.metall,c+Vector3(x-0.3+st*0.3,2.2+e*3.4,7.07),Vector3(0.05,1.2,0.05),Basis(),0.0)
 	GL.label("JVA RADEBERG – BLOCK %s"%["A","B","C"][rng.randi()%3],c+Vector3(0,9.6,7.1),Basis(),0.012,Color(0.15,0.15,0.18),Color(0.85,0.85,0.85),36.0)
+func _k_knast_haupt():
+	var c=_P(0,0,12);var beton=T(Color(0.74,0.72,0.68));var dunkel=T(Color(0.38,0.38,0.4))
+	L.box(beton,c+Vector3(0,7,0),Vector3(60,14,20),Basis(),0.05);K.haupt(c+Vector3(0,7,0),Vector3(60,14,20),Basis(),Color(0.74,0.72,0.68),Color(0.38,0.38,0.4),0,false)
+	L.box(beton,c+Vector3(0,10,0),Vector3(16,20,22),Basis(),0.05);K.haupt(c+Vector3(0,10,0),Vector3(16,20,22),Basis(),Color(0.74,0.72,0.68),Color(0.38,0.38,0.4),0,false)
+	L.box(dunkel,c+Vector3(0,14.2,0),Vector3(60.6,0.4,20.6),Basis(),0.03);L.box(dunkel,c+Vector3(0,20.2,0),Vector3(16.6,0.4,22.6),Basis(),0.03)
+	for e in 3:
+		for k in 16:
+			var x=-28.0+k*3.7
+			if abs(x)<8.5:continue
+			L.box(T(Color(0.15,0.16,0.2)),c+Vector3(x,2.5+e*4.0,10.03),Vector3(1.0,1.5,0.05),Basis(),0.0)
+			for st in 3:L.box(L.M.metall,c+Vector3(x-0.32+st*0.32,2.5+e*4.0,10.07),Vector3(0.05,1.5,0.05),Basis(),0.0)
+	for e in 4:L.box(L.M.glas[1],c+Vector3(0,3.0+e*4.2,11.03),Vector3(10,2.2,0.05),Basis(),0.0)
+	L.box(T(Color(0.3,0.32,0.36)),c+Vector3(0,1.6,11.05),Vector3(4,3.2,0.08),Basis(),0.0)
+	GL.label("JUSTIZVOLLZUGSANSTALT RADEBERG",c+Vector3(0,17.5,11.1),Basis(),0.016,Color(0.15,0.15,0.18),Color(0.9,0.9,0.88),15.5)
+	L.zyl(L.M.metall,c+Vector3(-10,0,14),c+Vector3(-10,12,14),0.08,1.1);L.box(T(Color(0.1,0.1,0.1)),c+Vector3(-9.3,11.4,14),Vector3(1.4,0.5,0.03),Basis(),0.0)
+	L.box(T(Color(0.8,0.1,0.1)),c+Vector3(-9.3,10.9,14),Vector3(1.4,0.5,0.03),Basis(),0.0);L.box(T(Color(0.95,0.8,0.1)),c+Vector3(-9.3,10.4,14),Vector3(1.4,0.5,0.03),Basis(),0.0)
+	L.koll_box(c+Vector3(0,7,0),Vector3(60,14,20));L.koll_box(c+Vector3(0,10,0),Vector3(16,20,22))
+func _k_sporthof():
+	var c=_P(0,0,13);var boden=T(Color(0.55,0.32,0.25));var weiss=T(Color(0.95,0.95,0.95));var zaun=L.M.metall
+	L.box(boden,c+Vector3(0,0.02,0),Vector3(30,0.06,20),Basis(),0.0)
+	for z in [-9.5,9.5]:L.box(weiss,c+Vector3(0,0.06,z),Vector3(28,0.02,0.12),Basis(),0.0)
+	for x in [-14.0,14.0,0.0]:L.box(weiss,c+Vector3(x,0.06,0),Vector3(0.12,0.02,19),Basis(),0.0)
+	for sx in [-1,1]:
+		L.zyl(zaun,c+Vector3(sx*12.5,0,0),c+Vector3(sx*12.5,3.6,0),0.08,1.1)
+		L.box(weiss,c+Vector3(sx*12.2,3.4,0),Vector3(0.08,1.0,1.6),Basis(),0.02);L.zyl(T(Color(0.95,0.45,0.1)),c+Vector3(sx*11.8,3.05,-0.25),c+Vector3(sx*11.8,3.05,0.25),0.23,1.0)
+	# Zaun rundum
+	for k in 16:
+		var a=TAU*k/16.0;var q=c+Vector3(cos(a)*16.5,0,sin(a)*12.0)
+		L.zyl(zaun,q,q+Vector3(0,4,0),0.06,1.1)
+	for sx in [-1,1]:L.box(T(Color(0.4,0.42,0.44,1)),c+Vector3(sx*16.0,2,0),Vector3(0.05,4,22),Basis(),0.0)
+	# Hantelbank und Bänke
+	for k in 3:L.box(T(Color(0.3,0.3,0.32)),c+Vector3(-8+k*8,0.45,11.5),Vector3(3,0.12,0.6),Basis(),0.02)
+	L.zyl(L.M.metall,c+Vector3(10,0.9,-11),c+Vector3(12,0.9,-11),0.03,1.0)
+	for sx in [10.0,12.0]:L.zyl(T(Color(0.1,0.1,0.1)),c+Vector3(sx,0.9,-11.2),c+Vector3(sx,0.9,-10.8),0.25,1.0)
+func _k_torhaus():
+	var c=_P(0,0,6);var beton=T(Color(0.7,0.7,0.68))
+	L.box(beton,c+Vector3(-7,2.5,0),Vector3(6,5,8),Basis(),0.05);K.haupt(c+Vector3(-7,2.5,0),Vector3(6,5,8),Basis(),Color(0.7,0.7,0.68),Color(0.35,0.35,0.37),0,true)
+	L.box(L.M.glas[0],c+Vector3(-7,3,4.03),Vector3(4,1.5,0.05),Basis(),0.0)
+	L.box(T(Color(0.35,0.35,0.37)),c+Vector3(0,5.6,0),Vector3(20,0.5,9),Basis(),0.04)
+	for sx in [-9.5,9.5,-4.0]:L.zyl(L.M.metall,c+Vector3(sx,0,-4),c+Vector3(sx,5.4,-4),0.15,1.1)
+	# Schranke rot-weiß
+	L.box(T(Color(0.2,0.2,0.2)),c+Vector3(-3.5,0.5,4),Vector3(0.5,1.0,0.5),Basis(),0.02)
+	for k in 6:L.box(T(Color(0.9,0.1,0.1) if k%2==0 else Color(0.95,0.95,0.95)),c+Vector3(-2.6+k*1.0,1.0,4),Vector3(1.0,0.12,0.12),Basis(),0.0)
+	GL.label("JVA – PFORTE",c+Vector3(-7,4.6,4.1),Basis(),0.01,Color(1,1,1),Color(0.1,0.15,0.3),5.5)
+	L.koll_box(c+Vector3(-7,2.5,0),Vector3(6,5,8))
+func _k_heliplatz():
+	var c=_P(0,0,13);var beton=T(Color(0.5,0.5,0.48));var gelb=T(Color(0.95,0.8,0.15));var oliv=T(Color(0.32,0.35,0.21))
+	L.zyl(beton,c,c+Vector3(0,0.08,0),11.0,1.0)
+	L.zyl(gelb,c+Vector3(0,0.09,0),c+Vector3(0,0.1,0),9.5,1.0);L.zyl(beton,c+Vector3(0,0.1,0),c+Vector3(0,0.11,0),9.0,1.0)
+	for x in [-2.0,2.0]:L.box(T(Color(1,1,1)),c+Vector3(x,0.12,0),Vector3(0.8,0.02,6),Basis(),0.0)
+	L.box(T(Color(1,1,1)),c+Vector3(0,0.12,0),Vector3(4,0.02,0.8),Basis(),0.0)
+	# abgestellter Transporthubschrauber
+	var h=c+Vector3(0,0,0)
+	L.box(oliv,h+Vector3(0,1.6,0),Vector3(2.4,2.2,6.5),Basis(),0.05);L.box(oliv,h+Vector3(0,1.9,6.0),Vector3(0.7,0.7,6.0),Basis(),0.04)
+	L.box(oliv,h+Vector3(0,3.0,8.8),Vector3(0.2,2.0,1.2),Basis(),0.03);L.box(L.M.glas[0],h+Vector3(0,2.0,-3.3),Vector3(2.2,1.1,0.3),Basis(),0.0)
+	for a in 2:L.box(T(Color(0.1,0.1,0.1)),h+Vector3(0,3.0,0),Vector3(0.4,0.06,14),Basis(Vector3.UP,PI*0.25+a*PI*0.5),0.0)
+	for sx in [-1,1]:L.box(T(Color(0.1,0.1,0.1)),h+Vector3(sx*1.3,0.3,0),Vector3(0.12,0.12,5),Basis(),0.0)
+	L.koll_box(h+Vector3(0,1.6,1),Vector3(2.5,2.4,8))
+func _k_tanklager():
+	var c=_P(0,0,9);var weiss=T(Color(0.9,0.9,0.88));var oliv=T(Color(0.35,0.38,0.24))
+	for k in 3:
+		var q=c+Vector3(-10+k*10,0,0)
+		L.zyl(weiss,q,q+Vector3(0,7,0),4.0,1.05);L.zyl(T(Color(0.6,0.6,0.6)),q+Vector3(0,7,0),q+Vector3(0,7.6,0),4.1,1.03)
+		L.box(T(Color(0.85,0.15,0.1)),q+Vector3(0,4,4.02),Vector3(2.2,0.6,0.05),Basis(),0.0)
+		L.koll_box(q+Vector3(0,3.5,0),Vector3(7.5,7,7.5))
+	L.zyl(L.M.metall,c+Vector3(-14,1,5),c+Vector3(14,1,5),0.25,1.05)
+	L.box(oliv,c+Vector3(13,1.4,-6),Vector3(2.5,2.6,7),Basis(),0.04)
+func _k_containerreihe():
+	var c=_P(0,0,4);var farben=[Color(0.35,0.38,0.24),Color(0.3,0.33,0.22),Color(0.42,0.4,0.3)]
+	for k in 6:
+		for e in (2 if k%2==0 else 1):
+			var q=c+Vector3(-16+k*6.4,1.3+e*2.6,0);L.box(T(farben[(k+e)%3]),q,Vector3(6,2.6,2.5),Basis(),0.04)
+		L.koll_box(c+Vector3(-16+k*6.4,1.3*(2 if k%2==0 else 1),0),Vector3(6,2.6*(2 if k%2==0 else 1),2.5))
+
 func _k_wachturm():
 	var p=_P(0,0,2.5);var grau=T(Color(0.6,0.6,0.58))
 	for sx in [-1.2,1.2]:
@@ -695,6 +861,10 @@ func sonderorte():
 		var p=kn+Vector2(cos(deg_to_rad(a))*236,sin(deg_to_rad(a))*196);_platz_bei("nd_wachturm",p,0.0,hk)
 	for k in 3:_platz_bei("nd_zellen",kn+Vector2(-60+k*60,-70+k*10),0.0,hk)
 	_platz_bei("nd_kaserne",kn+Vector2(0,80),PI,hk)
+	_platz_bei("nd_knast_haupt",kn+Vector2(0,-130),0.0,hk)
+	_platz_bei("nd_sporthof",kn+Vector2(-110,20),0.0,hk);_platz_bei("nd_sporthof",kn+Vector2(110,20),0.0,hk)
+	_platz_bei("nd_torhaus",kn+Vector2(0,175),0.0,hk)
+	for k in 2:_platz_bei("nd_zellen",kn+Vector2(-150+k*300,-60),0.0,hk)
 	# Militärflugplatz: Kasernen, Hangars, Jets, Panzer, Radar, Tower
 	var mi=ORTE.militaer[0];var hm=hs_welt(mi.x,mi.y-20)
 	for k in 4:_platz_bei("fl_hangar",mi+Vector2(-500+k*90,-80),0.0,hm)
@@ -702,6 +872,11 @@ func sonderorte():
 	for k in 6:_platz_bei("nd_jet",mi+Vector2(-480+k*45,-20),0.0,hm)
 	for k in 5:_platz_bei("nd_panzer",mi+Vector2(220+k*14,-40),0.0,hm)
 	_platz_bei("nd_radar",mi+Vector2(450,-110),0.0,hm);_platz_bei("fl_tower",mi+Vector2(-100,-110),0.0,hm)
+	for k in 3:_platz_bei("nd_heliplatz",mi+Vector2(-40+k*45,40),0.0,hm)
+	_platz_bei("nd_tanklager",mi+Vector2(380,40),0.0,hm)
+	for k in 3:_platz_bei("nd_container_reihe",mi+Vector2(150+k*0,60+k*14),0.0,hm)
+	for k in 3:_platz_bei("nd_kaserne",mi+Vector2(200+k*60,-180),0.0,hm)
+	for k in 4:_platz_bei("nd_panzer",mi+Vector2(220+k*14,-10),0.0,hm)
 	# Wüstenflugplatz: Hangar, Wracks, Wellblechhütten
 	var wf=ORTE.wflug[0];var hw=hs_welt(wf.x,wf.y)
 	_platz_bei("fl_hangar",wf+Vector2(-150,-60),0.0,hw);_platz_bei("nd_huette",wf+Vector2(-90,-50),0.0,hw);_platz_bei("nd_huette",wf+Vector2(-70,-52),0.3,hw)
@@ -836,11 +1011,34 @@ func landschaft_natur():
 	print("LANDSCHAFT Natur ",PLATZ.size()-n0," Bäume ",nb," ",Time.get_ticks_msec()-t0," ms")
 
 # ---------------- Geometrie mit Höhe ----------------
+var _belag_m:={}
+func belag_mat(art:String)->Material:
+	# Schotter/Sandweg: kleine Kachel-Textur, extern gespeichert (alle Kacheln teilen sie)
+	if _belag_m.has(art):return _belag_m[art]
+	var pfad="res://assets/cache/comic/kits/belag_%s.res"%art
+	var N=128;var img=Image.create(N,N,false,Image.FORMAT_RGB8);var r=RandomNumberGenerator.new();r.seed=art.hash()
+	for y in N:
+		for x in N:
+			var c=Color(0.56,0.51,0.45)*(0.85+r.randf()*0.25) if art=="schotter" else Color(0.78,0.67,0.48)*(0.92+r.randf()*0.12)
+			c.a=1.0;img.set_pixel(x,y,c)
+	if art=="schotter":
+		for k in 380:
+			var q=Vector2i(r.randi()%N,r.randi()%N);var g=r.randf_range(0.35,0.78)
+			for dy in 2:
+				for dx in 2:img.set_pixel((q.x+dx)%N,(q.y+dy)%N,Color(g,g*0.96,g*0.9))
+	img.generate_mipmaps()
+	var m=StandardMaterial3D.new();m.albedo_texture=ImageTexture.create_from_image(img);m.uv1_triplanar=true;m.uv1_world_triplanar=true;m.uv1_scale=Vector3(0.35,0.35,0.35)
+	m.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;m.roughness=1.0;m.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	ResourceSaver.save(m,pfad);m=load(pfad)
+	_belag_m[art]=m;L.kein_schatten[m]=true
+	return m
 func fahrbahnen():
-	var flick=T(Color(0.2,0.2,0.22));var sand=T(Color(0.7,0.58,0.42));var gelb=T(Color(0.95,0.8,0.15))
+	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
+	var bank=T(Color(0.47,0.6,0.33));L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
 	for ri in ROADS.size():
-		var r=ROADS[ri];var so=L._st(sand if r.orig=="piste" else L.M.asphalt,true)
+		var r=ROADS[ri];var belag=r.get("belag","asphalt")
+		var so=L._st(L.M.asphalt if belag=="asphalt" else belag_mat(belag),true)
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
 		var Ls=[];var Rs=[]
 		for i in n:
@@ -848,20 +1046,33 @@ func fahrbahnen():
 			var e=0.0
 			if i==0 or i==n-1:e=r.w*0.6
 			var pp=P[i]+(d*(-e if i==0 else e))
-			Ls.append(Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w));Rs.append(Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w))
+			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
+			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
+			for v in [a3,b3]:
+				var yf=_y_fremd(Vector2(v.x,v.z),ri,0.3)
+				if yf<INF:v.y=min(v.y,yf+0.03)
+			a3.y=min(a3.y,_y_fremd(Vector2(a3.x,a3.z),ri,0.3)+0.03);b3.y=min(b3.y,_y_fremd(Vector2(b3.x,b3.z),ri,0.3)+0.03)
+			Ls.append(a3);Rs.append(b3)
 		for i in n-1:
 			L._tri(so,Ls[i],Ls[i+1],Rs[i+1],Vector3.UP);L._tri(so,Ls[i],Rs[i+1],Rs[i],Vector3.UP)
-		# Böschung/Bankett für Landstraßen (sichtbare Kante zum Gelände)
+		# Bankett: schräg vom Fahrbahnrand 2,6 m nach außen ins Gelände (statt senkrechter Kante)
 		if not r.stadt:
-			var sb=L._st(T(Color(0.5,0.46,0.38)),true)
+			var sb=L._st(bank,true)
 			for i in n-1:
 				for sd in [1,-1]:
 					var a=Ls[i] if sd>0 else Rs[i];var b=Ls[i+1] if sd>0 else Rs[i+1]
-					L._tri(sb,a,b,b-Vector3(0,1.6,0),Vector3.UP);L._tri(sb,a,b-Vector3(0,1.6,0),a-Vector3(0,1.6,0),Vector3.UP)
+					var o=(a-(Rs[i] if sd>0 else Ls[i]));o.y=0;o=o.normalized()
+					var o2=(b-(Rs[i+1] if sd>0 else Ls[i+1]));o2.y=0;o2=o2.normalized()
+					var mid=(a+b)*0.5+o*1.3
+					if auf_fahrbahn(Vector2(mid.x,mid.z),ri,0.5):continue
+					var a_in=a-o*0.05-Vector3(0,0.03,0);var b_in=b-o2*0.05-Vector3(0,0.03,0)
+					var a_out=a+o*2.6-Vector3(0,0.41,0);var b_out=b+o2*2.6-Vector3(0,0.41,0)
+					if sd>0:L._tri(sb,a_in,a_out,b_out,Vector3.UP);L._tri(sb,a_in,b_out,b_in,Vector3.UP)
+					else:L._tri(sb,a_in,b_in,b_out,Vector3.UP);L._tri(sb,a_in,b_out,a_out,Vector3.UP)
 	L.koll_an=alt
 	for ri in ROADS.size():
 		var r=ROADS[ri];var s=4.0;var Lg:float=r.S[-1]
-		if r.orig=="piste":continue
+		if r.get("belag","asphalt")!="asphalt":continue
 		while s<Lg-4.0:
 			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var y=y_bei(r,s)+0.075;var nn=Vector2(-t.y,t.x)
 			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
@@ -994,6 +1205,7 @@ func gelaende_ziel():
 	# 3) Straßen: Fahrbahn plus eine Rasterzelle Rand flach auf Profilhöhe (sonst sticht das Gelände
 	#    zwischen den 10-m-Punkten durch den Asphalt), danach Böschung – je größer der Höhenunterschied, desto breiter
 	var best={}   # j -> [abstand, zielhöhe, w, stadt, böschung]
+	var unter={}  # j -> niedrigste Fahrbahnhöhe aller Straßen, deren Fahrbahnband die Zelle überdeckt
 	for r in ROADS:
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
 		var wk=r.w+r.sw
@@ -1012,6 +1224,7 @@ func gelaende_ziel():
 						var d=Vector2(GX0+ii*MST,GZ0+k*MST).distance_to(p)
 						if d>R:continue
 						var j=k*GNX+ii
+						if d<=(wk+1.0 if r.stadt else wk+MST*1.5):unter[j]=min(unter.get(j,INF),y-0.12)
 						if not best.has(j) or best[j][0]>d:best[j]=[d,y,wk,r.stadt,R]
 				s+=4.0
 	for j in best:
@@ -1024,4 +1237,6 @@ func gelaende_ziel():
 			var band=wk+MST*1.5
 			if d<=band:TH[j]=y-0.12
 			elif LOT[j]==0:TH[j]=lerp(y-0.12,basis,smoothstep(band,R,d))
+	# zuletzt: unter jeder Fahrbahn höchstens auf der niedrigsten Straßenhöhe -> nie Gelände im Belag
+	for j in unter:TH[j]=unter[j]
 	print("NORD Gelände-Ziel ",Time.get_ticks_msec()-t0," ms, Straßenzellen ",best.size())

@@ -38,6 +38,53 @@ var _ab:=0
 func _process(dt):
 	t+=dt
 	var st=spiel.st
+	if spiel.test_modus=="staub":
+		if ui_schritt==0:
+			if t<3.0:return
+			var best=null
+			for r in spiel.welt.S.roads:
+				if r.get("belag","")=="schotter" and r.P.size()>20:best=r;break
+			var i=4;var p:Vector2=best.P[i];var t2:Vector2=best.T[i];var fw=Vector3(t2.x,0,t2.y)
+			if spiel.welt.has_method("viertel_jetzt"):spiel.welt.viertel_jetzt(p)
+			var c=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(c);c.setup("c_e30_silber")
+			c.global_transform=Transform3D(Basis.looking_at(-fw,Vector3.UP),Vector3(p.x,best.h[i]+0.8,p.y))
+			spiel.geparkt.append(c);spiel.einsteigen(c)
+			set_meta("auto",c);set_meta("r",best);ui_schritt=1;t=0;_n=0;return
+		var c=get_meta("auto")
+		var r=get_meta("r")
+		# auf der Straße halten: Richtung zum nächsten Punkt
+		var p2=Vector2(c.global_position.x,c.global_position.z);var bi=0;var bd=1e9
+		for k in r.P.size():
+			var d=r.P[k].distance_to(p2)
+			if d<bd:bd=d;bi=k
+		var ziel=r.P[min(bi+3,r.P.size()-1)];var v=Vector3(ziel.x-p2.x,0,ziel.y-p2.y).normalized()
+		c.linear_velocity=Vector3(v.x*14.0,c.linear_velocity.y,v.z*14.0);c.look_at(c.global_position-v,Vector3.UP)
+		if t<0.5:return
+		t=0;_n+=1
+		if _n==6:
+			_cam_b=Camera3D.new();spiel.add_child(_cam_b);_cam_b.fov=55;spiel.ui.visible=false
+		if _n>=6 and _cam_b:
+			_cam_b.global_position=c.global_position+v*9.0+Vector3(-v.z,0,v.x)*5.0+Vector3(0,2.4,0);_cam_b.look_at(c.global_position-v*4.0+Vector3(0,1,0));_cam_b.current=true
+		if _n==9:get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/staub_1.png");print("STAUB menge=",c._staub_menge," aktiv=",c._staub!=null and c._staub.emitting)
+		if _n>=10:get_tree().quit()
+		return
+	if spiel.test_modus=="kante":
+		if t<4.0:return
+		var p=Vector2(spiel._arg("--x").to_float(),spiel._arg("--z").to_float())
+		if spiel.welt.has_method("viertel_jetzt"):spiel.welt.viertel_jetzt(p)
+		var S=spiel.welt.S;var best=null;var bd=1e9
+		for r in S.roads:
+			for i in r.P.size():
+				var d=r.P[i].distance_to(p)
+				if d<bd:bd=d;best=[r,i]
+		var r=best[0];var i=best[1]
+		print("KANTE strasse typ=",r.typ," w=",r.w," h=",r.h[i]," dist=",bd," n=",r.get("n") if r is Dictionary else "")
+		var t2:Vector2=r.T[i];var nn=Vector2(-t2.y,t2.x)
+		for k in range(-6,7):
+			var q=r.P[i]+nn*(k*2.0)
+			var hit=spiel.kampf._ray(Vector3(q.x,800,q.y),Vector3(q.x,-80,q.y),[])
+			print("  quer ",k*2," m: y=",snapped(hit.position.y if hit else -999.0,0.01)," koll=",hit.collider.name if hit else "-"," gelaende=",snapped(spiel.welt.G.h_at(q.x,q.y),0.01))
+		get_tree().quit();return
 	if spiel.test_modus=="biker":
 		var B=spiel.biker
 		if ui_schritt==0:
@@ -211,6 +258,11 @@ func _process(dt):
 			for d in spiel.welt.DIENSTE:
 				var vor=Vector2(sin(d.yaw),cos(d.yaw))
 				if nur=="" or "dienste" in nur:O.append(["dienst_%s_%d"%[d.art,int(d.p.x)],d.p+vor*15.0+Vector2(vor.y,-vor.x)*6.0,d.p-vor*14.0])
+			if nur=="" or "schotter" in nur:
+				var n=0
+				for r in spiel.welt.S.roads:
+					if r.get("belag","")=="schotter" and r.P.size()>12 and n<3:
+						var i=r.P.size()/2;O.append(["schotter_%d"%n,r.P[i-4],r.P[i+4]]);n+=1
 			if nur=="" or "belebt" in nur:
 				O.append(["knasthof",Vector2(2000,-4990),Vector2(2000,-5040)]);O.append(["hafenarbeiter",Vector2(520,2110),Vector2(500,2090)])
 			set_meta("O",O)

@@ -43,6 +43,7 @@ func aus_cache():
 	var f=FileAccess.open(DATEN,FileAccess.READ);var d=f.get_var(false);f.close()
 	G=CG.new();G.heights=d.H;G.nx=d.nx;G.nz=d.nz;G.X0=d.X0;G.Z0=d.Z0;G.STEP=d.STEP
 	S=STR.new(G);S.roads=d.roads;S.junctions=d.junctions
+	for ri in S.roads.size():S._index(ri)   # Raster für schnelle Straßensuche (Staub, Biker, …)
 	B=CB.new();B.rect=d.rect
 	A=CA.new();A.shops=d.shops
 	PARKEN=d.parken

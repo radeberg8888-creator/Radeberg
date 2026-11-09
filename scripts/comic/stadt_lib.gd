@@ -307,9 +307,10 @@ func _mesh_aus(k:String):
 		a2[Mesh.ARRAY_VERTEX]=e[0];a2[Mesh.ARRAY_NORMAL]=e[1]
 		if UV!=null:a2[Mesh.ARRAY_TEX_UV]=e[2]
 		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a2);_mi(am,m,weit).name="M_%s_%d_%d"%[k,key.x,key.y]
+var kein_schatten:={}   # Materialien flacher Bodenflächen (Fahrbahn, Bankett): werfen keinen Schatten
 func _mi(am:Mesh,m:Material,weit:float):
 	var mi=MeshInstance3D.new();mi.mesh=am;mi.material_override=m;welt.add_child(mi)
-	if m==ink:mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if m==ink or kein_schatten.has(m):mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if weit>0.0:mi.visibility_range_end=weit;mi.visibility_range_end_margin=20.0
 	return mi
 func _fertig():
