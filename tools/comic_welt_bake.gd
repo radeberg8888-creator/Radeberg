@@ -29,6 +29,8 @@ func _init():
 	var G0=load("res://scripts/welt_gelaende.gd").new()
 	var SD=_sued(L,G0)
 	var SU=SD.S
+	var ND=_sued(L,G0,"nord",SU)
+	var NO=ND.S
 	print("SUED fertig ",Time.get_ticks_msec()-t0," ms")
 	# ---- Gelände ----
 	var nx=G0.rx;var nz=G0.rz;var X0=G0.X0;var Z0=G0.Z0;var ST=G0.STEP
@@ -38,6 +40,8 @@ func _init():
 		for i in nx:
 			var x=X0+i*ST-CX;var z=Z0+k*ST-CZ;var j=k*nx+i
 			var dx=max(abs(x)-RX,0.0);var dz=max(abs(z)-RZ,0.0);var d=sqrt(dx*dx+dz*dz)
+			var thn=NO.TH[j]
+			if not is_nan(thn):H[j]=thn;continue
 			var dm=SU.dm_welt(x+CX,z+CZ)
 			if dm<0.1:H[j]=H0-0.02;continue
 			if dm<60.0 and G0._nat(x+CX,z+CZ)>=1.0 and d>dm:H[j]=lerp(H0-0.02,H[j],smoothstep(0.0,60.0,dm));continue
@@ -136,6 +140,16 @@ func _init():
 		roads.append({"lane_x":r.w*0.36,"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":T,"w":r.w,"sw":r.sw,"med":0.2 if r.typ=="allee" else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true})
 	for j in SU.JUNC:
 		junctions.append({"p":j.p+off,"h":H0+0.04,"r":j.r,"a":basis+j.a,"b":basis+j.b,"rail":false})
+	var basis_n=roads.size()
+	for r in NO.ROADS:
+		var Q=PackedVector2Array();var Hh=PackedFloat32Array();var T=PackedVector2Array();var tf=[];var el=[]
+		var P:PackedVector2Array=r.P
+		for i in P.size():
+			if i>0 and P[i].distance_to(P[i-1])<0.5:continue
+			Q.append(P[i]+off);Hh.append(H0+r.Y[i]+0.07);T.append((P[min(i+1,P.size()-1)]-P[max(i-1,0)]).normalized());tf.append(false);el.append(false)
+		roads.append({"lane_x":r.w*(0.5 if r.orig=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":T,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true})
+	for j in NO.JUNC:
+		junctions.append({"p":j.p+off,"h":H0+NO.hy(j.p)+0.07,"r":j.r,"a":basis_n+j.a,"b":basis_n+j.b,"rail":false})
 	# ---- Parkplätze, Läden ----
 	var parken=[]
 	var var_={"c_trabant":["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_trabant_rot"],"c_wartburg":["c_wartburg_beige","c_wartburg_blau","c_wartburg_gruen"],
@@ -147,7 +161,7 @@ func _init():
 		if var_.has(k):k=var_[k][rr.randi()%var_[k].size()]
 		var o=tf.origin;o.y+=L.FY(o.x,o.z)+H0+0.2;o.x+=CX;o.z+=CZ
 		parken.append([k,Transform3D(tf.basis,o)])
-	for e in SU.PARK:
+	for e in SU.PARK+NO.PARK:
 		var k:String=e[0];var tf:Transform3D=e[1]
 		if var_.has(k):k=var_[k][rr.randi()%var_[k].size()]
 		var o=tf.origin;o.y+=H0+0.2;o.x+=CX;o.z+=CZ
@@ -172,7 +186,7 @@ func _init():
 					parken=parken.filter(func(e):return Vector2(e[1].origin.x,e[1].origin.z).distance_to(zp)>16.0)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
 		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2)),"sued_rect":SD.rw,
-		"viertel":SD.viertel,"immo":SD.immo}
+		"viertel":SD.viertel+ND.viertel,"immo":SD.immo+ND.immo}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	# ---- speichern ----
 	_owner(W,W)
@@ -183,29 +197,45 @@ func _init():
 
 const SUED_RW:=Rect2(-3000,340,4700,2310)
 const KACHEL:=300.0
-func _sued(L,G0)->Dictionary:
+var _K=null;var _GL=null;var _nmat:=0;var _nsh:=0
+func _sued(L,G0,art:="sued",SU=null)->Dictionary:
 	var t0=Time.get_ticks_msec()
-	var GL=load("res://scripts/comic/ghetto_lib.gd").new(L)
-	var K=load("res://scripts/comic/kit_lib.gd").new(L)
-	var S=load("res://scripts/comic/sued_lib.gd").new(L,GL,K,G0)
+	if _GL==null:_GL=load("res://scripts/comic/ghetto_lib.gd").new(L);_K=load("res://scripts/comic/kit_lib.gd").new(L)
+	var GL=_GL;var K=_K
+	var S=load("res://scripts/comic/%s_lib.gd"%art).new(L,GL,K,G0)
 	var flach=Node3D.new();L.welt=flach
 	var alt=[L.kachel,L.weit_detail,L.weit_ink,L.spiel_modus]
 	L.spiel_modus=true
 	var AUSW=[Rect2(CX-RX-3,CZ-RZ-3,RX*2+6,RZ*2+6)]
-	S.maske_bauen(SUED_RW,AUSW);S.dist_maske()
-	var aus=[];for a in AUSW:aus.append(Rect2(a.position-Vector2(CX,CZ),a.size))
-	S.laden("res://assets/data/karte_sued.json",Rect2(SUED_RW.position-Vector2(CX,CZ),SUED_RW.size),aus)
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
-	S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.hafenkante();S.flughafen()
-	var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
-	var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
-	S.werkstatt_reservieren(Vector2(-200,960))
-	S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse()
-	# bekannte Namen
-	var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
-	for nm in namen:
-		var ns=S.naechst(nm[1]-Vector2(CX,CZ))
-		if ns[2]>=0:S.ROADS[ns[2]].n=nm[0]
+	if art=="sued":
+		S.maske_bauen(SUED_RW,AUSW);S.dist_maske()
+		var aus=[];for a in AUSW:aus.append(Rect2(a.position-Vector2(CX,CZ),a.size))
+		S.laden("res://assets/data/karte_sued.json",Rect2(SUED_RW.position-Vector2(CX,CZ),SUED_RW.size),aus)
+		n0=L.KOLL_F.size();p0=L.PFOSTEN.size()
+		S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.hafenkante();S.flughafen()
+		var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
+		var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
+		S.werkstatt_reservieren(Vector2(-200,960))
+		S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse()
+		var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
+		for nm in namen:
+			var ns=S.naechst(nm[1]-Vector2(CX,CZ))
+			if ns[2]>=0:S.ROADS[ns[2]].n=nm[0]
+	else:
+		var insel=Rect2(-4400,-11300,9100,14800)
+		S.maske_bauen(insel,[AUSW[0],SUED_RW])
+		S.KITLISTE=SU.KITLISTE.duplicate(true)
+		S.laden("res://assets/data/karte_nord.json",Rect2(insel.position-Vector2(CX,CZ),insel.size),[Rect2(AUSW[0].position-Vector2(CX,CZ),AUSW[0].size)])
+		n0=L.KOLL_F.size();p0=L.PFOSTEN.size()
+		S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.sonderorte()
+		var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_nord.json"))
+		var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
+		S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse();S.gelaende_ziel()
+		var namen=[["Nordallee",Vector2(-400,-1000)],["Sonnenhügel",Vector2(-150,-1500)],["Weststraße",Vector2(-850,-450)],["Oststraße",Vector2(2700,600)],["Sternstraße",Vector2(1080,-520)],["Staubwinkel",Vector2(1750,-5950)],["Gefängnisstraße",Vector2(1700,-5050)],["Farmweg",Vector2(1950,-7800)]]
+		for nm in namen:
+			var ns=S.naechst(nm[1]-Vector2(CX,CZ))
+			if ns[2]>=0:S.ROADS[ns[2]].n=nm[0]
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
 	S.fahrbahnen();S.platten();S.wege();L._fertig()
 	L.weit_detail=300.0;L.weit_ink=120.0
@@ -224,16 +254,17 @@ func _sued(L,G0)->Dictionary:
 				if mt:mats[mt]=true
 	for c in flach.get_children():
 		if c is MeshInstance3D and c.material_override:mats[c.material_override]=true
-	var nsh=0;var nm=0;var shs={}
+	var shs={}
 	for mt in mats:
 		if mt.resource_path!="":continue
 		if mt is ShaderMaterial and mt.shader and mt.shader.resource_path=="" and not shs.has(mt.shader):
-			var sp=ZIEL+"kits/shader_%d.gdshader"%nsh;nsh+=1
+			var sp=ZIEL+"kits/shader_%d.gdshader"%_nsh;_nsh+=1
 			ResourceSaver.save(mt.shader,sp);mt.shader.take_over_path(sp);shs[mt.shader]=true
-		var mp=ZIEL+"kits/mat_%d.res"%nm;nm+=1
+		var mp=ZIEL+"kits/mat_%d.res"%_nmat;_nmat+=1
 		ResourceSaver.save(mt,mp);mt.take_over_path(mp)
-	print("SUED Materialien extern ",nm," Shader ",nsh)
+	print("Materialien extern ",_nmat," Shader ",_nsh)
 	for kn in K.KITS:
+		if K.KITS[kn].mesh.resource_path!="":continue
 		var pfad=ZIEL+"kits/"+kn+".res"
 		ResourceSaver.save(K.KITS[kn].mesh,pfad,ResourceSaver.FLAG_COMPRESS);K.KITS[kn].mesh.take_over_path(pfad)
 		if K.KITS[kn].ink!=null:
@@ -243,7 +274,7 @@ func _sued(L,G0)->Dictionary:
 	var T={}
 	var kachel=func(key:Vector2i)->Node3D:
 		if not T.has(key):
-			var n=Node3D.new();n.name="Sued_%d_%d"%[key.x,key.y];n.position=Vector3(CX,H0,CZ);T[key]=n
+			var n=Node3D.new();n.name="%s_%d_%d"%[art.capitalize(),key.x,key.y];n.position=Vector3(CX,H0,CZ);T[key]=n
 		return T[key]
 	var schl=func(v:Vector3)->Vector2i:return Vector2i(int(floor(v.x/KACHEL)),int(floor(v.z/KACHEL)))
 	for c in flach.get_children():
@@ -290,22 +321,23 @@ func _sued(L,G0)->Dictionary:
 			var cy=CylinderShape3D.new();cy.radius=pf[1];cy.height=pf[2]
 			var c3=CollisionShape3D.new();c3.shape=cy;sk.add_child(c3);c3.position=pf[0]+Vector3(0,pf[2]*0.5,0)
 		_owner(tn,tn)
-		var datei=ZIEL+"sued_%d_%d.scn"%[key.x,key.y]
+		var datei=ZIEL+"%s_%d_%d.scn"%[art,key.x,key.y]
 		var ps=PackedScene.new();ps.pack(tn);ResourceSaver.save(ps,datei,ResourceSaver.FLAG_COMPRESS)
 		viertel.append({"name":tn.name,"datei":datei,"rect":Rect2(Vector2(key.x*KACHEL+CX,key.y*KACHEL+CZ),Vector2(KACHEL,KACHEL)),"ab":480.0,"weg":620.0})
 		tn.free()
 	# Fernansicht (immer geladen)
-	var fern=Node3D.new();fern.name="SuedFern";W.add_child(fern);fern.position=Vector3(CX,H0,CZ)
+	var fern=Node3D.new();fern.name=art.capitalize()+"Fern";W.add_child(fern);fern.position=Vector3(CX,H0,CZ)
 	K.fern(fern,S.PLATZ,600.0,2200.0)
 	# kaufbare Gebäude
 	var immo=[];var zn={"lager":0,"autohandel":0}
 	for im in S.IMMO:
 		var xf:Transform3D=im.xf;var zp=xf*Vector3(0,0,1.2)
 		zn[im.art]+=1
-		var ort={"ghetto":"Ghetto","sued":"Südstadt","docks":"Docks","industrie":"Industrie","hafen":"Hafen","strand":"Strand","flug":"Flughafen"}.get(im.stil,"Süd")
-		immo.append({"art":im.art,"id":"%s_%d"%[im.art,zn[im.art]],"ort":ort,"p":Vector3(zp.x+CX,H0+L.KB+0.05,zp.z+CZ),"yaw":atan2(xf.basis.z.x,xf.basis.z.z)})
+		if art!="sued":zn[im.art]+=0
+		var ort={"ghetto":"Ghetto","sued":"Südstadt","docks":"Docks","industrie":"Industrie","hafen":"Hafen","strand":"Strand","flug":"Flughafen","hoch":"Downtown","wohn":"Nordstadt","dorf":"Land","redneck":"Staubwinkel","villa":"Sonnenhügel"}.get(im.stil,"Süd")
+		immo.append({"art":im.art,"id":("%s_%d"%[im.art,zn[im.art]]) if art=="sued" else ("n%s_%d"%[im.art,zn[im.art]]),"ort":ort,"p":Vector3(zp.x+CX,H0+xf.origin.y+L.KB+0.05,zp.z+CZ),"yaw":atan2(xf.basis.z.x,xf.basis.z.z)})
 	L.welt=W.get_node("Stadt")
-	print("SUED Kacheln ",viertel.size()," Bausätze ",K.KITS.size()," Immobilien ",immo.size()," ",Time.get_ticks_msec()-t0," ms")
+	print(art," Kacheln ",viertel.size()," Bausätze ",K.KITS.size()," Immobilien ",immo.size()," ",Time.get_ticks_msec()-t0," ms")
 	return {"S":S,"viertel":viertel,"immo":immo,"rw":SUED_RW}
 
 func _koll(sk:StaticBody3D,L,KN:Array,KF:Array,PF:Array)->PackedVector3Array:
@@ -366,7 +398,7 @@ func _gelaende(G0,H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float)
 						for q in P:V.append(Vector3(X0+q[0]*ST,H[q[1]*nx+q[0]],Z0+q[1]*ST))
 						var n1=(V[2]-V[0]).cross(V[1]-V[0]).normalized()
 						if n1.y<0:n1=-n1
-						for t in [[0,2,1],[0,3,2]]:
+						for t in [[0,1,2],[0,2,3]]:
 							for q in t:
 								stt.set_color(_farbe(G0,P[q][0],P[q][1],V[q].y));stt.set_normal(n1);stt.add_vertex(V[q])
 						i=ii

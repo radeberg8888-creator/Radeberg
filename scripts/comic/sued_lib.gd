@@ -804,7 +804,7 @@ func hinterland(haeuser:Array):
 		var nv:Vector2=(p-ns[0]).normalized();if nv.length()<0.5:continue
 		var st=stil(p)
 		if st=="flug":continue
-		var typ={"ghetto":"holz_kurz","sued":"reihe","docks":"container","industrie":"container","hafen":"container","strand":"haus"}[st]
+		var typ={"ghetto":"holz_kurz","sued":"reihe","docks":"container","industrie":"container","hafen":"container","strand":"haus"}.get(st,"busch")
 		var kit=_wahl(st,typ);var k=K.KITS[kit]
 		var tt=Vector2(-nv.y,nv.x)
 		var F=p-nv*k.d*0.5
@@ -840,7 +840,7 @@ func fuellen():
 		while z<RECT.end.y:
 			var p=Vector2(x,z)
 			if maske(p) and not _belegt(p) and frei(p)>1.0 and frei(p)<45.0 and stil(p)!="flug":
-				var st=stil(p);var typ={"ghetto":"busch","sued":"busch","docks":"container","industrie":"container","hafen":"container","strand":"palmen","flug":"busch"}[st]
+				var st=stil(p);var typ={"ghetto":"busch","sued":"busch","docks":"container","industrie":"container","hafen":"container","strand":"palmen","flug":"busch"}.get(st,"busch")
 				if rng.randf()<(0.12 if typ=="container" else 0.07):
 					var kit=_wahl(st,typ);var k=K.KITS[kit]
 					var ns=naechst(p);var tt:Vector2=ns[1] if ns[2]>=0 else Vector2(1,0);var nv=Vector2(-tt.y,tt.x)

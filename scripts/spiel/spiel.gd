@@ -163,11 +163,11 @@ var _lade_i:=0
 func _ladebildschirm():
 	lade=Control.new();lade.set_anchors_preset(Control.PRESET_FULL_RECT);ui.add_child(lade)
 	var schwarz=ColorRect.new();schwarz.color=Color(0,0,0);schwarz.set_anchors_preset(Control.PRESET_FULL_RECT);lade.add_child(schwarz)
-	var namen=["grove","jagd","strand","lauf","boss","tuning"]
+	var namen=["gang","jagd","lauf","strand","boss","tuning","deal","schiesserei","wueste","flucht","party","rennen"]
 	namen.shuffle()
 	for n in namen:
-		var tx=load("res://assets/ui/lade/lade_%s.jpg"%n)
-		if tx:_lade_bilder.append(tx)
+		var pf="res://assets/ui/lade/lade_%s.jpg"%n
+		if ResourceLoader.exists(pf):_lade_bilder.append(pf)
 	var vs=get_viewport().get_visible_rect().size
 	for i in 2:
 		var tr=TextureRect.new();tr.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;tr.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
@@ -192,7 +192,7 @@ func _ladebildschirm():
 func _lade_naechstes():
 	if lade==null or not is_instance_valid(lade) or _lade_bilder.is_empty():return
 	var a:TextureRect=lade.get_node("Bild%d"%(_lade_i%2))
-	a.texture=_lade_bilder[_lade_i%_lade_bilder.size()];a.modulate.a=0.0
+	a.texture=load(_lade_bilder[_lade_i%_lade_bilder.size()]);a.modulate.a=0.0
 	lade.move_child(a,2)   # über dem anderen Bild, unter Schrift
 	var z0=1.0+randf()*0.04;var z1=1.14+randf()*0.06;var dx=randf_range(-50,50)
 	a.scale=Vector2(z0,z0);a.position=Vector2(dx,0)
@@ -202,6 +202,8 @@ func _lade_naechstes():
 	tw.tween_property(a,"position",Vector2(-dx,0),8.5).set_trans(Tween.TRANS_LINEAR)
 	_lade_i+=1
 	get_tree().create_timer(7.0).timeout.connect(_lade_naechstes)
+	# nächstes Bild schon im Hintergrund vorladen
+	ResourceLoader.load_threaded_request(_lade_bilder[_lade_i%_lade_bilder.size()])
 
 # Hauptmenü: normales Spiel oder Admin-/Testmodus
 signal _gewaehlt

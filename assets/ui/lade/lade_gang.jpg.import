@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c4t8e15sk25ka"
-path="res://.godot/imported/lade_grove.jpg-057a26a88f4611a4c260c817344c32e5.ctex"
+uid="uid://by8658t7iiasw"
+path="res://.godot/imported/lade_gang.jpg-b58717658d9cd1aa554e081c9352bd5f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/lade/lade_grove.jpg"
-dest_files=["res://.godot/imported/lade_grove.jpg-057a26a88f4611a4c260c817344c32e5.ctex"]
+source_file="res://assets/ui/lade/lade_gang.jpg"
+dest_files=["res://.godot/imported/lade_gang.jpg-b58717658d9cd1aa554e081c9352bd5f.ctex"]
 
 [params]
 

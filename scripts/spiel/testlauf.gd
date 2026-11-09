@@ -238,10 +238,13 @@ func _process(dt):
 			8:get_tree().quit()
 		schritt+=1
 		return
-	if spiel.test_modus=="ost" or spiel.test_modus=="sued":
+	if spiel.test_modus=="ost" or spiel.test_modus=="sued" or spiel.test_modus=="nord":
 		var P=[["rand",Vector2(-300,812),Vector2(-300,880)],["rand2",Vector2(100,812),Vector2(100,900)],["ghetto",Vector2(-262,1040),Vector2(-180,1040)],["ghetto2",Vector2(-560,1150),Vector2(-480,1100)],["suedstadt",Vector2(250,1560),Vector2(330,1560)],["docks",Vector2(500,2090),Vector2(600,2090)],
 			["kai",Vector2(700,2200),Vector2(760,2300)],["industrie",Vector2(900,640),Vector2(980,640)],["hafen",Vector2(1500,820),Vector2(1580,820)],["strand",Vector2(-2100,700),Vector2(-2100,800)],["flughafen",Vector2(-2000,1925),Vector2(-2000,1860)]] if spiel.test_modus=="sued" else [["bruecke",Vector2(1900,-158),Vector2(2400,-140)],["kowloon",Vector2(2760,-385),Vector2(2760,-560)],["lindstadt",Vector2(2700,600),Vector2(2700,450)],
 			["dorf",Vector2(3600,495),Vector2(3700,480)],["canyon",Vector2(3990,-330),Vector2(4180,-470)],["moewenbach",Vector2(1110,-490),Vector2(1110,-560)],["nacht",Vector2(250,-350),Vector2(250,-500)]]
+		if spiel.test_modus=="nord":P=[["n_stadt",Vector2(496,-168),Vector2(543,-160)],["n_wohn",Vector2(-1083,-504),Vector2(-1114,-509)],["n_villa",Vector2(-701,-1444),Vector2(-695,-1400)],
+			["n_huegel",Vector2(58,-2608),Vector2(76,-2652)],["n_knast",Vector2(1700,-5050),Vector2(1900,-5050)],["n_militaer",Vector2(-2600,-5300),Vector2(-2600,-5450)],["n_wflug",Vector2(500,-5200),Vector2(646,-5263)],
+			["n_redneck",Vector2(1749,-5950),Vector2(1797,-5954)],["n_farm",Vector2(1939,-7710),Vector2(1985,-7696)],["n_bucht",Vector2(-119,-9032),Vector2(-123,-9080)]]
 		if t<2.5:return
 		t=0
 		if ui_schritt==0 and spiel._arg("--ab")!="":ui_schritt=int(spiel._arg("--ab"));_ab=ui_schritt
@@ -252,6 +255,17 @@ func _process(dt):
 		var h=spiel.welt.G.h_at(p.x,p.y)
 		var hit=spiel.kampf._ray(Vector3(p.x,400,p.y),Vector3(p.x,-50,p.y),[])
 		if hit:h=hit.position.y
+		if spiel.test_modus=="nord" and spiel._arg("--aus")!="":
+			for c in spiel.welt.get_children():
+				if str(c.name).begins_with(spiel._arg("--aus")):c.visible=false;print("AUS ",c.name)
+		if spiel.test_modus=="nord":
+			print("NORDDBG ",e[0]," h_at ",spiel.welt.G.h_at(p.x,p.y)," hit ",(hit.position.y if hit else -999)," coll ",(hit.collider.name if hit else ""))
+			for g in spiel.welt.find_children("Gelaende_*","MeshInstance3D",true,false):
+				var a:AABB=g.global_transform*g.get_aabb()
+				if spiel._arg("--glfix")!="":
+					if g.name.ends_with("_1"):g.visibility_range_end=0.0
+					else:g.visible=false
+				if a.has_point(Vector3(p.x,a.get_center().y,p.y)):print("   GL ",g.name," vis ",g.is_visible_in_tree()," ",a," vr ",g.visibility_range_begin,"-",g.visibility_range_end)
 		spiel.spieler.global_position=Vector3(p.x,h+0.3,p.y);spiel.spieler.velocity=Vector3.ZERO
 		var v=z-p;spiel.kam.yaw=atan2(v.x,v.y)+PI;spiel.kam.pitch=-8.0
 		spiel.zeit=22.5*60.0 if e[0]=="nacht" else 11.0*60.0
