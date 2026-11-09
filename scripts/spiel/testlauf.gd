@@ -2,6 +2,8 @@ extends Node
 # Automatischer Spieltest: simuliert Eingaben und speichert Bildschirmfotos (nur am PC mit -- --test).
 var spiel
 var t:=0.0
+var _cam_b:Camera3D=null
+var _n:=0
 var schritt:=0
 var bilder:=0
 const OUT:="/home/claude/shots_godot/spiel_"
@@ -36,6 +38,207 @@ var _ab:=0
 func _process(dt):
 	t+=dt
 	var st=spiel.st
+	if spiel.test_modus=="biker":
+		var B=spiel.biker
+		if ui_schritt==0:
+			if t<3.0:return
+			var tr=B.treffs["hoellenhunde"];var p:Vector2=tr.p[0];var n=Vector2(-tr.p[1].y,tr.p[1].x)
+			var q=p+n*14.0
+			var hit=spiel.kampf._ray(Vector3(q.x,500,q.y),Vector3(q.x,-50,q.y),[])
+			spiel.spieler.global_position=Vector3(q.x,hit.position.y+0.3,q.y)
+			var v=Vector3(p.x-q.x,0,p.y-q.y);spiel.kam.yaw=atan2(v.x,v.z)+PI;spiel.kam.pitch=-10.0
+			ui_schritt=1;t=0;return
+		if ui_schritt==1:
+			if t<4.0:return
+			shot("biker_treff");print("BIKER treff an=",B.treffs["hoellenhunde"].an," leute=",B.treffs["hoellenhunde"].leute.size()," bikes=",B.treffs["hoellenhunde"].bikes.size())
+			var mp=Vector2(spiel.spieler.global_position.x,spiel.spieler.global_position.z)
+			for e in B.rudel.duplicate():B._rudel_weg(e)
+			B._rudel_neu("hoellenhunde",mp,"hoellenhunde");B._rudel_neu("elbewoelfe",mp,"hoellenhunde")
+			print("BIKER rudel=",B.rudel.size())
+			ui_schritt=2;t=0;return
+		if ui_schritt==2:
+			if t<3.0:return
+			if B.rudel.size()>0:
+				var L=B.rudel[0].leit
+				_cam_b=Camera3D.new();spiel.add_child(_cam_b);_cam_b.fov=60
+				var fw=L.global_transform.basis.z
+				_cam_b.global_position=L.global_position+Vector3(0,3.0,0)+fw*9.0+L.global_transform.basis.x*4.0
+				_cam_b.look_at(L.global_position-fw*4.0+Vector3(0,1,0));_cam_b.current=true
+				shot("biker_rudel");_cam_b.current=false;spiel.kam.cam.current=true
+				print("BIKER rudel0 club=",B.rudel[0].club," folger=",B.rudel[0].folger.size())
+			# Krieg erzwingen: zweites Rudel 28 m neben das erste setzen
+			if B.rudel.size()>=2:
+				var e1=B.rudel[0];var e2=B.rudel[1]
+				var basis=e1.leit.global_position
+				for k in ([e2.leit]+e2.folger).size():
+					var b=([e2.leit]+e2.folger)[k];b.global_position=basis+Vector3(28,0.5,k*2.5)
+				e2.leit.global_position=basis+Vector3(28,0.5,0)
+				B._absteigen(e1,e2.club);B._absteigen(e2,e1.club)
+				var v=e1.leit.global_position-spiel.spieler.global_position
+				spiel.spieler.global_position=basis+Vector3(14,0.3,-18)
+				var v2=basis+Vector3(14,0,0)-spiel.spieler.global_position;spiel.kam.yaw=atan2(v2.x,v2.z)+PI;spiel.kam.pitch=-12.0
+			ui_schritt=3;t=0;_n=0;return
+		if t<1.5:return
+		t=0;_n+=1
+		spiel.kampf.hp=100.0
+		var lebend={}
+		for g in spiel.kampf.gegner:
+			if is_instance_valid(g):lebend[g.fraktion+("_tot" if g.tot else "")]=lebend.get(g.fraktion+("_tot" if g.tot else ""),0)+1
+		print("BIKER krieg t=",_n," ",lebend)
+		if _n in [1,3,6]:shot("biker_krieg_%d"%_n)
+		if _n>=8:get_tree().quit()
+		return
+	if spiel.test_modus=="crash":
+		if ui_schritt==0:
+			if t<3.0:return
+			var S=spiel.welt.S;var best=null
+			for r in S.roads:
+				if r.typ!="strasse" or r.P.size()<40:continue
+				var p0=r.P[10];var p1=r.P[30]
+				if p0.distance_to(Vector2(-262,1040))<500 and (r.T[10].dot(r.T[30]))>0.98:best=r;break
+			var r=best;var i=10
+			var t2:Vector2=r.T[i];var p=r.P[i];var h=r.h[i]
+			var fw=Vector3(t2.x,0,t2.y)
+			var c=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(c);c.setup("c_e30_silber")
+			c.global_transform=Transform3D(Basis.looking_at(-fw,Vector3.UP),Vector3(p.x,h+0.7,p.y))
+			spiel.geparkt.append(c);spiel.einsteigen(c)
+			var hin=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(hin);hin.setup("c_lkw_weiss")
+			var q=p+t2*45.0
+			hin.global_transform=Transform3D(Basis.looking_at(-Vector3(-t2.y,0,t2.x),Vector3.UP),Vector3(q.x,h+0.9,q.y));hin.mass=20000.0
+			spiel.geparkt.append(hin)
+			c.linear_velocity=fw*24.0
+			set_meta("auto",c);set_meta("fw",fw)
+			ui_schritt=1;t=0;_n=0;return
+		var c=get_meta("auto")
+		if ui_schritt==1:
+			if t<0.35:return
+			t=0;_n+=1
+			print("CRASH t=",_n," kmh=",snapped(c.kmh(),0.1)," hp=",snapped(c.hp,1))
+			if _n<6:c.linear_velocity=get_meta("fw")*24.0 if c.kmh()>40.0 else c.linear_velocity
+			if _n==9:
+				_cam_b=Camera3D.new();spiel.add_child(_cam_b);_cam_b.fov=50
+				var fw=get_meta("fw");var quer=Vector3(-fw.z,0,fw.x)
+				_cam_b.global_position=c.global_position+Vector3(0,2.6,0)-fw*3.0+quer*5.5
+				_cam_b.look_at(c.global_position+Vector3(0,0.6,0));_cam_b.current=true;spiel.ui.visible=false
+			if _n==11:get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/crash_1.png")
+			if _n==12:
+				c.aufprall(18.0,c.global_transform.basis.x,null)   # zweiter Stoß von der Seite
+			if _n==14:get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/crash_2.png")
+			if _n==15:c.treffer(900.0,null,c.global_position)
+			if _n==19:get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/crash_3.png")
+			if _n>=24:get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/crash_4.png");get_tree().quit()
+		return
+	if spiel.test_modus=="rechts":
+		# Prüft, ob KI-Autos rechts ihrer Fahrtrichtung fahren
+		if t<12.0:return
+		var S=spiel.welt.S;var rechts=0;var links=0
+		for c in spiel.verkehr:
+			if not is_instance_valid(c) or c.modus!="ki":continue
+			var a=S.at(c.ki_road,clamp(c.ki_s,0.0,S.length(c.ki_road)))
+			var mitte:Vector2=a[0];var fw=c.global_transform.basis.z;var rv=Vector2(-fw.z,fw.x)   # rechts = (-fz, fx)
+			var off=Vector2(c.global_position.x,c.global_position.z)-mitte
+			if off.dot(rv)>0.1:rechts+=1
+			elif off.dot(rv)<-0.1:links+=1
+		print("RECHTSVERKEHR rechts=",rechts," links=",links)
+		get_tree().quit();return
+	if spiel.test_modus=="tuer":
+		# Einsteige-Ablauf: Verkehrsauto neben dem Spieler anhalten, entern, Bilderserie von der Seite
+		if ui_schritt==0:
+			if t<3.0:return
+			var p=Vector2(-262,1040)
+			var hit=spiel.kampf._ray(Vector3(p.x,400,p.y),Vector3(p.x,-50,p.y),[])
+			var h=hit.position.y
+			var c=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(c);c.setup("c_wartburg_beige" if ResourceLoader.exists("res://scripts/comic/comic_autos.gd") else "small_car")
+			c.global_transform=Transform3D(Basis(Vector3.UP,PI*0.5),Vector3(p.x,h+0.8,p.y))
+			spiel.verkehr.append(c);c.modus="geparkt"
+			spiel.spieler.global_position=Vector3(p.x,h+0.3,p.y)+c.global_transform.basis.x*(-5.0)+c.global_transform.basis.z*2.0
+			_cam_b=Camera3D.new();spiel.add_child(_cam_b);_cam_b.fov=55
+			_cam_b.global_position=Vector3(p.x,h+2.6,p.y)+c.global_transform.basis.x*(-7.5)+c.global_transform.basis.z*(-5.5)
+			_cam_b.look_at(Vector3(p.x,h+1.0,p.y)+c.global_transform.basis.x*(-1.2),Vector3.UP);_cam_b.current=true;spiel.ui.visible=false
+			set_meta("auto",c);ui_schritt=1;t=0;return
+		if ui_schritt==1:
+			if t<1.5:return
+			spiel.entern(get_meta("auto"));ui_schritt=2;t=0;_n=0;return
+		if t<0.22:return
+		t=0
+		if _n<14:
+			get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/tuer_%02d.png"%_n);_n+=1;return
+		if ui_schritt==2:
+			print("TUER drin auto=",spiel.auto!=null);spiel.aussteigen();ui_schritt=3;_n=20;return
+		if _n<26:
+			get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/tuer_%02d.png"%_n);_n+=1;return
+		get_tree().quit();return
+	if spiel.test_modus=="fahndung":
+		# Fahndungsstufe 5 im Ghetto: Hubschrauber, Abseilen, Panzer
+		if ui_schritt==0:
+			if t<3.0:return
+			var p=Vector2(-262,1040)
+			var hit=spiel.kampf._ray(Vector3(p.x,400,p.y),Vector3(p.x,-50,p.y),[])
+			spiel.spieler.global_position=Vector3(p.x,hit.position.y+0.3,p.y)
+			spiel.kampf.sterne=5.0;spiel.kampf.such_mitte=spiel.spieler.global_position
+			if spiel._arg("--nacht")!="":spiel.zeit=22.5*60.0
+			ui_schritt=1;t=0;return
+		spiel.kampf.hp=100.0
+		if t<2.0:return
+		t=0;_n+=1
+		var K=spiel.kampf
+		print("FAHNDUNG t=",_n*2," helis=",K.helis.size()," panzer=",K.panzer.size()," gegner=",K.gegner.size()," sterne=",K.sterne)
+		for h in K.helis:if is_instance_valid(h):print("  heli armee=",h.armee," pos=",h.global_position.snapped(Vector3.ONE)," abgesetzt=",h._abgesetzt)
+		for z in K.panzer:if is_instance_valid(z):print("  panzer pos=",z.global_position.snapped(Vector3.ONE)," dist=",snapped(z.global_position.distance_to(spiel.spieler.global_position),1))
+		# Kamera auf das interessanteste Ziel
+		var ziel=null
+		for h in K.helis:if is_instance_valid(h) and h.armee:ziel=h
+		if _n%3==2 and K.panzer.size()>0:ziel=K.panzer[0]
+		if ziel==null and K.helis.size()>0:ziel=K.helis[0]
+		if ziel:
+			var v=ziel.global_position-spiel.spieler.global_position
+			spiel.kam.yaw=atan2(v.x,v.z)+PI;spiel.kam.pitch=clamp(rad_to_deg(atan2(v.y,Vector2(v.x,v.z).length())),-30,40)
+		if _n>2:shot("fahndung_%02d"%_n)
+		if _n>=24:get_tree().quit()
+		return
+	if spiel.test_modus=="bilder":
+		# Galerie: je Ort eine Straßenansicht (Augenhöhe, ohne HUD) und eine Übersicht aus der Höhe
+		var O=[["innenstadt",Vector2(-120,560),Vector2(-60,560)],["ghetto",Vector2(-262,1040),Vector2(-180,1040)],["ghetto_west",Vector2(-560,1150),Vector2(-480,1100)],["suedstadt",Vector2(250,1560),Vector2(330,1560)],
+			["docks",Vector2(500,2090),Vector2(600,2090)],["industrie",Vector2(900,640),Vector2(980,640)],["hafen",Vector2(1500,820),Vector2(1580,820)],["strand",Vector2(-2100,700),Vector2(-2100,800)],
+			["flughafen",Vector2(-2000,1925),Vector2(-2000,1860)],["nordstadt",Vector2(496,-168),Vector2(543,-160)],["wohnviertel",Vector2(-1083,-504),Vector2(-1114,-509)],["huegel",Vector2(58,-2608),Vector2(76,-2652)],
+			["knast",Vector2(1700,-5050),Vector2(1900,-5050)],["militaer",Vector2(-2600,-5250),Vector2(-2600,-5450)],["wuestenflug",Vector2(480,-5265),Vector2(646,-5263)],["staubwinkel",Vector2(1749,-5950),Vector2(1797,-5954)],
+			["farmland",Vector2(1939,-7710),Vector2(1985,-7696)],["nordbucht",Vector2(-119,-9032),Vector2(-123,-9080)]]
+		if ui_schritt==0 and _n==0:
+			_n=1
+			var nur=spiel._arg("--nur")
+			if nur!="":O=O.filter(func(e):return e[0] in nur.split(","))
+			# Wachen und belebte Orte dazu
+			for d in spiel.welt.DIENSTE:
+				var vor=Vector2(sin(d.yaw),cos(d.yaw))
+				if nur=="" or "dienste" in nur:O.append(["dienst_%s_%d"%[d.art,int(d.p.x)],d.p+vor*15.0+Vector2(vor.y,-vor.x)*6.0,d.p-vor*14.0])
+			if nur=="" or "belebt" in nur:
+				O.append(["knasthof",Vector2(2000,-4990),Vector2(2000,-5040)]);O.append(["hafenarbeiter",Vector2(520,2110),Vector2(500,2090)])
+			set_meta("O",O)
+		if has_meta("O"):O=get_meta("O")
+		if t<(6.0 if ui_schritt%2==0 else 1.5):return
+		t=0
+		if _cam_b==null:
+			_cam_b=Camera3D.new();_cam_b.far=5000;_cam_b.fov=62;spiel.add_child(_cam_b)
+			spiel.ui.visible=false;spiel.zeit=11.0*60.0;spiel.st.e.sichtweite=2;spiel.st.e.schatten=true;spiel.einstellungen_anwenden()
+		if ui_schritt>0:
+			var vorher=O[(ui_schritt-1)/2]
+			var img=get_viewport().get_texture().get_image();img.save_png("/home/claude/shots_godot/bild_%s_%d.png"%[vorher[0],(ui_schritt-1)%2])
+		if ui_schritt>=O.size()*2:get_tree().quit();return
+		var e=O[ui_schritt/2];var p:Vector2=e[1];var z:Vector2=e[2];var d=(z-p).normalized()
+		if spiel.welt.has_method("viertel_jetzt"):spiel.welt.viertel_jetzt(p)
+		var hit=spiel.kampf._ray(Vector3(p.x,600,p.y),Vector3(p.x,-50,p.y),[])
+		var h=hit.position.y if hit else spiel.welt.G.h_at(p.x,p.y)
+		var D=Vector3(d.x,0,d.y)
+		spiel.spieler.global_position=Vector3(p.x,h+0.3,p.y)-D*8.0;spiel.spieler.velocity=Vector3.ZERO
+		spiel.env.fog_enabled=ui_schritt%2==0
+		if ui_schritt%2==0:
+			_cam_b.global_position=Vector3(p.x,h+1.8,p.y)-D*2.0;_cam_b.look_at(Vector3(p.x,h+3.0,p.y)+D*60.0)
+		else:
+			var rechts=Vector3(-D.z,0,D.x)
+			_cam_b.global_position=Vector3(p.x,h+75,p.y)-D*110.0+rechts*40.0;_cam_b.look_at(Vector3(p.x,h,p.y)+D*120.0)
+		_cam_b.current=true
+		ui_schritt+=1
+		return
 	if spiel.test_modus=="rundgang" or spiel.test_modus=="luft":
 		var luft=spiel.test_modus=="luft"
 		# Rundgang durch die Hauptstadt: an mehreren Straßenpunkten in vier Richtungen fotografieren

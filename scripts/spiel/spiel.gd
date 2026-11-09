@@ -36,6 +36,8 @@ var admin_keine_polizei:=false
 var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
 var ui:CanvasLayer
+var belebung=null
+var biker=null
 var lade:Control;var lade_bar:ProgressBar;var lade_text:Label
 var bereit:=false
 var geld:=500
@@ -111,7 +113,7 @@ func _ready():
 	await _schritt("Autos werden vorbereitet …",0.86)
 	# alle Fahrzeuge jetzt laden (kein Nachladen im Hintergrund – das hat das Spiel auf dem Handy blockiert)
 	var alle=[]
-	for k in FARB+(["c_feuerwehr","c_rtw","c_polizei"] if "comic" in welt else ["lkw","lkw_blau","bus","feuerwehr","rtw","armored"]):
+	for k in FARB+(["c_feuerwehr","c_rtw","c_polizei","c_taxi","c_lkw_radeberger","c_lkw_blau","c_lkw_weiss","c_lkw_bau","c_transporter_weiss","c_transporter_post","c_transporter_handwerk","c_harley_hoellenhunde","c_harley_hoellenhunde_p","c_harley_sachsenriders","c_harley_sachsenriders_p","c_harley_elbewoelfe","c_harley_elbewoelfe_p","c_harley_wuestenraben","c_harley_wuestenraben_p"] if "comic" in welt else ["lkw","lkw_blau","bus","feuerwehr","rtw","armored"]):
 		if not k in alle:alle.append(k)
 	for i in alle.size():
 		AUTO.vorlage(alle[i]);_log("  vorlage "+alle[i])
@@ -320,11 +322,15 @@ func _spieler():
 		mini.strassen=welt.S.roads;mini.icons=[]
 		for s in welt.A.shops:mini.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y})
 		for im in welt.get("IMMO") if welt.get("IMMO")!=null else []:mini.icons.append({"typ":im.art,"x":im.p.x,"z":im.p.z})
+		for d in welt.get("DIENSTE") if welt.get("DIENSTE")!=null else []:mini.icons.append({"typ":d.art,"x":d.p.x,"z":d.p.y})
 	motor=MOTOR.new();add_child(motor)
 	mis=MIS.new();mis.spiel=self;add_child(mis)
 	kampf=KAMPF.new();kampf.spiel=self;add_child(kampf);kampf.setup_spieler()
 	hud.kampf=kampf;mini.kampf=kampf
 	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
+	if "comic" in welt:
+		belebung=load("res://scripts/spiel/belebung.gd").new();add_child(belebung);belebung.setup(self)
+		biker=load("res://scripts/spiel/biker.gd").new();add_child(biker);biker.setup(self)
 	admin_mod=load("res://scripts/spiel/admin.gd").new();admin_mod.spiel=self;add_child(admin_mod)
 	if not "comic" in welt:gras=GRAS.new();gras.welt=welt;add_child(gras)
 
@@ -411,6 +417,8 @@ func _process(dt):
 	if auto==null and panel==null:kampf.spieler_schritt(dt)
 	var _t5=Time.get_ticks_usec();kampf.welt_schritt(dt);_pz('kampf.welt_schritt(dt)',_t5)
 	var _t6=Time.get_ticks_usec();wirt.schritt(dt);_pz('wirt.schritt(dt)',_t6)
+	if belebung:var _tb=Time.get_ticks_usec();belebung.schritt(dt);_pz('belebung',_tb)
+	if biker:var _tk=Time.get_ticks_usec();biker.schritt(dt);_pz('biker',_tk)
 	st.end_frame()
 
 # Tag und Nacht: Sonnenstand, Licht, Himmel, Straßenlaternen, Scheinwerfer
@@ -489,7 +497,8 @@ func _interaktion():
 				return
 			if z.typ in ["werkstatt","lack"]:z.offen=false
 
-# Wie in GTA: zur Fahrertür gehen, bei Verkehrsautos den Fahrer rausziehen (er rennt weg), dann einsteigen
+# Wie in GTA: zur Fahrertür gehen, Tür aufziehen, bei Verkehrsautos den Fahrer rauszerren
+# (er stürzt und rennt weg), einsteigen, Tür zuziehen.
 var _entert:=false
 var _fahrer_ped:Node3D=null
 func entern(c):
@@ -505,35 +514,92 @@ func entern(c):
 	# Figur schiebt das Auto beim Hingehen nicht weg (keine Kollision), Auto bleibt stehen
 	spieler.collision_layer=0;spieler.collision_mask=0
 	tuer.y=max(tuer.y,c.global_position.y+0.1)
-	var dauer=clamp(start.distance_to(tuer)/4.0,0.2,1.2)
+	var seitlich=c.global_transform.basis.x;seitlich.y=0;seitlich=seitlich.normalized()
+	var vor_tuer=tuer-seitlich*0.35+c.global_transform.basis.z*0.55   # neben dem Türgriff, Tür schwingt an ihm vorbei
+	var dauer=clamp(start.distance_to(vor_tuer)/4.0,0.2,1.2)
 	var blick=(c.global_position-tuer);spieler.rotation.y=0.0;spieler.figur.rotation.y=atan2(blick.x,blick.z)
-	var tw=create_tween();tw.tween_property(spieler,"global_position",tuer,dauer)
+	if dauer>0.25:PE.play(spieler.figur,"walk")
+	var tw=create_tween();tw.tween_property(spieler,"global_position",vor_tuer,dauer)
 	await get_tree().create_timer(dauer+0.05).timeout   # Zeitgeber feuert immer (Tween-Signal kann ausbleiben)
 	if tw.is_valid():tw.kill()
+	if not is_instance_valid(c):_entert=false;spieler.collision_layer=1;spieler.collision_mask=1|8;return
+	# Tür auf
+	var T=_tuer(c)
+	PE.play(spieler.figur,"punch")
+	var two=create_tween();two.tween_property(T,"rotation:y",1.15,0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.35).timeout
 	if hatte_fahrer and is_instance_valid(c):
 		if _fahrer_ped==null:
 			var r2=RandomNumberGenerator.new();r2.randomize()
 			_fahrer_ped=PE.make(PE.CIVIL[r2.randi()%PE.CIVIL.size()],r2);add_child(_fahrer_ped)
 		var p=_fahrer_ped;p.visible=true
-		var weg=(tuer-c.global_position);weg.y=0;weg=weg.normalized()
-		p.global_position=tuer+weg*0.6;p.rotation.y=atan2(weg.x,weg.z)
-		PE.play(p,"run")
-		hud.zeige("Fahrer rausgezogen!",1.5)
+		var weg=-seitlich
+		var sitz=c.global_transform*Vector3(c.ab.position.x+0.55,c.ab.position.y+0.05,c.ab.get_center().z+0.2)
+		p.global_position=sitz;p.rotation.y=atan2(weg.x,weg.z)
+		hud.zeige("Fahrer rausgezerrt!",1.5)
 		kampf.verbrechen(0.35)
-		# Fahrer wird rausgezerrt, stolpert kurz, rennt dann weg
-		p.global_position=tuer-weg*0.2+Vector3(0,0.0,0);PE.play(p,"shake")
-		var tw2=create_tween();tw2.tween_property(p,"global_position",tuer+weg*1.4,0.5)
+		# rausreißen (über die Schwelle), hinfallen, aufrappeln, wegrennen
+		PE.play(p,"shake")
+		var raus=Vector3(tuer.x,c.global_position.y-0.1,tuer.z)+weg*1.2
+		var boden=kampf._ray(raus+Vector3(0,2,0),raus+Vector3(0,-3,0),[c])
+		if boden:raus.y=boden.position.y
+		var tw2=create_tween()
+		tw2.tween_property(p,"global_position",raus,0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw2.parallel().tween_property(p,"rotation:x",-1.2,0.45)
+		tw2.tween_interval(0.5)
+		tw2.tween_property(p,"rotation:x",0.0,0.35)
 		tw2.tween_callback(func():PE.play(p,"run"))
-		tw2.tween_property(p,"global_position",tuer+weg*18.0,3.5)
+		tw2.tween_property(p,"global_position",raus+weg*16.0+c.global_transform.basis.z*4.0,3.2)
 		tw2.tween_callback(func():p.visible=false)
-		await get_tree().create_timer(0.9).timeout
+		await get_tree().create_timer(0.7).timeout
+	# reinsetzen
+	if is_instance_valid(c):
+		PE.play(spieler.figur,"idle")
+		var sitz2=c.global_transform*Vector3(c.ab.position.x+0.55,c.ab.position.y+0.05,c.ab.get_center().z+0.2)
+		var tw3=create_tween();tw3.tween_property(spieler,"global_position",sitz2,0.4)
+		await get_tree().create_timer(0.42).timeout
 	_entert=false
 	spieler.collision_mask=1|8
-	if is_instance_valid(c):einsteigen(c)
+	if is_instance_valid(c):
+		einsteigen(c)
+		_tuer_zu(T,0.15)
 	else:spieler.collision_layer=1;ereignis("entern: Auto weg")
+
+# Fahrertür als eigenes Teil: dunkle Öffnung im Blech + Türblatt in Wagenfarbe, an der Vorderkante angeschlagen
+func _tuer(c)->Node3D:
+	var alt=c.get_node_or_null("TuerAnim")
+	if alt:alt.queue_free()
+	var ab:AABB=c.ab
+	var lang=clamp(ab.size.z*0.27,0.95,1.35);var hoch=ab.size.y*0.42
+	var z_vorn=ab.get_center().z+lang*0.75;var y0=ab.position.y+ab.size.y*0.2
+	var farbe=Color(0.5,0.5,0.55);var best=0.0
+	for m in c.visual.find_children("*","MeshInstance3D",true,false) if c.visual else []:
+		var v=m.get_aabb().get_volume()
+		var mt=m.material_override if m.material_override else (m.mesh.surface_get_material(0) if m.mesh and m.mesh.get_surface_count()>0 else null)
+		if mt is StandardMaterial3D and v>best:best=v;farbe=mt.albedo_color
+	var wurzel=Node3D.new();wurzel.name="TuerAnim";c.add_child(wurzel)
+	var loch=MeshInstance3D.new();var lb=BoxMesh.new();lb.size=Vector3(0.02,hoch,lang);loch.mesh=lb
+	var lm=StandardMaterial3D.new();lm.albedo_color=Color(0.05,0.05,0.06);loch.material_override=lm
+	wurzel.add_child(loch);loch.position=Vector3(ab.position.x-0.012,y0+hoch*0.5,z_vorn-lang*0.5)
+	var dreh=Node3D.new();wurzel.add_child(dreh);dreh.position=Vector3(ab.position.x-0.03,y0,z_vorn);dreh.name="Dreh"
+	var blatt=MeshInstance3D.new();var bb=BoxMesh.new();bb.size=Vector3(0.07,hoch,lang);blatt.mesh=bb;dreh.add_child(blatt);blatt.position=Vector3(0,hoch*0.5,-lang*0.5)
+	var bm=StandardMaterial3D.new();bm.albedo_color=farbe;bm.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;blatt.material_override=bm
+	var fenster=MeshInstance3D.new();var fb=BoxMesh.new();fb.size=Vector3(0.05,hoch*0.55,lang*0.8);fenster.mesh=fb;dreh.add_child(fenster);fenster.position=Vector3(0,hoch*1.27,-lang*0.45)
+	var fm=StandardMaterial3D.new();fm.albedo_color=Color(0.4,0.6,0.75,0.55);fm.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;fenster.material_override=fm
+	var griff=MeshInstance3D.new();var gb=BoxMesh.new();gb.size=Vector3(0.05,0.05,0.2);griff.mesh=gb;dreh.add_child(griff);griff.position=Vector3(-0.05,hoch*0.8,-lang*0.85)
+	griff.material_override=lm
+	return dreh
+func _tuer_zu(T:Node3D,warte:=0.0):
+	if T==null or not is_instance_valid(T):return
+	var tw=T.create_tween();tw.tween_interval(warte);tw.tween_property(T,"rotation:y",0.0,0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():if is_instance_valid(T):T.get_parent().queue_free())
 
 func einsteigen(c):
 	ereignis("einsteigen "+str(c.kind))
+	if c.visual and c.visual.get_node_or_null("Fahrer"):c.visual.get_node("Fahrer").visible=false
+	if biker:
+		for e in biker.rudel:
+			if c in e.folger:e.folger.erase(c)
 	verkehr.erase(c);if not geparkt.has(c):geparkt.append(c)
 	auto=c;c.uebernehmen();c.contact_monitor=true;c.max_contacts_reported=4
 	if motor.has_method("waehle"):motor.waehle(c.kind)
@@ -583,6 +649,8 @@ func aussteigen_sofort():
 func aussteigen():
 	if auto.kmh()>25.0:hud.zeige("Zu schnell zum Aussteigen!",1.5);return
 	var p=_aussteig_platz(auto)
+	if auto.kmh()<5.0 and auto.visual:
+		var T=_tuer(auto);T.rotation.y=1.15;_tuer_zu(T,0.55)
 	kampf.halter.modell=null;kampf.halter.waffe_id="";kampf.halter.setze_waffe(kampf.aktuell)
 	auto.modus="geparkt";auto.engine_force=0;auto.brake=8.0;auto.steering=0
 	spieler.rotation=Vector3.ZERO;spieler.figur.rotation.y=auto.global_rotation.y+PI*0.5
@@ -621,6 +689,10 @@ func _rempler(b):
 	if auto!=null and auto.kmh()>25.0 and st.e.vibration:Input.vibrate_handheld(int(clamp(auto.kmh(),40,250)))
 	if b!=null and b.get_script()==AUTO and b.modus=="ki":
 		verkehr.erase(b);b.parken();b.freeze=false;geparkt.append(b)
+	# angefahrenes Auto bekommt ebenfalls Beulen (KI-Autos haben keine eigene Physik-Geschwindigkeit)
+	if b!=null and b.get_script()==AUTO and auto!=null and auto.kmh()>18.0:
+		var d=b.global_position-auto.global_position;d.y=0
+		if d.length()>0.1:b.aufprall(auto.kmh()/3.6*0.7,d.normalized(),auto)
 
 # ---------------- Verkehr ----------------
 # Verkehr: nur Fahrzeuge mit Scheiben (Trabant, Geldtransporter ohne Glas sind nicht mehr dabei)
@@ -684,7 +756,10 @@ func _spawn_auto(p2:Vector2):
 		var c=AUTO.new();add_child(c)
 		var k=FARB[rng.randi()%FARB.size()]
 		if "comic" in welt:
-			if rng.randf()<0.03:k=["c_feuerwehr","c_rtw"][rng.randi()%2]
+			var zf=rng.randf()
+			if zf<0.03:k=["c_feuerwehr","c_rtw"][rng.randi()%2]
+			elif zf<(0.22 if r.typ in ["autobahn","land"] else 0.1):k=["c_lkw_radeberger","c_lkw_blau","c_lkw_weiss","c_lkw_bau"][rng.randi()%4]
+			elif zf<(0.3 if r.typ in ["autobahn","land"] else 0.18):k=["c_transporter_weiss","c_transporter_post","c_transporter_handwerk"][rng.randi()%3]
 		elif r.typ=="autobahn" and rng.randf()<0.15:k=["lkw","lkw_blau"][rng.randi()%2]
 		elif rng.randf()<0.02:k="feuerwehr"
 		if wirt and r.typ!="autobahn" and rng.randf()<int(wirt.personal.get("taxizentrale",{}).get("fahrer",0))*0.025:k="c_taxi" if "comic" in welt else "taxi"

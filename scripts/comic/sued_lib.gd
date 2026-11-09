@@ -338,6 +338,10 @@ func kits_bauen():
 	_kit("flug","tower","fl_tower",14.0,14.0,func():_k_tower())
 	_kit("flug","flieger","fl_flieger",32.0,34.0,func():_k_flieger())
 	KITLISTE["flug/busch"]=KITLISTE["ghetto/busch"]
+	# Wachen: Polizei, Feuerwehr, Taxizentrale (Hof vorn, Gebäude hinten)
+	_kit("dienst","polizei","sv_polizei",30.0,28.0,func():_k_polizei())
+	_kit("dienst","feuerwehr","sv_feuerwehr",34.0,30.0,func():_k_feuerwehr())
+	_kit("dienst","taxi","sv_taxi",26.0,22.0,func():_k_taxizentrale())
 	GL.ohne_tags=false
 	print("SUED Bausätze ",K.KITS.size()," ",Time.get_ticks_msec()-t0," ms")
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
@@ -428,14 +432,14 @@ func _k_kirche():
 	L.hex(T(Color(0.85,0.85,0.88)),[_P(-2.1,12,1.9),_P(2.1,12,1.9),_P(2.1,12,6.1),_P(-2.1,12,6.1),_P(-0.05,17,3.95),_P(0.05,17,3.95),_P(0.05,17,4.05),_P(-0.05,17,4.05)],0.04)
 	L.box(L.M.holz,_P(0,15.5,4.0),Vector3(0.15,2.0,0.15),Basis(),0.0);L.box(L.M.holz,_P(0,15.9,4.0),Vector3(1.0,0.15,0.15),Basis(),0.0)
 	L.box(T(Color(0.35,0.22,0.15)),_P(0,1.3,1.98),Vector3(1.8,2.6,0.05),Basis(),0.0)
-	GL.label("GEMEINDE ZION",_P(0,8.3,1.95),Basis(),0.007,Color(0.95,0.9,0.7),Color(0.1,0.08,0.05))
+	GL.label("GEMEINDE ZION",_P(0,8.3,1.95),Basis(),0.007,Color(0.95,0.9,0.7),Color(0.1,0.08,0.05),3.6)
 func _k_werbung(i:int):
-	var pl=["RADEBERGER COLA","SPRUNK","CLUCKIN' HUHN","PFANDHAUS 24H"]
+	var pl=["RADEBERGER COLA","ELBQUELL","BROILER-BUDE","PFANDHAUS 24H"]
 	for sx in [-2.5,2.5]:L.zyl(L.M.metall,_P(sx,0,3.0),_P(sx,6.0,3.0),0.12,1.2)
 	L.PFOSTEN.append([_P(-2.5,0,3.0),0.15,6.0]);L.PFOSTEN.append([_P(2.5,0,3.0),0.15,6.0])
 	L.box(L.M.dunkel,_P(0,7.0,3.0),Vector3(7.6,3.4,0.25),Basis(),0.04)
 	L.box(T(GL.SPRAY[i%GL.SPRAY.size()]),_P(0,7.0,2.85),Vector3(7.2,3.0,0.05),Basis(),0.0)
-	GL.label(pl[i%pl.size()],_P(0,7.0,2.8),Basis(),0.016,Color(1,1,1),Color(0.08,0.08,0.1))
+	GL.label(pl[i%pl.size()],_P(0,7.0,2.8),Basis(),0.016,Color(1,1,1),Color(0.08,0.08,0.1),6.6)
 func _k_busch(i:int):
 	var p=_P(0,0,3.0)
 	match i%3:
@@ -460,7 +464,7 @@ func _k_autohandel(i:int):
 	L.box(L.M.putz[i%L.M.putz.size()],c+Vector3(0,2.2,0),Vector3(12,4.4,8),Basis(),0.05);K.haupt(c+Vector3(0,2.2,0),Vector3(12,4.4,8),Basis(),Color(0.9,0.85,0.75))
 	L.box(L.M.glas[1],c+Vector3(0,1.8,4.03),Vector3(8,2.2,0.05),Basis(),0.0)
 	L.box(T(Color(0.85,0.15,0.12)),c+Vector3(0,5.0,3.0),Vector3(14,1.4,0.3),Basis(),0.03)
-	GL.label(["GEBRAUCHTWAGEN ZÖLLNER","AUTO-ANKAUF BAR"][i],c+Vector3(0,5.0,3.2),Basis(),0.011,Color(1,1,0.9),Color(0.1,0.05,0.05))
+	GL.label(["GEBRAUCHTWAGEN ZÖLLNER","AUTO-ANKAUF BAR"][i],c+Vector3(0,5.0,3.2),Basis(),0.011,Color(1,1,0.9),Color(0.1,0.05,0.05),13.2)
 	for k in 8:
 		var q=_P(-13+k*3.6,0,0.6)
 		L.zyl(L.M.metall,q,q+Vector3(0,4.0,0),0.04,1.1)
@@ -494,7 +498,7 @@ func _k_lager(i:int,kauf:bool):
 	if kauf:
 		L.box(T(Color(0.95,0.95,0.92)),_P(-10,4.5,4.6),Vector3(8,2.4,0.2),Basis(),0.03)
 		L.zyl(L.M.metall,_P(-13,0,4.6),_P(-13,3.4,4.6),0.08,1.1);L.zyl(L.M.metall,_P(-7,0,4.6),_P(-7,3.4,4.6),0.08,1.1)
-		GL.label("ZU VERKAUFEN\nLAGERHALLE",_P(-10,4.5,4.48),Basis(),0.012,Color(0.85,0.1,0.1),Color(1,1,1))
+		GL.label("ZU VERKAUFEN\nLAGERHALLE",_P(-10,4.5,4.48),Basis(),0.012,Color(0.85,0.1,0.1),Color(1,1,1),7.4)
 	L._zaun(_P(-22,0,0.3),_P(-6,0,0.3),2.2);L._zaun(_P(6,0,0.3),_P(22,0,0.3),2.2)
 	L.koll_box(_P(-14,1.1,0.3),Vector3(16,2.2,0.12));L.koll_box(_P(14,1.1,0.3),Vector3(16,2.2,0.12))
 func container(p:Vector3,yaw:float,farbe:Color):
@@ -519,6 +523,75 @@ func _k_buero():
 	K.haupt(_P(0,2.6,5),Vector3(12.2,5.2,2.44),Basis(),Color(0.92,0.92,0.9))
 	L.box(L.M.glas[1],_P(0,1.3,3.75),Vector3(8,1.0,0.05),Basis(),0.0)
 	L.box(L.M.metall,_P(-6.6,1.3,5),Vector3(0.9,2.6,2.0),Basis(),0.02)
+func _fensterreihe(x0:float,x1:float,y:float,z:float,glas:Material,rahmen:Material,schritt:=2.6):
+	var x=x0
+	while x<=x1+0.01:
+		L.box(rahmen,_P(x,y,z-0.04),Vector3(1.5,1.5,0.08),Basis(),0.0);L.box(glas,_P(x,y,z-0.09),Vector3(1.2,1.2,0.05),Basis(),0.0);x+=schritt
+func _k_polizei():
+	var hof=L.M.hof;var weiss=T(Color(0.93,0.93,0.9));var blau=T(Color(0.12,0.25,0.55));var grau=T(Color(0.45,0.47,0.5))
+	L.box(hof,_P(0,-0.06,14),Vector3(30,0.14,28),Basis(),0.0)
+	for k in 5:L.box(T(Color(0.95,0.95,0.95)),_P(-10+k*4.5,0.02,7),Vector3(0.12,0.02,5),Basis(),0.0)   # Stellplätze
+	var c=_P(0,0,20);L.box(weiss,c+Vector3(0,4.0,0),Vector3(26,8,14),Basis(),0.05)
+	K.haupt(c+Vector3(0,4.0,0),Vector3(26,8,14),Basis(),Color(0.93,0.93,0.9),Color(0.45,0.47,0.5),0,true)
+	L.box(grau,c+Vector3(0,8.15,0),Vector3(26.4,0.3,14.4),Basis(),0.04)
+	L.box(blau,_P(0,2.9,13.0-0.02),Vector3(26.02,0.7,0.06),Basis(),0.0)   # blaues Band
+	L.box(blau,_P(0,6.3,13.0-0.02),Vector3(26.02,0.25,0.06),Basis(),0.0)
+	_fensterreihe(-11,11,5.1,13.0,L.M.glas[1],grau)
+	_fensterreihe(-11,-5,1.6,13.0,L.M.glas[1],grau);_fensterreihe(5,11,1.6,13.0,L.M.glas[1],grau)
+	# Eingang mit Vordach, Schild, Blaulicht-Lampe
+	L.box(L.M.glas[0],_P(0,1.3,12.95),Vector3(3.6,2.6,0.08),Basis(),0.02)
+	L.box(grau,_P(0,2.8,11.6),Vector3(6,0.25,3),Basis(),0.04)
+	for sx in [-1,1]:L.zyl(grau,_P(sx*2.7,0,10.3),_P(sx*2.7,2.7,10.3),0.12,1.1)
+	GL.label("POLIZEI",_P(0,7.2,12.9),Basis(),0.03,Color(1,1,1),Color(0.08,0.15,0.4),20.0)
+	var bl=T(Color(0.2,0.45,1.0));bl.emission_enabled=true;bl.emission=Color(0.1,0.3,1.0);bl.emission_energy_multiplier=1.5
+	L.kugel(bl,_P(0,3.25,10.3),Vector3(0.35,0.3,0.35),1.05)
+	# Fahnenmast, Garagen hinten seitlich
+	L.zyl(grau,_P(13,0,8),_P(13,10,8),0.08,1.1);L.box(T(Color(0.1,0.5,0.25)),_P(13.9,9.2,8),Vector3(1.8,1.1,0.03),Basis(),0.0)
+	for k in 2:L.box(T(Color(0.6,0.62,0.65)),_P(-8+k*16,1.6,26.9),Vector3(5,3.2,0.1),Basis(),0.02)
+	L.koll_box(c+Vector3(0,4.0,0),Vector3(26,8,14))
+func _k_feuerwehr():
+	var hof=L.M.hof;var ziegel=T(Color(0.68,0.26,0.18));var dunkelrot=T(Color(0.6,0.08,0.06));var grau=T(Color(0.5,0.5,0.52));var weiss=T(Color(0.95,0.95,0.93))
+	L.box(hof,_P(0,-0.06,15),Vector3(34,0.14,30),Basis(),0.0)
+	var c=_P(-3,0,20);L.box(ziegel,c+Vector3(0,4.5,0),Vector3(26,9,16),Basis(),0.05)
+	K.haupt(c+Vector3(0,4.5,0),Vector3(26,9,16),Basis(),Color(0.68,0.26,0.18),Color(0.35,0.33,0.33),1,false)
+	L.box(grau,c+Vector3(0,9.15,0),Vector3(26.4,0.3,16.4),Basis(),0.04)
+	# drei große Tore (geschlossen, rot mit Fensterband), Torrahmen weiß
+	for k in 3:
+		var x=-3.0-8.0+k*8.0
+		L.box(weiss,_P(x,2.6,12.0-0.03),Vector3(6.6,5.4,0.08),Basis(),0.0)
+		L.box(dunkelrot,_P(x,2.5,12.0-0.08),Vector3(6.0,5.0,0.08),Basis(),0.0)
+		for y in 5:L.box(T(Color(0.45,0.05,0.04)),_P(x,0.6+y*1.0,12.0-0.13),Vector3(6.0,0.06,0.03),Basis(),0.0)
+		L.box(L.M.glas[1],_P(x,3.6,12.0-0.13),Vector3(5.0,0.6,0.03),Basis(),0.0)
+		GL.label("%d"%(k+1),_P(x,5.75,11.9),Basis(),0.012,Color(1,1,1),Color(0.4,0.0,0.0))
+	GL.label("FEUERWEHR",_P(-3,7.6,11.9),Basis(),0.028,Color(1,1,1),Color(0.45,0.0,0.0),20.0)
+	# Schlauchturm
+	var tc=_P(13,0,22);L.box(ziegel,tc+Vector3(0,8,0),Vector3(5,16,5),Basis(),0.05)
+	K.haupt(tc+Vector3(0,8,0),Vector3(5,16,5),Basis(),Color(0.68,0.26,0.18),Color(0.3,0.3,0.3),0,false)
+	L.box(grau,tc+Vector3(0,16.3,0),Vector3(5.6,0.6,5.6),Basis(),0.04)
+	for y in [4.0,8.0,12.0]:L.box(L.M.glas[1],tc+Vector3(0,y,2.52),Vector3(1.0,1.6,0.05),Basis(),0.0)
+	var bl=T(Color(1.0,0.25,0.15));bl.emission_enabled=true;bl.emission=Color(1.0,0.15,0.05)
+	L.kugel(bl,tc+Vector3(0,16.9,0),Vector3(0.4,0.3,0.4),1.05)
+	L.koll_box(c+Vector3(0,4.5,0),Vector3(26,9,16));L.koll_box(tc+Vector3(0,8,0),Vector3(5,16,5))
+	# Hydrant, Übungsturm-Zaun
+	L.zyl(T(Color(0.85,0.1,0.08)),_P(-15,0,3),_P(-15,0.9,3),0.18,1.15)
+func _k_taxizentrale():
+	var hof=L.M.hof;var gelb=T(Color(1.0,0.82,0.15));var dunkel=T(Color(0.15,0.15,0.17));var wand=T(Color(0.85,0.82,0.75))
+	L.box(hof,_P(0,-0.06,11),Vector3(26,0.14,22),Basis(),0.0)
+	var c=_P(-6,0,16);L.box(wand,c+Vector3(0,2.0,0),Vector3(12,4,9),Basis(),0.05)
+	K.haupt(c+Vector3(0,2.0,0),Vector3(12,4,9),Basis(),Color(0.85,0.82,0.75),Color(0.3,0.3,0.3),0,true)
+	# Schachbrettband
+	for k in 24:L.box(gelb if k%2==0 else dunkel,_P(-11.75+k*0.5,3.6,11.48),Vector3(0.5,0.4,0.05),Basis(),0.0)
+	L.box(L.M.glas[2],_P(-6,1.4,11.45),Vector3(7,1.6,0.05),Basis(),0.0)
+	GL.label("TAXI-ZENTRALE",_P(-6,4.5,11.4),Basis(),0.02,Color(1,0.85,0.15),Color(0.1,0.1,0.1),10.5)
+	# Überdachung über den Stellplätzen
+	for sx in [-1,1]:
+		for sz in [6.0,14.0]:L.zyl(T(Color(0.7,0.7,0.72)),_P(6+sx*5.5,0,sz),_P(6+sx*5.5,3.2,sz),0.12,1.1)
+	L.box(gelb,_P(6,3.35,10),Vector3(12,0.25,9.5),Basis(),0.04)
+	L.koll_box(c+Vector3(0,2.0,0),Vector3(12,4,9))
+	var schild=T(Color(1,0.85,0.15));schild.emission_enabled=true;schild.emission=Color(0.5,0.4,0.05)
+	L.box(schild,_P(-12,4.6,1.0),Vector3(2.2,0.8,0.2),Basis(),0.03);L.zyl(dunkel,_P(-12,0,1.0),_P(-12,4.2,1.0),0.08,1.1)
+	GL.label("TAXI",_P(-12,4.6,0.88),Basis(),0.012,Color(0.1,0.1,0.1),Color(1,0.85,0.15),1.9)
+
 func _k_kran():
 	# Containerbrücke; Ausleger zeigt zur Straße (+z) -> wird so gestellt, dass die Straße/Kaikante vorn liegt
 	var c=_P(0,0,12);var farbe=T([Color(0.92,0.3,0.15),Color(0.95,0.75,0.15),Color(0.25,0.45,0.75)][rng.randi()%3])
@@ -639,7 +712,7 @@ func _k_terminal():
 	L.box(L.M.weiss,t+Vector3(0,5,0),Vector3(76,10,22),Basis(),0.05);K.haupt(t+Vector3(0,5,0),Vector3(76,10,22),Basis(),Color(0.95,0.95,0.95),Color(0.25,0.4,0.6))
 	L.box(L.M.glas[1],t+Vector3(0,5,11.05),Vector3(72,7,0.1),Basis(),0.0)
 	L.box(T(Color(0.25,0.4,0.6)),t+Vector3(0,10.6,0),Vector3(80,1.2,26),Basis(),0.04)
-	GL.label("FLUGHAFEN RADEBERG",t+Vector3(0,12.6,11.2),Basis(),0.028,Color(0.2,0.35,0.6),Color(1,1,1))
+	GL.label("FLUGHAFEN RADEBERG",t+Vector3(0,12.6,11.2),Basis(),0.028,Color(0.2,0.35,0.6),Color(1,1,1),60.0)
 func _k_tower():
 	var tw=_P(0,0,7)
 	L.zyl(L.M.weiss,tw,tw+Vector3(0,28,0),2.2,1.04);L.PFOSTEN.append([tw,2.2,28.0])
@@ -770,6 +843,29 @@ func grundstuecke():
 	print("SUED FAIL ",FAIL);print("SUED Grundstücke an Straßen ",PLATZ.size()," ",Time.get_ticks_msec()-t0," ms")
 # Hinterland: Originalhäuser als Vorlage, danach Füllstücke
 # Tuning-Werkstatt (Halle 20 x 26 m) an einer Ghetto-Straße reservieren; gebaut wird sie im Spiel (scripts/spiel/garage.gd)
+var DIENSTE:=[]   # {art, F, yaw} lokale Wachen (Polizei, Feuerwehr, Taxi)
+func dienst_reservieren(art:String,nahe_welt:Vector2):
+	var kit="sv_"+art;var k=K.KITS[kit];var ziel=nahe_welt-C;var best=null;var bd=1e9
+	for ri in ROADS.size():
+		var r=ROADS[ri]
+		if not r.typ in ["strasse","allee"] or r.n.begins_with("Hinter"):continue
+		if r.P[0].distance_to(ziel)>2500.0 and r.P[r.P.size()-1].distance_to(ziel)>2500.0:continue
+		var s=10.0
+		while s<r.S[-1]-10.0:
+			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1]
+			if p.distance_to(ziel)<600.0:
+				for sd in [-1,1]:
+					var n=Vector2(-t.y,t.x)*sd;var F=p+n*(r.w+r.sw+0.3)
+					var d=F.distance_to(ziel)
+					if d<bd and _rechteck_ok(F,t,n,k.w,k.d) and not nah_kreuzung(F,12.0):bd=d;best=[F,t,n,r]
+			s+=8.0
+	if best==null:print("DIENST %s: kein Platz bei %s"%[art,nahe_welt]);return
+	var F:Vector2=best[0];var n:Vector2=best[2]
+	_belegen(F,best[1],n,k.w,k.d)
+	_setzen(kit,F,best[1],n)
+	var aussen=-n
+	DIENSTE.append({"art":art,"F":F,"yaw":atan2(aussen.x,aussen.y)})
+	print("DIENST ",art," bei ",F+C)
 var WERKSTATT:={}
 func werkstatt_reservieren(nahe_welt:Vector2):
 	var ziel=nahe_welt-C;var best=null;var bd=1e9

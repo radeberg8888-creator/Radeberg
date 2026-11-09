@@ -4,7 +4,8 @@ const PE=preload("res://scripts/people.gd")
 const WD=preload("res://scripts/spiel/waffen_daten.gd")
 const HALTER=preload("res://scripts/spiel/waffen_halter.gd")
 const FARBEN={"kobras":Color(0.12,0.45,0.18),"ratten":Color(0.3,0.33,0.38),"ost":Color(0.5,0.05,0.06),"fuechse":Color(0.66,0.55,0.36),
-	"lindenhof":Color(0.36,0.16,0.5),"wache":Color(0.1,0.1,0.12),"polizei":Color(0.08,0.12,0.3)}
+	"lindenhof":Color(0.36,0.16,0.5),"wache":Color(0.1,0.1,0.12),"polizei":Color(0.08,0.12,0.3),
+	"hoellenhunde":Color(0.12,0.05,0.05),"elbewoelfe":Color(0.1,0.12,0.18),"sachsenriders":Color(0.06,0.12,0.07),"wuestenraben":Color(0.14,0.09,0.04)}
 var kampf
 var fraktion:="kobras"
 var waffe:="pistole"
@@ -26,10 +27,13 @@ var _denk:=0.0
 var _ziel_dist:=12.0
 var stationaer:=false       # bleibt am Platz (Wachen, Scharfschützen-Ziele)
 var verbuendet:=false       # kämpft auf Seite des Spielers
+var friedlich:=false        # greift den Spieler erst an, wenn er provoziert wird
+var feinde:=[]              # verfeindete Fraktionen (Bandenkrieg)
 
 func setup(f:String,w:String,opt:={}):
 	fraktion=f;waffe=w
 	mission=opt.get("mission",false);stationaer=opt.get("stationaer",false);verbuendet=opt.get("verbuendet",false)
+	friedlich=opt.get("friedlich",false);feinde=opt.get("feinde",[])
 	hp=float(opt.get("hp",100.0 if f!="polizei" else 110.0))
 	collision_layer=2;collision_mask=1|8
 	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.3;cap.height=1.75;cs.shape=cap;cs.position.y=0.88;add_child(cs)
@@ -38,6 +42,7 @@ func setup(f:String,w:String,opt:={}):
 	var basis:String=opt.get("basis",["joe","biker","daya"][r.randi()%3] if f!="polizei" else "police")
 	var look={}
 	if f!="polizei":look={"tint":FARBEN.get(f,Color(0.2,0.2,0.2)),"mix":0.8,"sat":1.0,"val":1.0,"hue":0.0}
+	if opt.has("look"):look=opt.look
 	figur=PE.make(basis,r,look);add_child(figur)
 	PE.play(figur,"idle",r.randf())
 	halter=HALTER.new();add_child(halter);halter.setup(figur);halter.setze_waffe(w)
@@ -51,6 +56,11 @@ func ist_mensch()->bool:return true
 func treffer(dmg:float,von,punkt:Vector3):
 	if tot:return
 	if verbuendet and (von==kampf.spiel.spieler):dmg*=0.25
+	if von==kampf.spiel.spieler or von==kampf.spiel.auto:
+		if friedlich:
+			for g in kampf.gegner:
+				if is_instance_valid(g) and g.fraktion==fraktion and g.global_position.distance_to(global_position)<60.0:g.friedlich=false;g.alarm=true
+		friedlich=false
 	# Kopftreffer
 	if punkt.y>global_position.y+1.5:dmg*=2.2
 	hp-=dmg;alarm=true
@@ -82,6 +92,14 @@ func _feind():
 				var d=g.global_position.distance_to(global_position)
 				if d<bd:bd=d;best=g
 		return best
+	if not feinde.is_empty():
+		var best=null;var bd=sicht*1.5
+		for g in kampf.gegner:
+			if is_instance_valid(g) and not g.tot and g.fraktion in feinde:
+				var d=g.global_position.distance_to(global_position)
+				if d<bd:bd=d;best=g
+		if best:alarm=true;return best
+	if friedlich:return null
 	var sp=kampf.spiel
 	return sp.auto if sp.auto!=null else sp.spieler
 

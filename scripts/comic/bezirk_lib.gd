@@ -334,14 +334,14 @@ func parzelle(F:Vector2,t:Vector2,n:Vector2,w:float,d:float,typ:String):
 			L.hex(GL.T(Color(0.85,0.85,0.88)),[P.call(-2.1,12,1.9),P.call(2.1,12,1.9),P.call(2.1,12,6.1),P.call(-2.1,12,6.1),P.call(-0.05,17,3.95),P.call(0.05,17,3.95),P.call(0.05,17,4.05),P.call(-0.05,17,4.05)],0.04)
 			L.box(L.M.holz,P.call(0,15.5,4.0),Vector3(0.15,2.0,0.15),hb,0.0);L.box(L.M.holz,P.call(0,15.9,4.0),Vector3(1.0,0.15,0.15),hb,0.0)
 			L.box(GL.T(Color(0.35,0.22,0.15)),P.call(0,1.3,1.98),Vector3(1.8,2.6,0.05),hb,0.0)
-			GL.label("GEMEINDE ZION",P.call(0,8.3,1.95),hb,0.007,Color(0.95,0.9,0.7),Color(0.1,0.08,0.05))
+			GL.label("GEMEINDE ZION",P.call(0,8.3,1.95),hb,0.007,Color(0.95,0.9,0.7),Color(0.1,0.08,0.05),3.6)
 		"werbung":
 			# Plakatwand auf Stelzen
-			var pl=["RADEBERGER COLA","SPRUNK","KAUF DIR EIN AUTO","PFANDHAUS","CLUCKIN' HUHN","BÜRGERMEISTER WÄHLEN"]
+			var pl=["RADEBERGER COLA","ELBQUELL","KAUF DIR EIN AUTO","PFANDHAUS","BROILER-BUDE","BÜRGERMEISTER WÄHLEN"]
 			for sx in [-2.5,2.5]:L.zyl(L.M.metall,P.call(sx,0,3.0),P.call(sx,6.0,3.0),0.12,1.2)
 			L.box(L.M.dunkel,P.call(0,7.0,3.0),Vector3(7.6,3.4,0.25),hb,0.04)
 			L.box(GL.T(GL.SPRAY[rng.randi()%GL.SPRAY.size()]),P.call(0,7.0,2.85),Vector3(7.2,3.0,0.05),hb,0.0)
-			GL.label(pl[rng.randi()%pl.size()],P.call(0,7.0,2.8),hb,0.016,Color(1,1,1),Color(0.08,0.08,0.1))
+			GL.label(pl[rng.randi()%pl.size()],P.call(0,7.0,2.8),hb,0.016,Color(1,1,1),Color(0.08,0.08,0.1),6.6)
 			if rng.randf()<0.5:GL.graffiti(P.call(0,1.2,3.0),aussen,0.7)
 		"brache","schuppen":
 			L.box(GL.T(Color(0.42,0.33,0.22)),P.call(0,0.02,d*0.5),Vector3(w-0.4,0.02,d-0.4),hb,0.0)

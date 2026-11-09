@@ -11,6 +11,8 @@ var NAT:PackedFloat32Array
 var KLASSE:PackedByteArray     # Stil aus Originalhäusern: 0 nichts, 1 wohn, 2 hoch, 3 ghetto
 var STADT:PackedByteArray      # Zelle nahe einer Stadtstraße
 var SUED_RW:Rect2
+var SU=null                    # Süd-Generator (für Abstände zu dessen Straßen/Bebauung)
+var AUSW_W:Rect2=Rect2()       # Comic-Innenstadt (Welt)
 const ORTE:={"knast":[Vector2(2000,-5050),340.0],"militaer":[Vector2(-2600,-5450),700.0],"wflug":[Vector2(600,-5265),520.0],
 	"redneck":[Vector2(1750,-5950),420.0],"farm":[Vector2(1950,-7750),650.0]}
 var TERR:=[]   # [Rect-Ecken (4 x Vector2 Welt), Höhe]
@@ -147,7 +149,25 @@ func _stuecke_frei(P:PackedVector2Array)->Array:   # nur Ausschlüsse/Wasser, ke
 			cur=PackedVector2Array()
 	if cur.size()>=3:aus.append(cur)
 	return aus
+# Landstraßen: Stützpunkte alle ~18 m, dann Ecken rund schleifen (Chaikin) -> weiche Kurven und Serpentinen
+func _rund(P:PackedVector2Array)->PackedVector2Array:
+	var R=PackedVector2Array();R.append(P[0]);var acc=0.0
+	for i in range(1,P.size()-1):
+		acc+=P[i].distance_to(P[i-1])
+		if acc>=18.0:R.append(P[i]);acc=0.0
+	if R.size()>1 and R[R.size()-1].distance_to(P[P.size()-1])<7.0:R.remove_at(R.size()-1)
+	R.append(P[P.size()-1])
+	for it in 3:
+		if R.size()<3:break
+		var N=PackedVector2Array();N.append(R[0])
+		for i in R.size()-1:
+			var a=R[i];var b=R[i+1]
+			if i>0:N.append(a.lerp(b,0.25))
+			if i<R.size()-2:N.append(a.lerp(b,0.75))
+		N.append(R[R.size()-1]);R=N
+	return _duenn(R)
 func _neu_n(P:PackedVector2Array,typ:String,stadt:bool):
+	if not stadt and typ in ["land","piste","rampe","autobahn"] and P.size()>2:P=_rund(P)
 	var Q=_duenn(P)
 	if Q.size()<2:return
 	var S=[0.0]
@@ -184,7 +204,7 @@ func _profil(Q:PackedVector2Array,S:Array,typ:String,stadt:bool)->PackedFloat32A
 		while b<n and S[b]<=S[i]+fen:summe+=roh[b];b+=1
 		while S[a]<S[i]-fen:summe-=roh[a];a+=1
 		Y[i]=summe/max(b-a,1)
-	var gmax={"autobahn":0.06,"rampe":0.08,"land":0.1,"piste":0.14}.get(typ,0.1)
+	var gmax={"autobahn":0.07,"rampe":0.09,"land":0.12,"piste":0.15}.get(typ,0.12)
 	for durch in 2:
 		for i in range(1,n):Y[i]=clamp(Y[i],Y[i-1]-gmax*(S[i]-S[i-1]),Y[i-1]+gmax*(S[i]-S[i-1]))
 		for i in range(n-2,-1,-1):Y[i]=clamp(Y[i],Y[i+1]-gmax*(S[i+1]-S[i]),Y[i+1]+gmax*(S[i+1]-S[i]))
@@ -312,6 +332,17 @@ func kits_bauen():
 	_kit("nord","radar","nd_radar",12.0,12.0,func():_k_radar())
 	_kit("nord","wrackflieger","nd_wrackflieger",30.0,32.0,func():_k_wrackflieger())
 	_kit("nord","huette","nd_huette",8.0,8.0,func():GL.huette(_P(0,0,4.0),5.0,4.0,2.5,0.0,Color(0.55,0.5,0.45));K.LOD.append([Transform3D(Basis(),_P(0,1.2,4.0)),Vector3(5,2.5,4),Color(0.55,0.5,0.45),Color(0,0,0,0)]))
+	# Landschaft: Bäume, Gras, Steine, Hochstand, Schrottplatz, Zeltlager, Holzstapel
+	for i in 4:_kit("land","laub","ld_laub_%d"%i,5.0,5.0,func():_k_laub(i))
+	for i in 3:_kit("land","nadel","ld_nadel_%d"%i,4.0,4.0,func():_k_nadel(i))
+	for i in 3:_kit("land","gras","ld_gras_%d"%i,2.0,2.0,func():_k_gras(i))
+	for i in 3:_kit("land","stein","ld_stein_%d"%i,3.0,3.0,func():_k_stein(i))
+	_kit("land","fern","ld_fern_laub",5.0,5.0,func():_k_fernbaum(false))
+	_kit("land","fern","ld_fern_nadel",4.0,4.0,func():_k_fernbaum(true))
+	_kit("land","hochstand","ld_hochstand",5.0,5.0,func():_k_hochstand())
+	_kit("land","schrott","ld_schrott",40.0,32.0,func():_k_schrott())
+	_kit("land","camp","ld_camp",14.0,12.0,func():_k_camp())
+	_kit("land","holz","ld_holz",6.0,4.0,func():_k_holzstapel())
 	GL.ohne_tags=false
 	print("NORD Bausätze ",K.KITS.size())
 
@@ -332,7 +363,7 @@ func _k_hochhaus(i:int):
 	L.box(rahmen,c+Vector3(0,h+0.8,0),Vector3(wv*0.6,1.6,wv*0.6),Basis(),0.03)
 	if i==4:L.zyl(L.M.metall,c+Vector3(0,h+1.6,0),c+Vector3(0,h+12,0),0.25,1.1)
 	K.haupt(c+Vector3(0,h*0.5,0),Vector3(wv,h,wv),Basis(),Color(0.4,0.55,0.7) if i%3!=2 else Color(0.72,0.66,0.58),Color(0.3,0.3,0.33))
-	GL.label(["BANK","VERSICHERUNG","HOTEL","TOWER","PLAZA","OFFICES"][i],c+Vector3(0,4.4,(wv+1.0)*0.5+0.06),Basis(),0.012,Color(1,1,1),Color(0.1,0.1,0.15))
+	GL.label(["BANK","VERSICHERUNG","HOTEL","TOWER","PLAZA","OFFICES"][i],c+Vector3(0,4.4,(wv+1.0)*0.5+0.06),Basis(),0.012,Color(1,1,1),Color(0.1,0.1,0.15),wv*0.8)
 func _k_nbuero(i:int):
 	_boden(22,18,Color(0.5,0.5,0.48))
 	L._haus(_P(0,0,1.0),21.0,14.0,AUSSEN,{"stock":[4,5,6,5,4][i],"laden":i%2==0})
@@ -398,7 +429,7 @@ func _k_bar(i:int):
 	L.box(T(Color(0.2,0.15,0.1)),c+Vector3(0,1.2,5.03),Vector3(1.8,2.4,0.05),Basis(),0.0)
 	L.box(T(Color(0.15,0.1,0.08)),c+Vector3(0,2.9,6.5),Vector3(12,0.15,3),Basis(),0.03)
 	for sx in [-5.5,-2,2,5.5]:L.zyl(holz,c+Vector3(sx,0,7.8),c+Vector3(sx,2.9,7.8),0.12,1.1)
-	GL.label(["SALOON","DUSTY'S BAR"][i],c+Vector3(0,5.5,5.1),Basis(),0.016,Color(1,0.3,0.25),Color(0.1,0.05,0.0))
+	GL.label(["SALOON","DUSTY'S BAR"][i],c+Vector3(0,5.5,5.1),Basis(),0.016,Color(1,0.3,0.25),Color(0.1,0.05,0.0),10.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI*0.5),_P(-5,0,2.5)),"c_suv");L._park(Transform3D(Basis(Vector3.UP,PI*0.45),_P(4,0,2.8)),"c_muscle")
 func _k_tanke():
 	L.box(L.M.asphalt,_P(0,-0.07,11),Vector3(26,0.16,22),Basis(),0.0)
@@ -411,7 +442,7 @@ func _k_tanke():
 	L.box(L.M.putz[0],s+Vector3(0,2,0),Vector3(14,4,6),Basis(),0.04);K.haupt(s+Vector3(0,2,0),Vector3(14,4,6),Basis(),Color(0.9,0.88,0.8))
 	L.box(L.M.glas[1],s+Vector3(0,1.6,3.02),Vector3(10,2.2,0.05),Basis(),0.0)
 	L.zyl(L.M.metall,_P(-11,0,2),_P(-11,8,2),0.2,1.1);L.box(rot,_P(-11,8.5,2),Vector3(3,2,0.4),Basis(),0.03)
-	GL.label("TANKE",_P(-11,8.5,2.25),Basis(),0.012,Color(1,1,1),Color(0.3,0,0));GL.label("SPRIT · SNACKS",c+Vector3(0,5.6,4.6),Basis(),0.008,Color(1,1,1),Color(0.3,0,0))
+	GL.label("TANKE",_P(-11,8.5,2.25),Basis(),0.012,Color(1,1,1),Color(0.3,0,0),2.7);GL.label("SPRIT · SNACKS",c+Vector3(0,5.6,4.6),Basis(),0.008,Color(1,1,1),Color(0.3,0,0),9.0)
 	K.LOD.append([Transform3D(Basis(),c+Vector3(0,5.6,0)),Vector3(14,0.8,9),Color(0.95,0.95,0.95),Color(0,0,0,0)])
 func _k_scheune(i:int):
 	_boden(24,28,Color(0.55,0.5,0.32))
@@ -436,8 +467,125 @@ func _k_wasserturm():
 	for sx in [-1.8,1.8]:
 		for sz in [-1.8,1.8]:L.zyl(L.M.metall,c+Vector3(sx,0,sz),c+Vector3(sx*0.7,14,sz*0.7),0.15,1.1)
 	L.zyl(T(Color(0.62,0.6,0.55)),c+Vector3(0,14,0),c+Vector3(0,19,0),3.2,1.03);L.hex(T(Color(0.5,0.48,0.45)),[c+Vector3(-3.2,19,-3.2),c+Vector3(3.2,19,-3.2),c+Vector3(3.2,19,3.2),c+Vector3(-3.2,19,3.2),c+Vector3(-0.1,21,-0.1),c+Vector3(0.1,21,-0.1),c+Vector3(0.1,21,0.1),c+Vector3(-0.1,21,0.1)],0.03)
-	GL.label("STAUBWINKEL",c+Vector3(0,16.5,3.25),Basis(),0.014,Color(0.25,0.2,0.15),Color(0.8,0.75,0.6))
+	GL.label("STAUBWINKEL",c+Vector3(0,16.5,3.25),Basis(),0.014,Color(0.25,0.2,0.15),Color(0.8,0.75,0.6),4.6)
 	L.PFOSTEN.append([c,1.6,14.0]);K.LOD.append([Transform3D(Basis(),c+Vector3(0,16.5,0)),Vector3(6.4,5,6.4),Color(0.62,0.6,0.55),Color(0,0,0,0)])
+# ---------------- Landschafts-Bausätze (Mitte im Ursprung) ----------------
+func _k_laub(i:int):
+	var h=[4.5,6.0,7.5,5.2][i];var p=Vector3(0,KB,0)
+	var laub=[T(Color(0.3,0.56,0.22)),T(Color(0.38,0.64,0.24)),T(Color(0.24,0.48,0.22)),T(Color(0.62,0.6,0.2))][i]
+	var laub2=T([Color(0.36,0.62,0.26),Color(0.3,0.55,0.2),Color(0.3,0.56,0.26),Color(0.75,0.5,0.18)][i])
+	L.zyl(L.M.rinde,p,p+Vector3(0.1,h*0.7,0.05),0.18+h*0.012,1.25)
+	L.zyl(L.M.rinde,p+Vector3(0,h*0.45,0),p+Vector3(0.9,h*0.8,0.3),0.08,1.3)
+	var c=p+Vector3(0.1,h*0.78,0.05);var r=h*0.32
+	L.kugel(laub,c,Vector3(r,r*0.85,r),1.06)
+	L.kugel(laub2,c+Vector3(r*0.6,r*0.25,0.2),Vector3(r*0.7,r*0.6,r*0.7),1.06)
+	L.kugel(laub,c+Vector3(-r*0.55,r*0.15,-r*0.3),Vector3(r*0.65,r*0.55,r*0.65),1.06)
+	L.PFOSTEN.append([p,0.3,3.0])
+func _k_nadel(i:int):
+	var h=[7.0,9.5,5.5][i];var p=Vector3(0,KB,0);var g=T([Color(0.16,0.38,0.22),Color(0.2,0.42,0.24),Color(0.14,0.34,0.2)][i])
+	L.zyl(L.M.rinde,p,p+Vector3(0,h*0.35,0),0.16+h*0.01,1.25)
+	for k in 3:
+		var y=h*(0.22+k*0.24);var r=h*(0.3-k*0.07)
+		var cm=CylinderMesh.new();cm.top_radius=0.02;cm.bottom_radius=r;cm.height=h*0.42;cm.radial_segments=8;cm.rings=1
+		L.mesh(g,cm,Transform3D(Basis(),p+Vector3(0,y+h*0.21,0)),1.06)
+	L.PFOSTEN.append([p,0.3,3.0])
+func _k_gras(i:int):
+	var g=T([Color(0.45,0.7,0.28),Color(0.55,0.72,0.3),Color(0.7,0.68,0.35)][i])
+	for k in 9:
+		var a=k*2.4;var r=0.25+k*0.07;var h=0.5+rng.randf()*0.5
+		L.box(g,Vector3(cos(a)*r,KB+h*0.5-0.05,sin(a)*r),Vector3(0.06,h,0.22),Basis(Vector3.UP,a)*Basis(Vector3.RIGHT,rng.randf_range(-0.3,0.3)),0.0)
+	if i==1:
+		for k in 3:L.kugel(T(Color(0.95,0.85,0.2) if k%2==0 else Color(0.9,0.4,0.5)),Vector3(cos(k*2.1)*0.5,KB+0.75,sin(k*2.1)*0.5),Vector3(0.09,0.09,0.09),1.0)
+func _k_stein(i:int):
+	var f=T([Color(0.58,0.57,0.55),Color(0.5,0.49,0.47),Color(0.66,0.64,0.6)][i])
+	var n=[1,2,3][i]
+	for k in n:L.kugel(f,Vector3(k*0.8-0.6,KB+0.25,k*0.3),Vector3(0.9,0.6+k*0.15,0.75)*rng.randf_range(0.7,1.3),1.06)
+	if i==2:L.koll_box(Vector3(0,KB+0.5,0),Vector3(2.2,1.0,1.6))
+func _k_fernbaum(nadel:bool):
+	# grobe Silhouette für die Ferne: 8-Eck-Kegel bzw. Kugel, ohne Kontur
+	var g=T(Color(0.18,0.4,0.23) if nadel else Color(0.3,0.55,0.24))
+	if nadel:
+		var cm=CylinderMesh.new();cm.top_radius=0.0;cm.bottom_radius=2.6;cm.height=8.0;cm.radial_segments=6;cm.rings=1
+		L.mesh(g,cm,Transform3D(Basis(),Vector3(0,KB+4.6,0)),1.0)
+	else:
+		var sm=SphereMesh.new();sm.radius=2.0;sm.height=3.6;sm.radial_segments=6;sm.rings=3
+		L.mesh(g,sm,Transform3D(Basis(),Vector3(0,KB+4.4,0)),1.0)
+		L.box(L.M.rinde,Vector3(0,KB+1.4,0),Vector3(0.4,2.8,0.4),Basis(),0.0)
+func _k_hochstand():
+	var holz=T(Color(0.45,0.32,0.2));var dunkel=T(Color(0.3,0.21,0.13));var p=Vector3(0,KB,0)
+	for sx in [-1,1]:
+		for sz in [-1,1]:L.zyl(holz,p+Vector3(sx*1.1,0,sz*1.1),p+Vector3(sx*0.75,4.0,sz*0.75),0.1,1.2)
+	L.box(holz,p+Vector3(0,4.05,0),Vector3(1.9,0.15,1.9),Basis(),0.04)
+	L.box(holz,p+Vector3(0,4.6,0.8),Vector3(1.9,1.0,0.08),Basis(),0.03)
+	L.box(holz,p+Vector3(0.9,4.6,0),Vector3(0.08,1.0,1.9),Basis(),0.03);L.box(holz,p+Vector3(-0.9,4.6,0),Vector3(0.08,1.0,1.9),Basis(),0.03)
+	L.box(holz,p+Vector3(0,4.4,-0.9),Vector3(1.9,0.6,0.08),Basis(),0.03)
+	for sx in [-1,1]:L.box(holz,p+Vector3(sx*0.9,5.6,0),Vector3(0.1,1.2,0.1),Basis(),0.0)
+	L.box(dunkel,p+Vector3(0,6.25,0),Vector3(2.3,0.12,2.3),Basis(Vector3.RIGHT,0.15),0.04)
+	# Leiter
+	for sx in [-1,1]:L.zyl(holz,p+Vector3(sx*0.3,0,-2.4),p+Vector3(sx*0.3,4.0,-0.95),0.05,1.2)
+	for k in 9:
+		var t=(k+0.5)/9.0;L.box(holz,p+Vector3(0,4.0*t,-2.4+1.45*t),Vector3(0.6,0.06,0.08),Basis(),0.0)
+	L.PFOSTEN.append([p,0.9,4.0])
+	K.LOD.append([Transform3D(Basis(),p+Vector3(0,4.6,0)),Vector3(1.9,1.2,1.9),Color(0.45,0.32,0.2),Color(0.3,0.21,0.13)])
+func _k_schrott():
+	var p=Vector3(0,KB,0);var w=38.0;var d=30.0
+	L.box(T(Color(0.45,0.4,0.33)),p+Vector3(0,-0.05,0),Vector3(w,0.14,d),Basis(),0.0)
+	# Wellblechzaun mit Tor
+	var blech=[T(Color(0.55,0.5,0.42)),T(Color(0.5,0.38,0.3)),T(Color(0.42,0.45,0.43))]
+	var x=-w*0.5
+	while x<w*0.5:
+		var b=blech[int(abs(x))%3]
+		L.box(b,p+Vector3(x+1.0,1.25,-d*0.5),Vector3(2.0,2.5,0.08),Basis(),0.03)
+		if abs(x+1.0)>4.0:L.box(b,p+Vector3(x+1.0,1.25,d*0.5),Vector3(2.0,2.5,0.08),Basis(),0.03)
+		x+=2.0
+	var z=-d*0.5
+	while z<d*0.5:
+		for sx in [-1,1]:L.box(blech[int(abs(z))%3],p+Vector3(sx*w*0.5,1.25,z+1.0),Vector3(0.08,2.5,2.0),Basis(),0.03)
+		z+=2.0
+	L.koll_box(p+Vector3(0,1.25,-d*0.5),Vector3(w,2.5,0.3))
+	for sx in [-1,1]:L.koll_box(p+Vector3(sx*w*0.5,1.25,0),Vector3(0.3,2.5,d));L.koll_box(p+Vector3(sx*(w*0.25+2.0),1.25,d*0.5),Vector3(w*0.5-4.0,2.5,0.3))
+	# Wrackstapel (gepresste Autos)
+	var farben=[Color(0.6,0.2,0.15),Color(0.25,0.35,0.5),Color(0.75,0.7,0.6),Color(0.3,0.45,0.3),Color(0.55,0.45,0.25),Color(0.35,0.32,0.3)]
+	for st in 7:
+		var sx=-w*0.5+5.0+(st%4)*7.5;var sz=-d*0.5+4.0+(st/4)*9.0
+		var n=rng.randi_range(2,5)
+		for k in n:
+			var c=farben[rng.randi()%farben.size()]*rng.randf_range(0.7,1.0);c.a=1.0
+			L.box(T(c),p+Vector3(sx+rng.randf_range(-0.3,0.3),0.35+k*0.72,sz),Vector3(4.0,0.7,1.9),Basis(Vector3.UP,rng.randf_range(-0.15,0.15)),0.03)
+		L.koll_box(p+Vector3(sx,n*0.36,sz),Vector3(4.2,n*0.72,2.0))
+	# Reifenberg, Autowracks mit Rädern, Kran, Hütte
+	for k in 14:L.zyl(T(Color(0.08,0.08,0.08)),p+Vector3(10.0+rng.randf_range(-2,2),0.15+k*0.12,8.0+rng.randf_range(-2,2)),p+Vector3(10.0+rng.randf_range(-2,2),0.4+k*0.12,8.0+rng.randf_range(-2,2)),0.4,1.1)
+	for k in 3:
+		var wx=-6.0+k*6.0;var c2=T(farben[k+2])
+		L.box(c2,p+Vector3(wx,0.75,9.0),Vector3(1.8,0.8,4.2),Basis(Vector3.UP,0.3*k),0.04)
+		L.box(c2,p+Vector3(wx,1.35,9.2),Vector3(1.6,0.6,2.2),Basis(Vector3.UP,0.3*k),0.04)
+		L.koll_box(p+Vector3(wx,0.8,9.0),Vector3(1.9,1.6,4.3),Basis(Vector3.UP,0.3*k))
+	var gelb=T(Color(0.9,0.7,0.12))
+	L.box(gelb,p+Vector3(14,0.8,-8),Vector3(3.0,1.6,4.5),Basis(),0.04);L.box(gelb,p+Vector3(14,2.2,-7),Vector3(2.0,1.4,2.0),Basis(),0.04)
+	L.zyl(gelb,p+Vector3(14,2.8,-8),p+Vector3(9,9,-8),0.25,1.2);L.zyl(gelb,p+Vector3(9,9,-8),p+Vector3(6,5,-8),0.18,1.2)
+	L.koll_box(p+Vector3(14,1.2,-8),Vector3(3,2.4,4.5))
+	GL.huette(p+Vector3(-14,0,-9),6.0,4.5,2.8,0.0,Color(0.52,0.45,0.38))
+	var schild=Label3D.new();schild.text="SCHROTT\nANKAUF";schild.font_size=96;schild.pixel_size=0.012;schild.modulate=Color(1,0.85,0.2);schild.outline_size=18
+	L.welt.add_child(schild);schild.position=p+Vector3(4.5,2.0,d*0.5+0.1)
+	K.LOD.append([Transform3D(Basis(),p+Vector3(0,1.25,0)),Vector3(w,2.5,d),Color(0.55,0.5,0.42),Color(0.45,0.4,0.33)])
+func _k_camp():
+	var p=Vector3(0,KB,0)
+	var farben=[Color(0.85,0.45,0.15),Color(0.25,0.45,0.7),Color(0.4,0.55,0.25)]
+	for k in 3:
+		var c=p+Vector3(-4.0+k*4.0,0,-2.5+(k%2)*1.5);var m=T(farben[k])
+		var cm=CylinderMesh.new();cm.top_radius=0.0;cm.bottom_radius=1.4;cm.height=1.8;cm.radial_segments=4;cm.rings=1
+		L.mesh(m,cm,Transform3D(Basis(Vector3.UP,PI*0.25+k*0.3).scaled(Vector3(1,1,1.6)),c+Vector3(0,0.9,0)),1.05)
+	# Feuerstelle mit Steinring, Baumstämme zum Sitzen
+	for k in 10:var a=TAU*k/10.0;L.kugel(T(Color(0.5,0.5,0.48)),p+Vector3(cos(a)*0.8,0.1,2.5+sin(a)*0.8),Vector3(0.22,0.15,0.2),1.0)
+	L.kugel(T(Color(1.0,0.55,0.1)),p+Vector3(0,0.3,2.5),Vector3(0.35,0.4,0.35),1.0)
+	for sx in [-1,1]:L.zyl(L.M.rinde,p+Vector3(sx*2.2,0.25,1.4),p+Vector3(sx*2.2,0.25,3.6),0.25,1.15)
+	L.box(T(Color(0.3,0.3,0.32)),p+Vector3(4.5,0.35,3.0),Vector3(1.0,0.7,0.6),Basis(),0.03)
+func _k_holzstapel():
+	var p=Vector3(0,KB,0)
+	for r in 4:
+		for k in 6-r:L.zyl(L.M.rinde,p+Vector3(-2.4,0.3+r*0.5,-1.25+k*0.5+r*0.25),p+Vector3(2.4,0.3+r*0.5,-1.25+k*0.5+r*0.25),0.25,1.12)
+	L.koll_box(p+Vector3(0,1.0,0),Vector3(4.8,2.0,3.0))
+
 func _k_kaktus(i:int):
 	var g=T(Color(0.25,0.5,0.25));var p=_P(0,0,2)
 	var h=[3.5,5.0,2.5][i]
@@ -459,7 +607,7 @@ func _k_zellenblock():
 			var x=-18.5+k*2.85
 			L.box(T(Color(0.15,0.15,0.18)),c+Vector3(x,2.2+e*3.4,7.03),Vector3(0.9,1.2,0.05),Basis(),0.0)
 			for st in 3:L.box(L.M.metall,c+Vector3(x-0.3+st*0.3,2.2+e*3.4,7.07),Vector3(0.05,1.2,0.05),Basis(),0.0)
-	GL.label("JVA RADEBERG – BLOCK %s"%["A","B","C"][rng.randi()%3],c+Vector3(0,9.6,7.1),Basis(),0.012,Color(0.15,0.15,0.18),Color(0.85,0.85,0.85))
+	GL.label("JVA RADEBERG – BLOCK %s"%["A","B","C"][rng.randi()%3],c+Vector3(0,9.6,7.1),Basis(),0.012,Color(0.15,0.15,0.18),Color(0.85,0.85,0.85),36.0)
 func _k_wachturm():
 	var p=_P(0,0,2.5);var grau=T(Color(0.6,0.6,0.58))
 	for sx in [-1.2,1.2]:
@@ -576,6 +724,116 @@ func sonderorte():
 		var F=w-C;var n=-aussen;var xf=Transform3D(Basis(Vector3.UP.cross(Vector3(aussen.x,0,aussen.y)),Vector3.UP,Vector3(aussen.x,0,aussen.y)),Vector3(F.x,ny(F)-0.2,F.y))
 		PLATZ.append([kit,xf]);_occ(F);nd+=1
 	print("NORD Sonderorte ",PLATZ.size()-n0," davon Wüste ",nd)
+
+# ---------------- Landschaft zwischen den Orten ----------------
+func h_end(w:Vector2)->float:   # endgültige Geländehöhe (Welt) nach gelaende_ziel
+	var fx=(w.x-GX0)/MST;var fz=(w.y-GZ0)/MST;var i=clamp(int(floor(fx)),0,GNX-2);var k=clamp(int(floor(fz)),0,GNZ-2)
+	var tx=clamp(fx-i,0.0,1.0);var tz=clamp(fz-k,0.0,1.0)
+	var v=[]
+	for jj in [k*GNX+i,k*GNX+i+1,(k+1)*GNX+i,(k+1)*GNX+i+1]:v.append(TH[jj] if not is_nan(TH[jj]) else NAT[jj])
+	return lerp(lerp(v[0],v[1],tx),lerp(v[2],v[3],tx),tz)
+func _land_ok(w:Vector2,rand:float)->int:   # 0 = nein, 1 = freie Landschaft, 2 = Ortsrand/Stadtgrün
+	var i=_ix(w.x);var k=_kz(w.y)
+	if i<1 or k<1 or i>=GNX-1 or k>=GNZ-1:return 0
+	var j=k*GNX+i
+	if WASSER[j]==1 or NAT[j]<2.5 or NAT[j]>600.0:return 0
+	if AUSW_W.size.x>0 and AUSW_W.grow(260.0).has_point(w):return 0
+	for o in ORTE:
+		if o!="farm" and o!="redneck" and w.distance_to(ORTE[o][0])<ORTE[o][1]+40.0:return 0
+	var F=w-C
+	if SUED_RW.has_point(w):
+		if SU==null:return 0
+		if SU.dm_welt(w.x,w.y)<70.0 or SU.frei(F)<rand or SU._belegt(F):return 0
+		return 1
+	if frei(F)<rand or _belegt(F):return 0
+	if MASKE[j]==1 or STADT[j]==1:return 2
+	return 1
+func _boden_art(w:Vector2)->Array:   # Gewichte [gras, wald, sand, fels, trocken]
+	var i=_ix(w.x);var k=_kz(w.y);var j=(k*GNX+i)*4;var bo=G0._bo
+	var a=[bo[j]/255.0,bo[j+1]/255.0,bo[j+2]/255.0,bo[j+3]/255.0]
+	a.append(max(0.0,1.0-a[0]-a[1]-a[2]-a[3]))
+	return a
+var _orte_n:={}
+func landschaft_orte():
+	# besondere Plätze in der freien Landschaft (vor dem Gelände-Ziel: bekommen eine ebene Fläche)
+	var t0=Time.get_ticks_msec();var n0=PLATZ.size()
+	var plan=[["ld_schrott",7,14.0,45.0,"egal"],["ld_hochstand",50,18.0,1e9,"waldrand"],["ld_camp",12,30.0,1e9,"gruen"],["ld_holz",30,9.0,60.0,"wald"],
+		["nd_huette",22,15.0,120.0,"gruen"],["nd_trailer_%d",10,12.0,50.0,"trocken"]]
+	for e in plan:
+		var kit:String=e[0];var soll:int=e[1];var gesetzt=0
+		for versuch in 6000:
+			if gesetzt>=soll:break
+			var w=Vector2(rng.randf_range(-4300,4600),rng.randf_range(-11200,3400))
+			if _land_ok(w,e[2])!=1:continue
+			var fr=frei(w-C) if not SUED_RW.has_point(w) else SU.frei(w-C)
+			if fr>e[3]:continue
+			var b=_boden_art(w)
+			match e[4]:
+				"waldrand":if b[1]<0.25 or b[1]>0.8:continue
+				"wald":if b[1]<0.4:continue
+				"gruen":if b[0]+b[1]<0.5:continue
+				"trocken":if b[2]+b[4]<0.4:continue
+			# nicht zu steil
+			var hm=G0._nat(w.x,w.y);var steil=false
+			for d in [Vector2(12,0),Vector2(-12,0),Vector2(0,12),Vector2(0,-12)]:
+				if abs(G0._nat(w.x+d.x,w.y+d.y)-hm)>3.0:steil=true
+			if steil:continue
+			var name=kit%rng.randi_range(0,5) if "%d" in kit else kit
+			var yaw=rng.randf()*TAU
+			# Zufahrt zur Straße ausrichten
+			var ns=naechst(w-C) if not SUED_RW.has_point(w) else SU.naechst(w-C)
+			if ns[2]>=0:var zu:Vector2=(ns[0]+C)-w;yaw=atan2(zu.x,zu.y)
+			var n_vor=PLATZ.size()
+			_platz_bei(name,w,yaw,hm)
+			if PLATZ.size()>n_vor:gesetzt+=1
+		_orte_n[kit]=gesetzt
+	print("LANDSCHAFT Plätze ",PLATZ.size()-n0," ",_orte_n," ",Time.get_ticks_msec()-t0," ms")
+func landschaft_natur():
+	# Bäume, Gras, Steine, Büsche über die ganze Insel (nach dem Gelände-Ziel, auf der endgültigen Höhe)
+	var t0=Time.get_ticks_msec();var n0=PLATZ.size();var nb=0
+	var busch=KITLISTE.get("ghetto/busch",["busch_0"])
+	var x=-4300.0
+	while x<4600.0:
+		var z=-11200.0
+		while z<3400.0:
+			var w=Vector2(x+rng.randf_range(-4.5,4.5),z+rng.randf_range(-4.5,4.5))
+			z+=10.0
+			var art=_land_ok(w,7.0)
+			if art==0:continue
+			var b=_boden_art(w);var r=rng.randf();var kit=""
+			if art==2:
+				if r<0.035:kit="ld_laub_%d"%rng.randi_range(0,2)
+				elif r<0.06:kit=busch[rng.randi()%busch.size()]
+			elif b[1]>=0.45:
+				if r<0.5:kit=("ld_nadel_%d" if rng.randf()<0.55 else "ld_laub_%d")%rng.randi_range(0,2)
+				elif r<0.62:kit="ld_gras_%d"%rng.randi_range(0,1)
+				elif r<0.64:kit="ld_stein_%d"%rng.randi_range(0,2)
+			elif b[3]>=0.4:
+				if r<0.12:kit="ld_stein_%d"%rng.randi_range(0,2)
+				elif r<0.18:kit="ld_nadel_%d"%rng.randi_range(0,2)
+				elif r<0.26:kit="ld_gras_2"
+			elif b[2]>=0.5:
+				if r<0.01:kit="ld_stein_%d"%rng.randi_range(0,2)
+			elif b[0]>=b[4]:
+				if r<0.07:kit=("ld_laub_%d" if rng.randf()<0.8 else "ld_nadel_%d")%rng.randi_range(0,3 if rng.randf()<0.2 else 2)
+				elif r<0.35:kit="ld_gras_%d"%rng.randi_range(0,1)
+				elif r<0.38:kit=busch[rng.randi()%busch.size()]
+				elif r<0.4:kit="ld_stein_%d"%rng.randi_range(0,2)
+			else:
+				if r<0.2:kit="ld_gras_2"
+				elif r<0.24:kit="ld_stein_%d"%rng.randi_range(0,1)
+				elif r<0.27:kit=busch[rng.randi()%busch.size()]
+				elif r<0.29:kit="ld_laub_3"
+			if kit=="" or not K.KITS.has(kit):continue
+			var F=w-C;var sc=rng.randf_range(0.8,1.3)
+			var xf=Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3(sc,sc,sc)),Vector3(F.x,h_end(w)-H0-0.12,F.y))
+			PLATZ.append([kit,xf])
+			if kit.begins_with("ld_laub") or kit.begins_with("ld_nadel"):
+				nb+=1
+				PLATZ.append(["ld_fern_nadel" if kit.begins_with("ld_nadel") else "ld_fern_laub",xf])
+			if art==2:_occ(F)
+		x+=10.0
+	print("LANDSCHAFT Natur ",PLATZ.size()-n0," Bäume ",nb," ",Time.get_ticks_msec()-t0," ms")
 
 # ---------------- Geometrie mit Höhe ----------------
 func fahrbahnen():
@@ -723,6 +981,7 @@ func gelaende_ziel():
 		if dist[j]>4 or WASSER[j]==1 or not is_nan(TH[j]):continue
 		TH[j]=lerp(HS[j],NAT[j],smoothstep(0.0,4.0,float(dist[j])))
 	# 2) Grundstücks-Terrassen
+	var LOT=PackedByteArray();LOT.resize(GNX*GNZ)
 	for e in TERR:
 		var P:Array=e[0];var h:float=e[1]
 		var mn=Vector2(INF,INF);var mx=-mn
@@ -731,28 +990,38 @@ func gelaende_ziel():
 		for k in range(_kz(mn.y),_kz(mx.y)+1):
 			for i in range(_ix(mn.x),_ix(mx.x)+1):
 				if i<0 or k<0 or i>=GNX or k>=GNZ:continue
-				if Geometry2D.is_point_in_polygon(Vector2(GX0+i*MST,GZ0+k*MST),poly):TH[k*GNX+i]=h
-	# 3) Straßen: unter der Fahrbahn auf Profilhöhe (etwas tiefer), Böschung 20 m
-	var best={}   # j -> [abstand, zielhöhe, w]
+				if Geometry2D.is_point_in_polygon(Vector2(GX0+i*MST,GZ0+k*MST),poly):TH[k*GNX+i]=h;LOT[k*GNX+i]=1
+	# 3) Straßen: Fahrbahn plus eine Rasterzelle Rand flach auf Profilhöhe (sonst sticht das Gelände
+	#    zwischen den 10-m-Punkten durch den Asphalt), danach Böschung – je größer der Höhenunterschied, desto breiter
+	var best={}   # j -> [abstand, zielhöhe, w, stadt, böschung]
 	for r in ROADS:
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
-		var R=r.w+r.sw+(22.0 if not r.stadt else 3.0)
+		var wk=r.w+r.sw
 		for i in P.size()-1:
 			var a=P[i]+C;var b=P[i+1]+C;var Lg=a.distance_to(b);var s=0.0
 			while s<=Lg:
 				var p=a.lerp(b,s/max(Lg,0.01));var y=lerp(Y[i],Y[i+1],s/max(Lg,0.01))+H0
+				var R:float
+				if r.stadt:R=wk+MST*1.2
+				else:
+					var dh=abs(y-G0._nat(p.x,p.y))
+					R=wk+MST*1.5+clamp(dh*2.0+8.0,16.0,80.0)
 				for k in range(_kz(p.y-R),_kz(p.y+R)+1):
 					for ii in range(_ix(p.x-R),_ix(p.x+R)+1):
 						if ii<0 or k<0 or ii>=GNX or k>=GNZ:continue
 						var d=Vector2(GX0+ii*MST,GZ0+k*MST).distance_to(p)
 						if d>R:continue
 						var j=k*GNX+ii
-						if not best.has(j) or best[j][0]>d:best[j]=[d,y,r.w+r.sw,r.stadt]
+						if not best.has(j) or best[j][0]>d:best[j]=[d,y,wk,r.stadt,R]
 				s+=4.0
 	for j in best:
-		var e=best[j];var d:float=e[0];var y:float=e[1];var wk:float=e[2]
+		var e=best[j];var d:float=e[0];var y:float=e[1];var wk:float=e[2];var R:float=e[4]
 		var basis=TH[j] if not is_nan(TH[j]) else NAT[j]
-		if d<=wk+1.0:TH[j]=y-(0.12 if e[3] else 0.08)
-		elif not e[3]:TH[j]=lerp(y-0.08,basis,smoothstep(wk+1.0,wk+22.0,d))
-		elif d<=wk+3.0:TH[j]=min(basis,y+0.05) if basis>y else lerp(y-0.05,basis,0.5)
+		if e[3]:
+			if d<=wk+1.0:TH[j]=y-0.12
+			else:TH[j]=min(basis,y-0.06)   # Stadt: nur absenken (Grundstücke bleiben auf ihrer Terrasse)
+		else:
+			var band=wk+MST*1.5
+			if d<=band:TH[j]=y-0.12
+			elif LOT[j]==0:TH[j]=lerp(y-0.12,basis,smoothstep(band,R,d))
 	print("NORD Gelände-Ziel ",Time.get_ticks_msec()-t0," ms, Straßenzellen ",best.size())

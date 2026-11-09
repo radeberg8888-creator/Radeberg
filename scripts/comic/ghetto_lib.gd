@@ -382,7 +382,13 @@ func streifen(P:PackedVector2Array,w:float):
 		var a=Vector3(Ls[i].x,0.015,Ls[i].y);var b=Vector3(Ls[i+1].x,0.015,Ls[i+1].y);var c=Vector3(Rs[i+1].x,0.015,Rs[i+1].y);var e=Vector3(Rs[i].x,0.015,Rs[i].y)
 		L._tri(so,a,b,c,Vector3.UP);L._tri(so,a,c,e,Vector3.UP)
 	L.koll_an=alt
-func label(text:String,pos:Vector3,b:Basis,px:float,farbe:Color,umriss:Color):
+func label(text:String,pos:Vector3,b:Basis,px:float,farbe:Color,umriss:Color,maxb:=0.0):
+	# maxb: größte Breite in m (Schild/Tafel) – Schrift wird verkleinert, damit sie nicht übersteht
+	if maxb>0.0:
+		var f=ThemeDB.fallback_font;var w=0.0
+		for z in text.split("\n"):w=max(w,f.get_string_size(z,HORIZONTAL_ALIGNMENT_LEFT,-1,96).x)
+		w+=24.0
+		if w*px>maxb:px=maxb/w
 	var lb=Label3D.new();lb.text=text;lb.font_size=96;lb.pixel_size=px;lb.modulate=farbe;lb.shaded=false;lb.double_sided=false
 	lb.outline_size=12;lb.outline_modulate=umriss
 	lb.visibility_range_end=55.0;lb.visibility_range_end_margin=10.0

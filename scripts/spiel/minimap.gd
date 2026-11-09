@@ -12,7 +12,8 @@ var R:=88.0
 var kampf=null
 var story_punkte:=[]      # [Vector2, Buchstabe, Farbe]
 const COL={"autohandel":Color(0.9,0.85,0.2),"werkstatt":Color(0.95,0.6,0.1),"waffen":Color(0.85,0.12,0.1),"kleider":Color(0.65,0.3,0.85),"zuhause":Color(0.15,0.7,0.3),
-	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"militaer":Color(0.4,0.45,0.25),"lack":Color(0.85,0.25,0.65),"auto":Color(0.2,0.45,0.9),"premium":Color(0.85,0.7,0.15),"lager":Color(0.55,0.4,0.25),"park":Color(0.3,0.7,0.3),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9)}
+	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"militaer":Color(0.4,0.45,0.25),"lack":Color(0.85,0.25,0.65),"auto":Color(0.2,0.45,0.9),"premium":Color(0.85,0.7,0.15),"lager":Color(0.55,0.4,0.25),"park":Color(0.3,0.7,0.3),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9),
+	"polizei":Color(0.15,0.35,0.95),"feuerwehr":Color(0.95,0.15,0.1),"taxi":Color(1.0,0.85,0.15),"biker":Color(0.1,0.1,0.1)}
 
 func _ready():
 	mouse_filter=Control.MOUSE_FILTER_IGNORE

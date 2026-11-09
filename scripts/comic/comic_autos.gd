@@ -32,6 +32,22 @@ const LISTE:={
 	"c_muscle_schwarz":["_muscle",[Color(0.12,0.12,0.14)],false,"v8gross"],
 	"c_suv_grau":["_suv",[Color(0.35,0.38,0.42)],false,"v6diesel"],
 	"c_suv_gruen":["_suv",[Color(0.25,0.35,0.25)],false,"v6diesel"],
+	"c_lkw_radeberger":["_lkw",[Color(0.85,0.12,0.1),Color(0.95,0.95,0.93),"RADEBERGER"],false,"diesel"],
+	"c_lkw_blau":["_lkw",[Color(0.15,0.3,0.6),Color(0.2,0.35,0.65),"SACHSEN-LOGISTIK"],false,"diesel"],
+	"c_lkw_weiss":["_lkw",[Color(0.92,0.92,0.92),Color(0.88,0.88,0.86),""],false,"diesel"],
+	"c_lkw_bau":["_lkw",[Color(0.95,0.65,0.1),Color(0.5,0.5,0.48),"ELBE-BAU"],false,"diesel"],
+	"c_transporter_weiss":["_transporter",[Color(0.95,0.95,0.94),""],false,"diesel"],
+	"c_transporter_post":["_transporter",[Color(0.98,0.8,0.1),"POST"],false,"diesel"],
+	"c_transporter_handwerk":["_transporter",[Color(0.2,0.4,0.25),"MEISTERBETRIEB"],false,"diesel"],
+	# Motorräder der Biker-Clubs (mit Fahrer = Verkehr/Rudel, ohne = abgestellt)
+	"c_harley_hoellenhunde":["_harley",[Color(0.5,0.05,0.05),Color(0.85,0.1,0.08),true],false,"v8gross"],
+	"c_harley_hoellenhunde_p":["_harley",[Color(0.5,0.05,0.05),Color(0.85,0.1,0.08),false],false,"v8gross"],
+	"c_harley_sachsenriders":["_harley",[Color(0.1,0.1,0.11),Color(0.15,0.6,0.25),true],false,"v8gross"],
+	"c_harley_sachsenriders_p":["_harley",[Color(0.1,0.1,0.11),Color(0.15,0.6,0.25),false],false,"v8gross"],
+	"c_harley_elbewoelfe":["_harley",[Color(0.3,0.35,0.45),Color(0.4,0.65,0.95),true],false,"v8gross"],
+	"c_harley_elbewoelfe_p":["_harley",[Color(0.3,0.35,0.45),Color(0.4,0.65,0.95),false],false,"v8gross"],
+	"c_harley_wuestenraben":["_harley",[Color(0.08,0.08,0.09),Color(0.95,0.55,0.1),true],false,"v8gross"],
+	"c_harley_wuestenraben_p":["_harley",[Color(0.08,0.08,0.09),Color(0.95,0.55,0.1),false],false,"v8gross"],
 }
 static var _lib=null
 static func lib():

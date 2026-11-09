@@ -57,6 +57,8 @@ func explosion(p:Vector3,quelle=null):
 		if is_instance_valid(g) and not g.tot and g.global_position.distance_to(p)<7.0:g.treffer(150.0,quelle,g.global_position+Vector3(0,1,0))
 	for c in spiel.verkehr+spiel.geparkt:
 		if is_instance_valid(c) and c!=quelle and c.global_position.distance_to(p)<6.0:c.treffer(450.0,quelle,p)
+	for e in helis+panzer:
+		if is_instance_valid(e) and e!=quelle and e.global_position.distance_to(p)<8.0:e.treffer(700.0,quelle,p)
 	spiel.kam.rueckstoss(4.0)
 
 func setup_spieler():
@@ -380,6 +382,7 @@ func welt_schritt(dt:float):
 		if not (spiel.admin and spiel.admin_keine_polizei):
 			sterne=4.0;such_mitte=mp;_ohne_sicht=0.0;spiel.hud.zeige("SPERRGEBIET! Fahndungsstufe 4",2.5)
 	if spiel.admin and spiel.admin_keine_polizei:sterne=0.0
+	_einheiten_pflege(dt,me)
 	if sterne>=1.0:
 		var sieht=polizei_sieht_dich()
 		if sieht:_ohne_sicht=0.0;such_mitte=me.global_position
@@ -401,6 +404,52 @@ func welt_schritt(dt:float):
 	elif sterne>0.0:
 		sterne=max(0.0,sterne-dt*0.02)
 
+# Hubschrauber (ab 3 Sternen Polizei, bei 5 Armee) und Panzer (5 Sterne)
+const HELI=preload("res://scripts/spiel/heli.gd")
+const PANZER=preload("res://scripts/spiel/panzer.gd")
+var helis:=[]
+var panzer:=[]
+var _einheit_t:=0.0
+func _einheiten_pflege(dt:float,me):
+	for h in helis.duplicate():
+		if not is_instance_valid(h):helis.erase(h);continue
+		var weg=(sterne<3.0 and not h.tot) or h.global_position.distance_to(me.global_position)>700.0
+		if weg or not h.schritt(dt,me):helis.erase(h);h.queue_free()
+	for t in panzer.duplicate():
+		if not is_instance_valid(t):panzer.erase(t);continue
+		if (sterne<5.0 and not t.tot) or t.global_position.distance_to(me.global_position)>600.0 or not t.schritt(dt,me):panzer.erase(t);t.queue_free()
+	if tot or sterne<3.0:return
+	_einheit_t-=dt
+	if _einheit_t>0.0:return
+	_einheit_t=6.0
+	var lebend=func(a):return a.filter(func(x):return is_instance_valid(x) and not x.tot)
+	var pol=lebend.call(helis).filter(func(x):return not x.armee).size()
+	var arm=lebend.call(helis).filter(func(x):return x.armee).size()
+	var mp=me.global_position
+	if pol<(1 if sterne<5.0 else 1):
+		_heli_neu(mp,false)
+	if sterne>=5.0:
+		if arm<1:_heli_neu(mp,true)
+		if lebend.call(panzer).size()<1:_panzer_neu(mp)
+func _heli_neu(mp:Vector3,armee:bool):
+	var h=HELI.new();spiel.add_child(h);h.setup(self,armee)
+	var a=randf()*TAU
+	h.global_position=mp+Vector3(cos(a)*260.0,90.0,sin(a)*260.0)
+	helis.append(h)
+	spiel.hud.zeige("ARMEE-HUBSCHRAUBER IM ANFLUG!" if armee else "Polizeihubschrauber im Anflug",2.0)
+func _panzer_neu(mp:Vector3):
+	# auf einer Straße 120–200 m entfernt absetzen
+	var S=spiel.welt.S;var p2=Vector2(mp.x,mp.z);var kand=[]
+	for r in S.roads:
+		if not r.typ in ["strasse","allee","land","autobahn"]:continue
+		for i in range(0,r.P.size(),5):
+			var d=r.P[i].distance_to(p2)
+			if d>120.0 and d<200.0 and not r.tunnel_flags[i]:kand.append(Vector3(r.P[i].x,r.h[i],r.P[i].y))
+	if kand.is_empty():return
+	var t=PANZER.new();spiel.add_child(t);t.setup(self);t.global_position=kand[randi()%kand.size()]
+	panzer.append(t)
+	spiel.hud.zeige("PANZER!",2.0)
+
 var such_mitte:=Vector3.ZERO
 var such_r:=0.0
 var streifen:=[]          # verfolgende Streifenwagen
@@ -408,6 +457,9 @@ var _streifen_t:=0.0
 func polizei_sieht_dich()->bool:
 	var me=spiel.auto if spiel.auto!=null else spiel.spieler
 	var p=me.global_position
+	for h in helis:
+		if is_instance_valid(h) and not h.tot and h.global_position.distance_to(p)<130.0:
+			if _ray(h.global_position+Vector3(0,-2,0),p+Vector3(0,1.0,0),[h,me])==null:return true
 	for g in gegner:
 		if is_instance_valid(g) and g.fraktion=="polizei" and not g.tot and g.global_position.distance_to(p)<70.0:
 			var h=_ray(g.global_position+Vector3(0,1.6,0),p+Vector3(0,1.0,0),[g,me])

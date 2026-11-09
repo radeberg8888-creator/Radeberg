@@ -3771,3 +3771,117 @@ func _dachband(m:Material,T:Transform3D,K:Array,x0:float,x1:float,z0:float,z1:fl
 		var a=Vector3(x0,_oben_y(K,z,x0)+0.008,z);var b=Vector3(x1,_oben_y(K,z,x1)+0.008,z)
 		if prev!=null:_tri(s2,T*prev[0],T*prev[1],T*b,T.basis*Vector3.UP);_tri(s2,T*prev[0],T*b,T*a,T.basis*Vector3.UP)
 		prev=[a,b]
+
+# ---------------- Nutzfahrzeuge: LKW mit Koffer, Transporter ----------------
+func _lkw(T:Transform3D,kabine:Color,koffer:Color,schrift:String=""):
+	var lk=_lack(kabine);var ko=_toon(koffer);var dunkel=M.dunkel
+	# Fahrerhaus (Frontlenker)
+	karosse(lk,T,[[4.25,0.75,1.25,1.15,1.12,0.1],[4.2,0.7,2.55,1.2,1.12,0.12],[2.6,0.7,2.7,1.2,1.15,0.08],[2.55,0.75,2.7,1.18,1.12,0.06]])
+	var gl=_shader(GLAS,{"farbe":Color(0.2,0.33,0.43)})
+	lbox(gl,T,Vector3(0,2.05,4.24),Vector3(2.1,0.85,0.03),0.02)
+	for sd in [-1,1]:
+		lbox(gl,T,Vector3(sd*1.2,2.05,3.75),Vector3(0.02,0.75,0.8),0.015)
+		lbox(M.lampe,T,Vector3(sd*0.8,1.0,4.26),Vector3(0.38,0.2,0.03),0.012)
+		lbox(_toon(Color(1.0,0.6,0.1)),T,Vector3(sd*1.12,1.0,4.22),Vector3(0.08,0.18,0.1),0.01)
+		lbox(M.rot_l,T,Vector3(sd*0.95,0.9,-4.36),Vector3(0.18,0.3,0.03),0.012)
+		lstab(dunkel,T,Vector3(sd*1.22,2.7,4.0),Vector3(sd*1.45,2.4,4.1),0.05)   # Spiegelarm
+		lbox(dunkel,T,Vector3(sd*1.48,2.15,4.1),Vector3(0.06,0.5,0.25),0.01)
+		lstab(M.metall,T,Vector3(sd*1.21,0.85,3.2),Vector3(sd*1.21,0.85,2.75),0.12)   # Trittstufe
+	lbox(dunkel,T,Vector3(0,1.25,4.27),Vector3(1.4,0.35,0.03),0.01)
+	for k in 6:lbox(M.metall,T,Vector3(-0.6+k*0.24,1.25,4.29),Vector3(0.06,0.3,0.01))
+	lbox(M.stein_d,T,Vector3(0,0.72,4.3),Vector3(2.3,0.25,0.18),0.02)
+	# Rahmen und Kofferaufbau
+	lbox(dunkel,T,Vector3(0,0.8,-0.9),Vector3(1.6,0.3,6.8),0.02)
+	lbox(ko,T,Vector3(0,2.15,-1.0),Vector3(2.45,2.9,6.7),0.035)
+	lbox(lk,T,Vector3(0,3.62,-1.0),Vector3(2.47,0.1,6.72),0.0)
+	lbox(dunkel,T,Vector3(0,2.15,-4.36),Vector3(0.04,2.8,0.02),0.0)
+	for sd in [-1,1]:
+		lbox(M.metall,T,Vector3(sd*1.23,0.95,-1.2),Vector3(0.04,0.25,4.6),0.01)   # Unterfahrschutz
+		if schrift!="":_schrift(schrift,T*Vector3(sd*1.235,2.3,-1.0),T.basis.orthonormalized()*Basis(Vector3.UP,sd*PI*0.5),0.009,Color(0.12,0.12,0.15) if koffer.v>0.6 else Color(1,1,1),Color(0,0,0,0),110)
+	if schrift!="":_schrift(schrift,T*Vector3(0,2.3,-4.37),T.basis.orthonormalized()*Basis(Vector3.UP,PI),0.007,Color(0.12,0.12,0.15) if koffer.v>0.6 else Color(1,1,1))
+	for sx in [-1,1]:
+		for sz in [3.05,-2.6]:_rad(T,Vector3(sx*1.0,0.52,sz),0.52,0.34,sx,"",M.stein,1.18)
+	box(dunkel,T*Vector3(0,0.006,0),Vector3(2.3,0.004,8.6),T.basis,0.0)
+
+func _transporter(T:Transform3D,farbe:Color,schrift:String=""):
+	var lk=_lack(farbe)
+	karosse(lk,T,[[2.75,0.42,0.85,0.88,0.84,0.15],[2.62,0.38,1.05,0.97,0.93,0.13],[1.95,0.36,1.15,1.0,0.97,0.1],[-2.7,0.36,1.15,1.0,0.97,0.1],[-2.78,0.42,1.1,0.98,0.95,0.06]])
+	_kabine(T,[[1.95,1.15,1.17,0.96,0.95,0.03],[1.25,1.15,2.2,0.96,0.9,0.06],[1.1,1.15,2.2,0.96,0.9,0.06],[1.05,1.15,1.17,0.96,0.95,0.03]],lk,lk,
+		[[1.27,2.17,2.24,0.9,0.88,0.04],[1.03,2.17,2.24,0.9,0.88,0.04]],false,0.05)
+	karosse(lk,T,[[1.05,1.15,2.25,0.98,0.92,0.08],[-2.75,1.15,2.25,0.98,0.92,0.08]],0.035)
+	for sd in [-1,1]:
+		lbox(M.lampe,T,Vector3(sd*0.62,0.8,2.74),Vector3(0.32,0.18,0.04),0.012)
+		lbox(M.rot_l,T,Vector3(sd*0.92,0.9,-2.79),Vector3(0.14,0.4,0.03),0.012)
+		lstab(M.dunkel,T,Vector3(sd*0.985,0.45,0.3),Vector3(sd*0.985,2.15,0.3),0.015)
+		if schrift!="":_schrift(schrift,T*Vector3(sd*1.0,1.55,-0.9),T.basis.orthonormalized()*Basis(Vector3.UP,sd*PI*0.5),0.0045,Color(1,1,1) if farbe.v<0.6 else Color(0.15,0.15,0.2))
+	lbox(M.dunkel,T,Vector3(0,0.65,2.78),Vector3(1.0,0.22,0.03),0.012)
+	lbox(M.stein_d,T,Vector3(0,0.42,2.8),Vector3(1.9,0.16,0.12),0.02)
+	lstab(M.dunkel,T,Vector3(0,0.5,-2.79),Vector3(0,2.15,-2.79),0.02)
+	for sd in [-1,1]:lbox(_glas_auto,T,Vector3(sd*0.48,1.75,-2.8),Vector3(0.7,0.5,0.02),0.012)
+	for sx in [-1,1]:
+		for sz in [1.95,-1.75]:_rad(T,Vector3(sx*0.86,0.34,sz),0.34,0.22,sx,"",M.stein,0.98)
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(1.95,0.004,5.5),T.basis,0.0)
+
+# ---------------- Motorrad (Cruiser) mit optionalem Fahrer in Kutte ----------------
+# Je Achse zwei eng beieinander liegende Räder (Physik braucht vier), optisch ein breiter Reifen.
+func _harley(T:Transform3D,lack_f:Color,kutte:Color,fahrer:=false):
+	var lk=_lack(lack_f);var ch=M.chrom;var sw=M.dunkel;var leder=_toon(Color(0.08,0.07,0.07))
+	var R=0.34
+	for sx in [-1,1]:
+		_rad(T,Vector3(sx*0.065,R,0.92),R,0.12,sx,"stahl",ch,0.0)
+		_rad(T,Vector3(sx*0.065,R,-0.68),R,0.12,sx,"stahl",ch,0.0)
+	# Gabel (flach angestellt), Lenker (Ape Hanger), Scheinwerfer
+	for sx in [-1,1]:
+		zyl(ch,T*Vector3(sx*0.11,R,0.92),T*Vector3(sx*0.11,1.08,0.5),0.035,1.1)
+		zyl(ch,T*Vector3(sx*0.08,1.1,0.5),T*Vector3(sx*0.36,1.32,0.42),0.022,1.1)
+		zyl(sw,T*Vector3(sx*0.36,1.32,0.42),T*Vector3(sx*0.44,1.3,0.32),0.03,1.1)
+	zyl(ch,T*Vector3(-0.08,1.1,0.5),T*Vector3(0.08,1.1,0.5),0.022,1.0)
+	kugel(ch,T*Vector3(0,0.98,0.62),Vector3(0.13,0.13,0.11),1.06)
+	kugel(M.lampe,T*Vector3(0,0.98,0.71),Vector3(0.09,0.09,0.03),1.0)
+	# Schutzbleche
+	lbox(lk,T,Vector3(0,R+0.3,0.92),Vector3(0.18,0.05,0.55),0.02,Basis(Vector3.RIGHT,0.25))
+	lbox(lk,T,Vector3(0,R+0.32,-0.72),Vector3(0.22,0.05,0.7),0.02,Basis(Vector3.RIGHT,-0.2))
+	# Rahmen, Tank, Sitz, V2-Motor, Auspuff
+	zyl(sw,T*Vector3(0,1.02,0.48),T*Vector3(0,0.42,0.2),0.04,1.1)
+	zyl(sw,T*Vector3(0,0.42,0.2),T*Vector3(0,0.38,-0.5),0.04,1.1)
+	zyl(sw,T*Vector3(0,0.95,0.45),T*Vector3(0,0.8,-0.45),0.035,1.1)
+	kugel(lk,T*Vector3(0,0.98,0.22),Vector3(0.17,0.12,0.3),1.06)
+	kugel(_toon(Color(0.95,0.95,0.92)),T*Vector3(0,1.0,0.22),Vector3(0.175,0.05,0.12),1.0)   # Streifen/Logo
+	kugel(leder,T*Vector3(0,0.82,-0.22),Vector3(0.17,0.07,0.28),1.06)
+	kugel(leder,T*Vector3(0,0.9,-0.48),Vector3(0.13,0.1,0.08),1.06)   # Sitzrolle
+	for k in 2:
+		var a=-0.45+k*0.9
+		zyl(ch,T*Vector3(0,0.48,0.02),T*Vector3(0,0.48+0.36*cos(a),0.02+0.36*sin(a)),0.085,1.08)
+		zyl(ch,T*Vector3(0,0.48+0.36*cos(a),0.02+0.36*sin(a)),T*Vector3(0,0.5+0.4*cos(a),0.02+0.4*sin(a)),0.1,1.0)
+	lbox(ch,T,Vector3(0,0.42,0.0),Vector3(0.24,0.26,0.36),0.02)
+	for k in 2:zyl(ch,T*Vector3(0.14,0.45+k*0.1,0.05),T*Vector3(0.2,0.35+k*0.12,-1.0),0.045,1.1)
+	# Fußrasten vorn, Rücklicht
+	for sx in [-1,1]:zyl(ch,T*Vector3(sx*0.12,0.38,0.42),T*Vector3(sx*0.3,0.38,0.44),0.025,1.0)
+	lbox(M.rot_l,T,Vector3(0,0.72,-1.03),Vector3(0.12,0.06,0.03),0.01)
+	box(M.dunkel,T*Vector3(0,0.006,0),Vector3(0.7,0.004,2.3),T.basis,0.0)
+	if not fahrer:return
+	# Fahrer als eigener Knoten "Fahrer" (wird ausgeblendet, wenn der Spieler das Motorrad übernimmt)
+	_fertig()
+	var alt=welt;var fn=Node3D.new();fn.name="Fahrer";welt.add_child(fn);welt=fn
+	var haut=_toon(HAUT[rng.randi()%HAUT.size()]);var jeans=_toon(Color(0.2,0.27,0.42));var helm=_toon(Color(0.06,0.06,0.07))
+	var hf=T*Vector3(0,0.9,-0.2);var sch=T*Vector3(0,1.47,-0.27)
+	kapsel(jeans,T*Vector3(0,0.88,-0.18),T*Vector3(0,0.98,-0.25),0.17,true)
+	kapsel(_toon(Color(0.85,0.85,0.82) if rng.randf()<0.5 else Color(0.2,0.2,0.22)),hf,sch,0.17,true)   # Shirt
+	# Kutte: Weste mit Rückenaufnäher in Clubfarbe
+	lbox(leder,T,Vector3(0,1.2,-0.24),Vector3(0.4,0.52,0.3),0.03,Basis(Vector3.RIGHT,-0.12))
+	lbox(_toon(kutte),T,Vector3(0,1.25,-0.4),Vector3(0.26,0.22,0.02),0.0,Basis(Vector3.RIGHT,-0.12))
+	lbox(_toon(kutte),T,Vector3(0,1.42,-0.39),Vector3(0.3,0.05,0.02),0.0,Basis(Vector3.RIGHT,-0.12))
+	lbox(_toon(kutte),T,Vector3(0,1.04,-0.38),Vector3(0.3,0.05,0.02),0.0,Basis(Vector3.RIGHT,-0.12))
+	kugel(haut,T*Vector3(0,1.66,-0.24),Vector3(0.11,0.13,0.11),1.06)
+	kugel(helm,T*Vector3(0,1.71,-0.25),Vector3(0.125,0.09,0.13),1.06)
+	lbox(_toon(Color(0.05,0.05,0.05)),T,Vector3(0,1.67,-0.13),Vector3(0.17,0.04,0.02),0.0)   # Sonnenbrille
+	kugel(_toon(Color(0.45,0.38,0.32)),T*Vector3(0,1.56,-0.16),Vector3(0.07,0.06,0.04),1.0)   # Bart
+	for sx in [-1,1]:
+		var s=T*Vector3(sx*0.21,1.42,-0.26);var e=T*Vector3(sx*0.33,1.24,0.06);var h=T*Vector3(sx*0.38,1.31,0.38)
+		kapsel(haut,s,e,0.055,true);kapsel(haut,e,h,0.05,true)
+		kapsel(leder,s,s.lerp(e,0.35),0.07,true)
+		var hu=T*Vector3(sx*0.12,0.9,-0.18);var kn=T*Vector3(sx*0.2,0.86,0.25);var fu=T*Vector3(sx*0.24,0.42,0.42)
+		kapsel(jeans,hu,kn,0.08,true);kapsel(jeans,kn,fu,0.065,true)
+		lbox(leder,T,Vector3(sx*0.25,0.4,0.48),Vector3(0.1,0.12,0.24),0.02)
+	_fertig()
+	welt=alt

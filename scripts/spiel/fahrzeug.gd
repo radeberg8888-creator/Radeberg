@@ -39,6 +39,98 @@ func treffer(dmg:float,von,punkt:Vector3):
 	if modus=="ki" and (not zaeh or hp<350.0):ki_ziel=0.0;ki_speed=max(0.0,ki_speed-4.0)
 	if hp<380.0 and _rauch==null:_rauch_an()
 	if hp<=0.0 and _brand<=0.0:_brand=4.0
+# ---------------- Schadensmodell ----------------
+# Aufprall erkennen (plötzliche Geschwindigkeitsänderung), Blech an der Stoßstelle eindrücken,
+# Scheiben zersplittern, Teile fliegen weg, Motor verliert Leistung, Rauch -> Feuer -> Explosion.
+var _v_alt:=Vector3.ZERO
+var _crash_t:=0.0
+var _eigen:=false
+var _splitter:=false
+func _physics_process(dt):
+	if freeze or modus=="ki":_v_alt=Vector3.ZERO;return
+	_crash_t=max(0.0,_crash_t-dt)
+	var dv=linear_velocity-_v_alt
+	var verlust=_v_alt.length()-linear_velocity.length()   # Aufprall bremst ab (Anschieben/Teleport zählt nicht)
+	_v_alt=linear_velocity
+	var st=dv.length()
+	if verlust>6.0 and st>6.0 and _crash_t<=0.0 and dt>0.0:
+		_crash_t=0.25
+		aufprall(min(st,verlust*1.3),dv/st)
+func aufprall(staerke:float,richtung_welt:Vector3,andere=null):
+	# richtung_welt: Kraftrichtung auf das Auto (zeigt vom Hindernis weg) -> Stoßstelle liegt auf der Gegenseite
+	if wrack:return
+	var lok=global_transform.basis.inverse()*(-richtung_welt);lok.y*=0.3
+	if lok.length()<0.01:return
+	lok=lok.normalized()
+	var h=ab.size*0.5;var m=ab.get_center()
+	var t=min(h.x/max(abs(lok.x),0.001),h.z/max(abs(lok.z),0.001))
+	var punkt=m+lok*t;punkt.y=ab.position.y+ab.size.y*0.4
+	treffer(pow(max(staerke-6.0,0.0),1.4)*12.0,andere,global_transform*punkt)
+	_beulen(punkt,-lok,clamp((staerke-5.0)*0.035,0.04,0.42))
+	if staerke>11.0 and not _splitter:_scheiben_kaputt()
+	if staerke>13.0:_truemmer(global_transform*punkt,richtung_welt,int(clamp((staerke-10.0)/3.0,1,4)))
+func _beulen(punkt_lokal:Vector3,nach_innen:Vector3,tiefe:float):
+	if visual==null:return
+	var R=1.15
+	for mi in visual.find_children("*","MeshInstance3D",true,false):
+		if mi.name.begins_with("Rad") or (mi.get_parent() and mi.get_parent().name.begins_with("Rad")):continue
+		var am=mi.mesh as ArrayMesh
+		if am==null:continue
+		if not mi.has_meta("eigen"):am=am.duplicate(true);mi.mesh=am;mi.set_meta("eigen",true)
+		var zu_mesh=mi.global_transform.affine_inverse()*global_transform
+		var pm=zu_mesh*punkt_lokal;var dm=(zu_mesh.basis*nach_innen).normalized()
+		var neu=[];var mats=[];var geaendert=false
+		for si in am.get_surface_count():
+			var a=am.surface_get_arrays(si);mats.append(am.surface_get_material(si))
+			var v:PackedVector3Array=a[Mesh.ARRAY_VERTEX]
+			for i in v.size():
+				var d=v[i].distance_to(pm)
+				if d<R:var f=1.0-d/R;v[i]+=dm*tiefe*f*f;geaendert=true
+			a[Mesh.ARRAY_VERTEX]=v;neu.append([am.surface_get_primitive_type(si),a])
+		if not geaendert:continue
+		am.clear_surfaces()
+		for i in neu.size():am.add_surface_from_arrays(neu[i][0],neu[i][1]);am.surface_set_material(i,mats[i])
+func _scheiben_kaputt():
+	_splitter=true
+	var riss=StandardMaterial3D.new();riss.albedo_color=Color(0.85,0.9,0.95,0.55);riss.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA;riss.roughness=0.2
+	var tex=_riss_textur();riss.albedo_texture=tex;riss.uv1_triplanar=true;riss.uv1_scale=Vector3(0.8,0.8,0.8)
+	for mi in visual.find_children("*","MeshInstance3D",true,false):
+		var m=mi.mesh
+		if m==null:continue
+		for si in m.get_surface_count():
+			var mt=m.surface_get_material(si)
+			if mt is ShaderMaterial and mt.shader and str(mt.shader.resource_path).to_lower().contains("glas"):mi.set_surface_override_material(si,riss)
+			elif mt is ShaderMaterial and mt.shader and str(mt.shader.code).contains("gemalte Spiegelung"):mi.set_surface_override_material(si,riss)
+static var _riss:ImageTexture=null
+static func _riss_textur()->ImageTexture:
+	if _riss:return _riss
+	var img=Image.create(128,128,false,Image.FORMAT_RGBA8);img.fill(Color(1,1,1,0))
+	var r=RandomNumberGenerator.new();r.seed=7
+	for k in 9:
+		var p=Vector2(64,64);var a=TAU*k/9.0+r.randf_range(-0.2,0.2)
+		for s in 70:
+			a+=r.randf_range(-0.25,0.25);p+=Vector2(cos(a),sin(a))
+			if p.x>=0 and p.y>=0 and p.x<128 and p.y<128:img.set_pixel(int(p.x),int(p.y),Color(1,1,1,1))
+	for k in 3:
+		for s in 360:
+			var q=Vector2(64,64)+Vector2(cos(deg_to_rad(s)),sin(deg_to_rad(s)))*(14+k*16)*r.randf_range(0.9,1.1)
+			if r.randf()<0.6 and q.x>=0 and q.y>=0 and q.x<128 and q.y<128:img.set_pixel(int(q.x),int(q.y),Color(1,1,1,0.9))
+	_riss=ImageTexture.create_from_image(img);return _riss
+func _truemmer(p:Vector3,richtung:Vector3,n:int):
+	var farbe=Color(0.5,0.5,0.5)
+	for mi in visual.find_children("*","MeshInstance3D",true,false):
+		var mt=mi.mesh.surface_get_material(0) if mi.mesh and mi.mesh.get_surface_count()>0 else null
+		if mt is StandardMaterial3D:farbe=mt.albedo_color;break
+	for i in n:
+		var rb=RigidBody3D.new();rb.collision_layer=0;rb.collision_mask=1;rb.mass=8.0
+		var cs=CollisionShape3D.new();var bx=BoxShape3D.new();var gr=Vector3(randf_range(0.3,0.9),randf_range(0.05,0.2),randf_range(0.2,0.6));bx.size=gr;cs.shape=bx;rb.add_child(cs)
+		var m=MeshInstance3D.new();var bm=BoxMesh.new();bm.size=gr;m.mesh=bm;rb.add_child(m)
+		var mt2=StandardMaterial3D.new();mt2.albedo_color=farbe if i%2==0 else Color(0.12,0.12,0.12);m.material_override=mt2
+		get_parent().add_child(rb);rb.global_position=p+Vector3(0,0.3,0)
+		rb.linear_velocity=linear_velocity*0.6+(richtung*-1.0+Vector3(randf_range(-1,1),1.2,randf_range(-1,1))).normalized()*randf_range(3,7)
+		rb.angular_velocity=Vector3(randf_range(-9,9),randf_range(-9,9),randf_range(-9,9))
+		var tw=rb.create_tween();tw.tween_interval(10.0);tw.tween_callback(rb.queue_free)
+	# Dampf aus dem Motor bei mittlerem Schaden
 func _rauch_an():
 	_rauch=CPUParticles3D.new();add_child(_rauch);_rauch.position=Vector3(0,ab.end.y*0.7,ab.end.z-0.9)
 	_rauch.amount=24;_rauch.lifetime=1.6;_rauch.direction=Vector3.UP;_rauch.spread=15;_rauch.initial_velocity_min=1.0;_rauch.initial_velocity_max=2.2;_rauch.gravity=Vector3(0,0.6,0)
@@ -145,6 +237,7 @@ func setup(k:String):
 	elif k.begins_with("c_luxus"):kraft=5600.0;max_kmh=215.0
 	elif k.begins_with("c_muscle"):kraft=6400.0;max_kmh=225.0
 	elif k.begins_with("c_suv"):kraft=5400.0;max_kmh=175.0
+	elif k.begins_with("c_harley"):mass=330.0;kraft=1500.0;max_kmh=190.0
 	center_of_mass_mode=RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM;center_of_mass=Vector3(0.0,0.0,ab.get_center().z)
 	# Karosserie als Kollisionskasten (über dem Boden, damit die Räder federn können)
 	var cs=CollisionShape3D.new();var bx=BoxShape3D.new()
@@ -242,7 +335,8 @@ func fahren(st,dt:float):
 	if st.brake>0.05:
 		if v>0.8:b=st.brake*45.0
 		else:f=-st.brake*kraft*0.5
-	if speed>max_kmh and f>0:f=0.0
+	if speed>max_kmh*clamp(0.55+hp/1000.0*0.45,0.55,1.0) and f>0:f=0.0
+	f*=clamp(0.5+hp/1000.0*0.5,0.5,1.0)   # beschädigter Motor zieht schlechter
 	if v<-11.0 and f<0:f=0.0   # rückwärts höchstens ~40 km/h
 	if st.nos and nos_vorrat>0.0 and st.gas>0.1:f*=1.7;nos_vorrat=max(0.0,nos_vorrat-dt*0.25)
 	else:nos_vorrat=min(1.0,nos_vorrat+dt*0.03)
@@ -339,7 +433,7 @@ func _lane(r)->float:
 func _ki_place(dt:float):
 	var a=S.at(ki_road,clamp(ki_s,0.0,S.length(ki_road)))
 	var t:Vector2=a[2]*ki_dir;var n=Vector2(-t.y,t.x)
-	var p:Vector2=a[0]-n*ki_lane    # Rechtsverkehr
+	var p:Vector2=a[0]+n*ki_lane    # Rechtsverkehr: n zeigt in Fahrtrichtung nach rechts
 	var y=a[1]+0.04
 	# Steigung der Straße übernehmen (sonst steckt bei Gefälle Bug oder Heck in der Fahrbahn)
 	var L=S.length(ki_road)

@@ -12,6 +12,7 @@ var LV=null
 var PARKEN:=[]   # [kind, Transform3D]
 var VIERTEL:=[]  # {name, datei, rect, node, laed, ab, weg}
 var SUED_RECT:=Rect2()
+var DIENSTE:=[]   # Polizei-, Feuer-, Taxiwachen {art,p,yaw}
 var IMMO:=[]     # kaufbare Lagerhallen / Autohandel aus dem Generator  – nach Entfernung nachgeladene Stadtviertel
 const LADEN_AB:=650.0
 const ENTLADEN_AB:=850.0
@@ -46,7 +47,7 @@ func aus_cache():
 	A=CA.new();A.shops=d.shops
 	PARKEN=d.parken
 	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB),"baut":false,"weg_jetzt":false})
-	SUED_RECT=d.get("sued_rect",Rect2());IMMO=d.get("immo",[])
+	SUED_RECT=d.get("sued_rect",Rect2());IMMO=d.get("immo",[]);DIENSTE=d.get("dienste",[])
 
 # Viertel nachladen/entladen je nach Abstand der Kamera zum Viertel-Rechteck
 func _rect_abst(r:Rect2,p:Vector2)->float:

@@ -186,7 +186,7 @@ func _init():
 					parken=parken.filter(func(e):return Vector2(e[1].origin.x,e[1].origin.z).distance_to(zp)>16.0)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
 		"rect":Rect2(Vector2(CX-RX,CZ-RZ),Vector2(RX*2,RZ*2)),"sued_rect":SD.rw,
-		"viertel":SD.viertel+ND.viertel,"immo":SD.immo+ND.immo}
+		"viertel":SD.viertel+ND.viertel,"immo":SD.immo+ND.immo,"dienste":SD.dienste+ND.dienste}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	# ---- speichern ----
 	_owner(W,W)
@@ -217,6 +217,7 @@ func _sued(L,G0,art:="sued",SU=null)->Dictionary:
 		var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_sued.json"))
 		var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
 		S.werkstatt_reservieren(Vector2(-200,960))
+		for e in [["polizei",Vector2(-60,1250)],["feuerwehr",Vector2(350,1700)],["taxi",Vector2(-420,1180)],["polizei",Vector2(1300,900)]]:S.dienst_reservieren(e[0],e[1])
 		S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse()
 		var namen=[["Grove Street",Vector2(-250,1000)],["Hafenstraße",Vector2(500,2100)],["Südallee",Vector2(250,1580)],["Kaistraße",Vector2(1500,800)],["Flughafenstraße",Vector2(-1900,1750)],["Strandpromenade",Vector2(-2150,600)],["Industriestraße",Vector2(900,650)]]
 		for nm in namen:
@@ -225,13 +226,15 @@ func _sued(L,G0,art:="sued",SU=null)->Dictionary:
 	else:
 		var insel=Rect2(-4400,-11300,9100,14800)
 		S.maske_bauen(insel,[AUSW[0],SUED_RW])
+		S.SU=SU;S.AUSW_W=AUSW[0]
 		S.KITLISTE=SU.KITLISTE.duplicate(true)
 		S.laden("res://assets/data/karte_nord.json",Rect2(insel.position-Vector2(CX,CZ),insel.size),[Rect2(AUSW[0].position-Vector2(CX,CZ),AUSW[0].size)])
 		n0=L.KOLL_F.size();p0=L.PFOSTEN.size()
 		S.zwischenstrassen();S.kreuzungen();S.kits_bauen();S.sonderorte()
+		for e in [["polizei",Vector2(300,-500)],["feuerwehr",Vector2(-700,-300)],["taxi",Vector2(800,-150)],["polizei",Vector2(1760,-5900)],["feuerwehr",Vector2(1900,-7650)],["polizei",Vector2(-1000,-1300)]]:S.dienst_reservieren(e[0],e[1])
 		var d=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_nord.json"))
 		var hs=[];for h in d.houses:hs.append(Vector2(h[0],h[1]))
-		S.hinterland(hs);S.grundstuecke();S.fuellen();S.parken_strasse();S.gelaende_ziel()
+		S.hinterland(hs);S.grundstuecke();S.fuellen();S.landschaft_orte();S.parken_strasse();S.gelaende_ziel();S.landschaft_natur()
 		var namen=[["Nordallee",Vector2(-400,-1000)],["Sonnenhügel",Vector2(-150,-1500)],["Weststraße",Vector2(-850,-450)],["Oststraße",Vector2(2700,600)],["Sternstraße",Vector2(1080,-520)],["Staubwinkel",Vector2(1750,-5950)],["Gefängnisstraße",Vector2(1700,-5050)],["Farmweg",Vector2(1950,-7800)]]
 		for nm in namen:
 			var ns=S.naechst(nm[1]-Vector2(CX,CZ))
@@ -338,7 +341,9 @@ func _sued(L,G0,art:="sued",SU=null)->Dictionary:
 		immo.append({"art":im.art,"id":("%s_%d"%[im.art,zn[im.art]]) if art=="sued" else ("n%s_%d"%[im.art,zn[im.art]]),"ort":ort,"p":Vector3(zp.x+CX,H0+xf.origin.y+L.KB+0.05,zp.z+CZ),"yaw":atan2(xf.basis.z.x,xf.basis.z.z)})
 	L.welt=W.get_node("Stadt")
 	print(art," Kacheln ",viertel.size()," Bausätze ",K.KITS.size()," Immobilien ",immo.size()," ",Time.get_ticks_msec()-t0," ms")
-	return {"S":S,"viertel":viertel,"immo":immo,"rw":SUED_RW}
+	var dienste=[]
+	for d in S.DIENSTE:dienste.append({"art":d.art,"p":d.F+Vector2(CX,CZ),"yaw":d.yaw})
+	return {"S":S,"viertel":viertel,"immo":immo,"rw":SUED_RW,"dienste":dienste}
 
 func _koll(sk:StaticBody3D,L,KN:Array,KF:Array,PF:Array)->PackedVector3Array:
 	var F=PackedVector3Array(KN)
@@ -360,10 +365,10 @@ func _owner(n:Node,o:Node):
 
 const C_GRAS:=Color(0.5,0.78,0.34)
 const C_WALD:=Color(0.3,0.58,0.27)
-const C_SAND:=Color(0.95,0.82,0.52)
+const C_SAND:=Color(0.86,0.7,0.44)
 const C_FELS:=Color(0.62,0.55,0.47)
-const C_TROCKEN:=Color(0.84,0.74,0.44)
-const C_STRAND:=Color(0.96,0.88,0.64)
+const C_TROCKEN:=Color(0.76,0.66,0.38)
+const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
 func _farbe(G0,i:int,k:int,h:float)->Color:
 	var j=(k*G0.rx+i)*4;var bo=G0._bo

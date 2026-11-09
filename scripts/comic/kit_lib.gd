@@ -135,6 +135,11 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 			for i in xs.size():mm.set_instance_transform(i,Transform3D(xs[i].basis,xs[i].origin-mitte))
 			var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.name=kn;fn.add_child(mmi)
 			mmi.visibility_range_end=sicht;mmi.visibility_range_end_margin=25.0
+			# Landschaft: eigene Sichtweiten (Fernbäume übernehmen ab 130 m, Gras nur nah)
+			if kn.begins_with("ld_fern"):mmi.visibility_range_begin=130.0;mmi.visibility_range_end=950.0;mmi.visibility_range_begin_margin=15.0;mmi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			elif kn.begins_with("ld_laub") or kn.begins_with("ld_nadel"):mmi.visibility_range_end=145.0
+			elif kn.begins_with("ld_gras"):mmi.visibility_range_end=70.0;mmi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			elif kn.begins_with("ld_stein"):mmi.visibility_range_end=180.0
 			n_mm+=1
 			if k.get("ink")!=null:
 				var mi2=MultiMesh.new();mi2.transform_format=MultiMesh.TRANSFORM_3D;mi2.mesh=k.ink;mi2.instance_count=xs.size()
