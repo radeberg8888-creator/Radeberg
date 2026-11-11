@@ -26,6 +26,11 @@ func M(c:Color,em:=0.0)->StandardMaterial3D:
 	var m=StandardMaterial3D.new();m.albedo_color=c;m.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;m.specular_mode=BaseMaterial3D.SPECULAR_DISABLED;m.roughness=1.0
 	if em>0.0:m.emission_enabled=true;m.emission=c;m.emission_energy_multiplier=em
 	_mats[k]=m;return m
+# Hallenboden: liegt komplett im Dachschatten -> keine Schatten empfangen (sonst Streifen-Flimmern auf dem Handy)
+func M_boden(c:Color)->StandardMaterial3D:
+	var k="boden"+str(c)
+	if _mats.has(k):return _mats[k]
+	var m=M(c).duplicate();m.disable_receive_shadows=true;m.albedo_color=c*0.82;_mats[k]=m;return m
 func box(eltern:Node3D,c:Vector3,s:Vector3,col:Color,koll:=false,em:=0.0,rot:=Vector3.ZERO)->MeshInstance3D:
 	var mi=MeshInstance3D.new();var bm=BoxMesh.new();bm.size=s;mi.mesh=bm;mi.material_override=M(col,em);eltern.add_child(mi);mi.position=c;mi.rotation=rot
 	if koll:
@@ -44,10 +49,11 @@ func schrift(eltern:Node3D,t:String,c:Vector3,px:float,col:Color,rand:Color,rot:
 func bauen():
 	var ziegel=Color(0.55,0.27,0.2);var dunkel=Color(0.18,0.18,0.2);var beton=Color(0.55,0.55,0.53)
 	# Boden innen (Beton mit Ölflecken), Vorplatz
-	box(self,Vector3(0,KB*0.5,-T*0.5),Vector3(B,KB,T),beton,true)
-	for i in 6:box(self,Vector3(randf_range(-6,6),KB+0.005,randf_range(-20,-5)),Vector3(randf_range(0.8,2.2),0.01,randf_range(0.6,1.8)),Color(0.22,0.21,0.2))
-	box(self,Vector3(0,KB+0.006,-13),Vector3(5.2,0.01,7.0),Color(0.85,0.75,0.1))   # gelbe Markierung Bühne
-	box(self,Vector3(0,KB+0.007,-13),Vector3(4.8,0.012,6.6),beton)
+	var bo=[box(self,Vector3(0,(KB+0.05)*0.5,-T*0.5),Vector3(B,KB+0.05,T),beton,true)]
+	for i in 6:bo.append(box(self,Vector3(randf_range(-6,6),KB+0.062,randf_range(-20,-5)),Vector3(randf_range(0.8,2.2),0.024,randf_range(0.6,1.8)),Color(0.22,0.21,0.2)))
+	bo.append(box(self,Vector3(0,KB+0.07,-13),Vector3(5.2,0.04,7.0),Color(0.85,0.75,0.1)))   # gelbe Markierung Bühne
+	bo.append(box(self,Vector3(0,KB+0.085,-13),Vector3(4.8,0.07,6.6),beton))
+	for b in bo:b.material_override=M_boden((b.material_override as StandardMaterial3D).albedo_color);b.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Wände
 	box(self,Vector3(-B*0.5,H*0.5,-T*0.5),Vector3(0.4,H,T),ziegel,true)
 	box(self,Vector3(B*0.5,H*0.5,-T*0.5),Vector3(0.4,H,T),ziegel,true)
@@ -58,7 +64,7 @@ func bauen():
 	box(self,Vector3(0,TH+(H-TH)*0.5,0),Vector3(TB,H-TH,0.4),ziegel,true)
 	# Dach, Attika, Torkasten
 	box(self,Vector3(0,H+0.15,-T*0.5),Vector3(B+0.6,0.3,T+0.6),dunkel,true)
-	box(self,Vector3(0,H+0.55,0.2),Vector3(B+0.6,0.6,0.3),Color(0.85,0.2,0.15))
+	box(self,Vector3(0,H+0.95,0.2),Vector3(B+0.6,1.6,0.3),Color(0.85,0.2,0.15))
 	box(self,Vector3(0,TH+0.45,0.45),Vector3(TB+0.4,0.9,0.5),Color(0.3,0.3,0.32))
 	# Rolltor (bewegt sich)
 	tor=Node3D.new();add_child(tor);tor.position=Vector3(0,0,0.05)
@@ -68,7 +74,7 @@ func bauen():
 	schrift(tor,tg[randi()%tg.size()],Vector3(-1.2,1.6,0.1),0.012,Color(0.2,0.9,0.4),Color(0.05,0.05,0.05),Vector3(0,0,0.12))
 	var tsb=StaticBody3D.new();tor_koll=CollisionShape3D.new();var tsh=BoxShape3D.new();tsh.size=Vector3(TB,TH,0.3);tor_koll.shape=tsh;tsb.add_child(tor_koll);tor.add_child(tsb);tsb.position=Vector3(0,TH*0.5,0)
 	# Außen: Schild, Streifen, Graffiti, Reifenstapel, Ölfässer
-	schrift(self,"RADEBERG CUSTOMS",Vector3(0,H-0.65,0.27),0.02,Color(1,0.82,0.2),Color(0.15,0.05,0.0),Vector3.ZERO,true)
+	schrift(self,"RADEBERG CUSTOMS",Vector3(0,H+0.95,0.37),0.0115,Color(1,0.82,0.2),Color(0.15,0.05,0.0),Vector3.ZERO,true)
 	for sx in [-1,1]:
 		box(self,Vector3(sx*(TB*0.5+0.35),TH*0.5,0.22),Vector3(0.3,TH,0.05),Color(0.95,0.8,0.1))
 		box(self,Vector3(sx*(B*0.5-2.0),2.0,0.22),Vector3(2.8,2.2,0.03),[Color(0.9,0.2,0.6),Color(0.2,0.6,0.95)][int(sx>0)])
@@ -82,8 +88,8 @@ func bauen():
 	box(self,Vector3(0,KB+4.0,LIFT.z),Vector3(5.6,0.18,0.3),Color(0.95,0.75,0.1))
 	buehne=Node3D.new();add_child(buehne);buehne.position=LIFT
 	for sx in [-1,1]:
-		for sz in [-1,1]:box(buehne,Vector3(sx*1.5,0.12,sz*1.3),Vector3(2.0,0.1,0.22),Color(0.25,0.25,0.28),false,0.0,Vector3(0,sx*sz*0.35,0))
-	zyl(buehne,Vector3(0,0.03,0),2.6,0.05,Color(0.35,0.35,0.38))
+		for sz in [-1,1]:box(buehne,Vector3(sx*1.5,0.22,sz*1.3),Vector3(2.0,0.1,0.22),Color(0.25,0.25,0.28),false,0.0,Vector3(0,sx*sz*0.35,0))
+	zyl(buehne,Vector3(0,0.14,0),2.6,0.05,Color(0.35,0.35,0.38))
 	# Werkbank, Werkzeugwand, Werkzeugwagen, Kompressor, Regale mit Reifen
 	box(self,Vector3(-B*0.5+0.9,KB+0.5,-10),Vector3(1.2,1.0,5.0),Color(0.35,0.25,0.18),true)
 	box(self,Vector3(-B*0.5+0.25,2.6,-10),Vector3(0.06,1.8,5.0),Color(0.75,0.65,0.5))

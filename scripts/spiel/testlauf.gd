@@ -701,7 +701,7 @@ func _werkstatt_test(dt):
 		var gb:Transform3D=g.global_transform
 		var vor=gb*Vector3(0,0,float(spiel._arg("--vor")) if spiel._arg("--vor")!="" else 14.0)
 		spiel.welt.viertel_jetzt(Vector2(vor.x,vor.z))
-		var c=spiel.AUTO.new();spiel.add_child(c);c.setup("c_muscle_orange")
+		var c=spiel.AUTO.new();spiel.add_child(c);c.setup(spiel._arg("--kind") if spiel._arg("--kind")!="" else "c_trabant_blau")
 		c.global_transform=Transform3D(gb.basis*Basis(Vector3.UP,PI),vor+Vector3(0,1.0,0));spiel.einsteigen(c)
 		t=0;schritt=1;return
 	if schritt==1:
@@ -716,7 +716,36 @@ func _werkstatt_test(dt):
 		return
 	if schritt==3:
 		if t<4.0:return
-		shot("werkstatt_menue");print("WERKSTATT panel ",spiel.panel!=null);t=0;schritt=4;return
+		shot("werkstatt_menue");print("WERKSTATT panel ",spiel.panel!=null);t=0;schritt=30;return
+	if schritt==30:
+		schritt=31
+		# Wischen über einen Knopf: muss scrollen und darf nichts kaufen
+		var sc:ScrollContainer=spiel.panel.find_children("*","ScrollContainer",true,false)[0]
+		var kn:Button=null
+		for b in sc.find_children("*","Button",true,false):
+			if b.text.begins_with("Tieferlegung"):kn=b
+		var geld0=spiel.geld;var p0=kn.get_global_rect().get_center();var s0=sc.scroll_vertical
+		var ev=InputEventMouseButton.new();ev.button_index=MOUSE_BUTTON_LEFT;ev.pressed=true;ev.position=p0;ev.global_position=p0;Input.parse_input_event(ev)
+		for k in 12:
+			await get_tree().process_frame
+			var mv=InputEventMouseMotion.new();mv.button_mask=MOUSE_BUTTON_MASK_LEFT;mv.position=p0-Vector2(0,25*(k+1));mv.global_position=mv.position;mv.relative=Vector2(0,-25);Input.parse_input_event(mv)
+		await get_tree().process_frame
+		var up=InputEventMouseButton.new();up.button_index=MOUSE_BUTTON_LEFT;up.pressed=false;up.position=p0-Vector2(0,300);up.global_position=up.position;Input.parse_input_event(up)
+		for k in 3:await get_tree().process_frame
+		print("WISCH scroll ",s0," -> ",sc.scroll_vertical," max ",sc.get_v_scroll_bar().max_value," geld ",geld0," -> ",spiel.geld)
+		shot("werkstatt_gescrollt")
+		# kurzer Tipp auf einen Knopf muss kaufen
+		var kn2:Button=null
+		for b in sc.find_children("*","Button",true,false):
+			if kn2==null and b.text.contains("›") and sc.get_global_rect().encloses(b.get_global_rect()):kn2=b
+		if kn2:
+			var p1=kn2.get_global_rect().get_center();var ktext=kn2.text;var g1=spiel.geld
+			var e1=InputEventMouseButton.new();e1.button_index=MOUSE_BUTTON_LEFT;e1.pressed=true;e1.position=p1;e1.global_position=p1;Input.parse_input_event(e1)
+			await get_tree().process_frame
+			var e2=e1.duplicate();e2.pressed=false;Input.parse_input_event(e2)
+			for k in 3:await get_tree().process_frame
+			print("TIPP ",ktext," geld ",g1," -> ",spiel.geld," tu ",spiel._ctu())
+		t=0;schritt=4;return
 	if schritt==4:
 		spiel.panel_zu();t=0;schritt=5;return
 	if schritt==5:

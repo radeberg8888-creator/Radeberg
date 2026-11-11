@@ -135,6 +135,7 @@ func _ready():
 	if test_modus!="":st.e.sichtweite=0;st.e.schatten=false
 	einstellungen_anwenden()
 	lade.queue_free()
+	hud.visible=true;mini.visible=true
 	bereit=true
 	_log("SPIEL LAEUFT")
 	hud.zeige("Willkommen in Radeberg!",4.0)
@@ -318,6 +319,8 @@ func _spieler():
 	kam.yaw=home.yaw+PI*0.0
 	hud=HUD.new();hud.st=st;hud.spiel=self;ui.add_child(hud)
 	mini=MINI.new();ui.add_child(mini);mini.position=Vector2(22,22)
+	# Knöpfe und Karte erst zeigen, wenn der Ladebildschirm weg ist
+	if lade!=null and is_instance_valid(lade):hud.visible=false;mini.visible=false;ui.move_child(lade,-1)
 	if "comic" in welt:
 		mini.strassen=welt.S.roads;mini.icons=[]
 		for s in welt.A.shops:mini.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y})
@@ -866,7 +869,32 @@ func _panel(titel:String)->VBoxContainer:
 	x.pressed.connect(func():
 		if auto!=null:auto.brake=0.0
 		panel_zu())
+	call_deferred("_wisch_alle",pc)
 	return v
+
+# Menüs mit dem Finger scrollen: Knöpfe lösen nur aus, wenn nicht gewischt wurde
+func _wisch_alle(n:Node):
+	if n==null or not is_instance_valid(n):return
+	for c in n.find_children("*","ScrollContainer",true,false):
+		var sc:ScrollContainer=c
+		sc.scroll_deadzone=10
+		var vb=sc.get_v_scroll_bar();vb.custom_minimum_size.x=14
+		for b in sc.find_children("*","BaseButton",true,false):_wisch_knopf(sc,b)
+func _wisch_knopf(sc:ScrollContainer,b:BaseButton):
+	if b.has_meta("wisch"):return
+	b.set_meta("wisch",true);b.mouse_filter=Control.MOUSE_FILTER_PASS
+	var zst={"an":false,"weg":0.0,"start":Vector2.ZERO}
+	b.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
+			b.accept_event()
+			if e.pressed:zst.an=true;zst.weg=0.0;zst.start=e.global_position
+			elif zst.an:
+				zst.an=false
+				if zst.weg<14.0 and b.get_global_rect().has_point(e.global_position) and not b.disabled:b.pressed.emit()
+		elif e is InputEventMouseMotion and zst.an:
+			b.accept_event()
+			zst.weg=max(zst.weg,(e.global_position-zst.start).length())
+			if zst.weg>=14.0:sc.scroll_vertical-=int(e.relative.y);sc.scroll_horizontal-=int(e.relative.x))
 
 func _btn(v:Control,t:String,f:Callable)->Button:
 	var b=Button.new();b.text=t;b.custom_minimum_size=Vector2(0,58);b.pressed.connect(f);v.add_child(b);return b
@@ -1239,14 +1267,14 @@ func _comic_umbauen(tu:Dictionary,farbe=null,preis:=0)->bool:
 	if not _zahlen(preis):return false
 	auto.set_meta("ctu",tu)
 	if farbe!=null:auto.set_meta("cfarbe",farbe)
-	var v=CA.bauen(auto.kind,tu,auto.get_meta("cfarbe",null))
+	var v=CA.bauen(auto.kind,tu,auto.get_meta("cfarbe") if auto.has_meta("cfarbe") else null)
 	auto.neue_optik(v)
 	return true
 func _comic_werkstatt():
 	auto.engine_force=0;auto.brake=10.0
 	var v=_panel("RADEBERG CUSTOMS")
 	var vs=get_viewport().get_visible_rect().size
-	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(500,min(660.0,vs.y-20)-170);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
+	var sc=ScrollContainer.new();sc.custom_minimum_size=Vector2(468,min(660.0,vs.y-20)-170);sc.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;v.add_child(sc)
 	var fertig=Button.new();fertig.text="FERTIG – losfahren";fertig.custom_minimum_size=Vector2(0,60);v.add_child(fertig)
 	fertig.pressed.connect(func():auto.brake=0.0;panel_zu())
 	var w=VBoxContainer.new();w.size_flags_horizontal=Control.SIZE_EXPAND_FILL;w.add_theme_constant_override("separation",6);sc.add_child(w)
@@ -1267,7 +1295,7 @@ func _comic_werkstatt():
 			var akt=tu.get(schl,liste[0][0]);var i=0
 			for k in liste.size():
 				if liste[k][0]==akt:i=k
-			var b=Button.new();b.text="%s:  %s   ›   ($%d)"%[titel,liste[i][1],preis];b.custom_minimum_size=Vector2(500,56);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
+			var b=Button.new();b.text="%s: %s  ›  $%d"%[titel,liste[i][1],preis];b.custom_minimum_size=Vector2(0,56);b.clip_text=true;b.add_theme_font_size_override("font_size",23);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
 			b.pressed.connect(func():
 				var t2=_ctu().duplicate();var nx=liste[(i+1)%liste.size()][0]
 				if nx==null or (nx is String and (nx=="" or nx=="std")) or (nx is int and nx==0):t2.erase(schl)
@@ -1275,7 +1303,7 @@ func _comic_werkstatt():
 				if _comic_umbauen(t2,null,preis):neu.call())
 		var schalter=func(titel:String,schl:String,preis:int):
 			var an=tu.get(schl,false)
-			var b=Button.new();b.text="%s:  %s   ($%d)"%[titel,"AN" if an else "aus",preis];b.custom_minimum_size=Vector2(500,56);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
+			var b=Button.new();b.text="%s: %s  $%d"%[titel,"AN" if an else "aus",preis];b.custom_minimum_size=Vector2(0,56);b.clip_text=true;b.add_theme_font_size_override("font_size",23);b.alignment=HORIZONTAL_ALIGNMENT_LEFT;w.add_child(b)
 			b.pressed.connect(func():
 				var t2=_ctu().duplicate();t2[schl]=not an
 				if _comic_umbauen(t2,null,preis):neu.call())
@@ -1285,7 +1313,7 @@ func _comic_werkstatt():
 		zeile.call("Frontlippe",TU_STUFE,"lippe",400)
 		zeile.call("Seitenschweller",TU_STUFE,"schweller",500)
 		zeile.call("Heckdiffusor",TU_STUFE,"diffusor",450)
-		schalter.call("Kotflügel-Verbreiterung (genietet)","flares",700)
+		schalter.call("Verbreiterung genietet","flares",700)
 		schalter.call("Motorhaube mit Lufthutze","haube",500)
 		zeile.call("Vinyl-Streifen",TU_VINYL,"vinyl",350)
 		zeile.call("Spoiler",TU_SPOILER,"spoiler",600)
