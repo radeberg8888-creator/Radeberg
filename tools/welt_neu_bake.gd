@@ -23,6 +23,10 @@ var BER:={}
 var NETZ:=[]       # {n,P(lokal),w,typ}
 var BAHN:=[];var UEBERGANG:=[];var SCHRANKEN:=[]
 var AB:=[];var RAMPEN:=[]
+var ALLE_FL:=[]     # bebaute Stadtflächen (Fassadenblöcke, Hafen, Industrie, Flughafen; lokal) – Natur bleibt draußen
+var N               # natur_lib
+var NATUR_ORTE:=[]  # {art, p (Welt), yaw}
+var NATUR_FERN:=[] # [kit, Transform3D Welt] dünner Fernwald (immer geladen)
 # Raster über STADT (10 m): Stadtfläche (nahe Straße, Land), Wasser
 var MNX:int;var MNZ:int;var MX0:float;var MZ0:float
 var FLAECHE:PackedByteArray;var WASS:PackedByteArray
@@ -562,7 +566,9 @@ func _stadt_bauen(faces:Array,d):
 	# Straßenausstattung über alle Stadtblöcke
 	var alle=fass.duplicate()
 	for e in kit:alle.append(e[0])
-	L.STADT_STUECKE=alle
+	L.STADT_STUECKE=alle;ALLE_FL=fass.duplicate()
+	for e in kit:
+		if e[1] in ["docks","industrie","flug"]:ALLE_FL.append(e[0])
 	L.strassen_modus=true;L._markierungen();L.strassen_modus=false
 	_ampeln(fass)
 	L.STADT_STUECKE=fass
@@ -859,6 +865,177 @@ func _mats_extern(mats:Dictionary):
 		var mp=ZIEL+"kits/mat_%d.res"%_nmat;_nmat+=1
 		ResourceSaver.save(mt,mp);mt.take_over_path(mp)
 
+# ================= 5b. Natur (natur_lib): Sonderorte + Bewuchs auf der ganzen Insel =================
+var NM:=PackedByteArray();var NM_X0:=0.0;var NM_Z0:=0.0;var NM_NX:=0;var NM_NZ:=0;const NM_ST:=4.0
+var SONDER_FREI:=[]   # [Welt-Mitte, Radius]
+func _natur_maske():
+	# 4-m-Raster über Stadt + Rand: 1 = Stadtfläche, Gleis, Autobahn (dort kein Bewuchs)
+	var r=STADT.grow(300.0);NM_X0=r.position.x;NM_Z0=r.position.y;NM_NX=int(r.size.x/NM_ST)+1;NM_NZ=int(r.size.y/NM_ST)+1
+	NM.resize(NM_NX*NM_NZ);NM.fill(0)
+	for pc in ALLE_FL:
+		var bb=L._bbox(pc)
+		for k in range(int((bb.position.y+C.y-NM_Z0)/NM_ST),int((bb.end.y+C.y-NM_Z0)/NM_ST)+1):
+			for i in range(int((bb.position.x+C.x-NM_X0)/NM_ST),int((bb.end.x+C.x-NM_X0)/NM_ST)+1):
+				if i<0 or k<0 or i>=NM_NX or k>=NM_NZ:continue
+				if Geometry2D.is_point_in_polygon(Vector2(NM_X0+i*NM_ST,NM_Z0+k*NM_ST)-C,pc):NM[k*NM_NX+i]=1
+	var linien=[]
+	for b in BAHN:linien.append([b.P,6.0])
+	for a in AB+RAMPEN:linien.append([a.P,a.get("w",9.0)+6.0])
+	for li in linien:
+		var P:PackedVector2Array=li[0];var R:float=li[1]
+		for i in P.size()-1:
+			var a=P[i]+C;var b=P[i+1]+C;var lg=a.distance_to(b);var s=0.0
+			while s<=lg:
+				var q=a.lerp(b,s/max(lg,0.01))
+				for k in range(int((q.y-R-NM_Z0)/NM_ST),int((q.y+R-NM_Z0)/NM_ST)+1):
+					for ii in range(int((q.x-R-NM_X0)/NM_ST),int((q.x+R-NM_X0)/NM_ST)+1):
+						if ii<0 or k<0 or ii>=NM_NX or k>=NM_NZ:continue
+						if Vector2(NM_X0+ii*NM_ST,NM_Z0+k*NM_ST).distance_to(q)<=R:NM[k*NM_NX+ii]=1
+				s+=3.0
+func _nm(w:Vector2)->bool:
+	var i=int((w.x-NM_X0)/NM_ST+0.5);var k=int((w.y-NM_Z0)/NM_ST+0.5)
+	if i<0 or k<0 or i>=NM_NX or k>=NM_NZ:return false
+	return NM[k*NM_NX+i]==1
+func _natur_ok(NL,w:Vector2)->int:   # 0 nein, 1 Landschaft, 2 Stadtgrün
+	for f in SONDER_FREI:
+		if w.distance_to(f[0])<f[1]:return 0
+	if not STADT.grow(260.0).has_point(w):return NL._land_ok(w,4.0)
+	var i=NL._ix(w.x);var k=NL._kz(w.y)
+	if i<1 or k<1 or i>=NL.GNX-1 or k>=NL.GNZ-1:return 0
+	var j=k*NL.GNX+i
+	if NL.WASSER[j]==1 or NAT0[G0rj(w)]<1.0:return 0
+	if _nm(w):return 0
+	var p=w-C
+	if SU.frei(p)<4.0:return 0
+	for d in [Vector2.ZERO,Vector2(3,0),Vector2(-3,0),Vector2(0,3),Vector2(0,-3)]:
+		if SU._belegt(p+d):return 0
+	if not STADT.has_point(w) and (NL.frei(p)<4.0 or NL._belegt(p)):return 0
+	return 2
+func G0rj(w:Vector2)->int:
+	var i=clampi(int((w.x-G0.X0)/G0.STEP+0.5),0,G0.rx-1);var k=clampi(int((w.y-G0.Z0)/G0.STEP+0.5),0,G0.rz-1);return k*G0.rx+i
+func _natur_h(NL,w:Vector2)->float:
+	if STADT.has_point(w):return L.FY(w.x-C.x,w.y-C.y)
+	return NL.h_end(w)
+func _trocken(w:Vector2)->float:
+	# Wüste nur in den echten Wüstengebieten (Sandboden, weit weg von der Stadt, nicht am Strand)
+	if STADT.grow(500.0).has_point(w):return 0.0
+	var j=G0rj(w)*4;return G0._bo[j+2]/255.0
+func _natur(NL):
+	var t0=Time.get_ticks_msec();_natur_maske();print("NATUR Maske ",Time.get_ticks_msec()-t0," ms")
+	var n0=NL.PLATZ.size();var nb=0;var st={};var RS:=7.0
+	var x=-4300.0
+	while x<4600.0:
+		var z=-11200.0
+		while z<3400.0:
+			var w=Vector2(x+N.rng.randf_range(-RS*0.45,RS*0.45),z+N.rng.randf_range(-RS*0.45,RS*0.45))
+			z+=RS
+			var art=_natur_ok(NL,w)
+			if art==0:continue
+			var h=_natur_h(NL,w)
+			if h<0.3:continue
+			var stg=Vector2(_natur_h(NL,w+Vector2(3,0))-_natur_h(NL,w-Vector2(3,0)),_natur_h(NL,w+Vector2(0,3))-_natur_h(NL,w-Vector2(0,3))).length()/6.0
+			var p=w-C
+			var nah=(SU.frei(p) if STADT.grow(260.0).has_point(w) else NL.frei(p))<120.0
+			var kit=N.waehle(w.x,w.y,h,stg,G0.kuesten_abstand(w.x,w.y),_trocken(w),nah,art==2)
+			if kit=="":continue
+			if art==2 and N.rng.randf()<0.2:continue   # Stadtgrün etwas lockerer
+			var sc=N.rng.randf_range(0.85,1.25)
+			var xf=Transform3D(Basis(Vector3.UP,N.rng.randf()*TAU).scaled(Vector3.ONE*sc),Vector3(p.x,h-NL.H0-0.1,p.y))
+			NL.PLATZ.append([kit,xf]);st[kit.split("_")[1]]=st.get(kit.split("_")[1],0)+1
+			var fk=N.ist_baum(kit)
+			if fk!="":
+				nb+=1;NL.PLATZ.append([fk,xf])
+				if nb%3==0:NATUR_FERN.append([fk,Transform3D(xf.basis,Vector3(w.x,h-0.1,w.y))])
+		x+=RS
+	print("NATUR ",NL.PLATZ.size()-n0," Bäume ",nb," Fern ",NATUR_FERN.size()," ",st," ",Time.get_ticks_msec()-t0," ms")
+
+func _ebnen(NL,mitte:Vector2,r:float,h:float,rand:float):
+	# ebene Fläche, weicher Übergang zur bisherigen Zielhöhe (überschreibt keine Nachbarn hart)
+	for k in range(NL._kz(mitte.y-r-rand),NL._kz(mitte.y+r+rand)+1):
+		for i in range(NL._ix(mitte.x-r-rand),NL._ix(mitte.x+r+rand)+1):
+			if i<0 or k<0 or i>=NL.GNX or k>=NL.GNZ:continue
+			var j=k*NL.GNX+i
+			if NL.WASSER[j]==1:continue
+			var d=Vector2(NL.GX0+i*NL.MST,NL.GZ0+k*NL.MST).distance_to(mitte)
+			var cur=NL.TH[j] if not is_nan(NL.TH[j]) else NL.NAT[j]
+			var t=smoothstep(r,r+rand,d)
+			if t>=1.0:continue
+			NL.TH[j]=lerp(h,cur,t);NL.HS[j]=NL.TH[j]
+func _natur_orte(NL):
+	# Jagdhütten im Wald, eine große versteckte Cannabisplantage, Strandvillen mit Bootssteg
+	var t0=Time.get_ticks_msec();var rng=N.rng
+	var grund={}
+	var gut=func(w:Vector2,r:float,maxd:float,mind:float,flach:float)->bool:
+		if NL._land_ok(w,min(r,12.0))!=1:grund["land"]=grund.get("land",0)+1;return false
+		for f in SONDER_FREI:
+			if w.distance_to(f[0])<f[1]+r+250.0:grund["nah"]=grund.get("nah",0)+1;return false
+		var fr=NL.frei(w-C)
+		if fr>maxd or fr<mind:grund["strasse"]=grund.get("strasse",0)+1;return false
+		var hm=G0._nat(w.x,w.y)
+		for a in 8:
+			var d=Vector2(cos(a*TAU/8.0),sin(a*TAU/8.0))*r
+			if NL._land_ok(w+d,2.0)==0:grund["rand"]=grund.get("rand",0)+1;return false
+			if abs(G0._nat(w.x+d.x,w.y+d.y)-hm)>flach:grund["steil"]=grund.get("steil",0)+1;return false
+		return true
+	var setze=func(P:Array,mitte:Vector2,rx:float,h:float,art:String,yaw:float):
+		_ebnen(NL,mitte,rx,h,40.0)
+		for e in P:
+			var xf:Transform3D=e[1];var o=xf.origin
+			NL.PLATZ.append([e[0],Transform3D(xf.basis,Vector3(o.x-C.x,o.y-NL.H0,o.z-C.y))])
+			NL._occ(Vector2(o.x,o.z)-C)
+		SONDER_FREI.append([mitte,rx]);NATUR_ORTE.append({"art":art,"p":[mitte.x,h,mitte.y],"yaw":yaw})
+	# Cannabisplantage (1x): abseits (80-900 m von der Straße), möglichst eben – Bedingungen werden schrittweise gelockert
+	var g=N.hanf_groesse();var rh=g.length()*0.5
+	for stufe in 4:
+		var ok=false
+		for v in 15000:
+			var w=Vector2(rng.randf_range(-4000,4300),rng.randf_range(-10800,-2200))
+			if _trocken(w)>0.4:continue
+			if not gut.call(w,rh,900.0,80.0 if stufe<3 else 30.0,[6.0,10.0,16.0,24.0][stufe]):continue
+			var h=G0._nat(w.x,w.y);var yaw=rng.randf()*TAU
+			setze.call(N.hanf_platz(w,h,yaw),w,rh+6.0,h,"hanf",yaw);ok=true;break
+		if ok:break
+	print("NATUR Hanf-Suche ",grund);grund.clear()
+	# Jagdhütten (4x) mitten im Wald, 60-400 m von der Straße
+	var nj=0
+	for v in 20000:
+		if nj>=4:break
+		var w=Vector2(rng.randf_range(-4000,4300),rng.randf_range(-10800,-1900))
+		if N.biom(w.x,w.y,G0._nat(w.x,w.y),0.0,G0.kuesten_abstand(w.x,w.y),_trocken(w))!="wald":continue
+		var rundum=true
+		for a in 6:
+			var q=w+Vector2(cos(a*1.047),sin(a*1.047))*70.0
+			if N.biom(q.x,q.y,G0._nat(q.x,q.y),0.0,G0.kuesten_abstand(q.x,q.y),_trocken(q))!="wald":rundum=false
+		if not rundum:continue
+		if not gut.call(w,24.0,400.0,60.0,4.0):continue
+		var h=G0._nat(w.x,w.y);var yaw=rng.randf()*TAU
+		setze.call(N.jagd_platz(w,h,yaw),w,24.0,h,"jagd",yaw);nj+=1
+	grund.clear()
+	# Strandvillen (4x): Wasserlinie suchen, Haus 40 m landeinwärts, Steg ins Wasser, Straße höchstens 400 m entfernt
+	var nv=0
+	for v in 60000:
+		if nv>=4:break
+		var u=Vector2(rng.randf_range(-4300,4600),rng.randf_range(-11000,3300))
+		var hu=G0._nat(u.x,u.y)
+		if hu<0.0 or hu>2.0:continue
+		var gr=Vector2(G0._nat(u.x+10,u.y)-G0._nat(u.x-10,u.y),G0._nat(u.x,u.y+10)-G0._nat(u.x,u.y-10))
+		if gr.length()<0.05:grund["flach"]=grund.get("flach",0)+1;continue
+		var land=gr.normalized();var w=u+land*42.0
+		var hv=G0._nat(w.x,w.y)
+		if hv<1.5 or hv>16.0:grund["hoehe"]=grund.get("hoehe",0)+1;continue
+		if G0._nat(u.x-land.x*25,u.y-land.y*25)>-0.3:grund["kein_meer"]=grund.get("kein_meer",0)+1;continue
+		if STADT.grow(400.0).has_point(w) or _trocken(w)>0.25:continue
+		if not gut.call(w,16.0,400.0,12.0,5.0):continue
+		var see=-land;var yaw=atan2(see.x,see.y)
+		setze.call(N.villa_platz(w,hv,see,u),w,20.0,hv,"villa",yaw)
+		for k in 12:
+			var q=w+see*(18.0+k*2.0)
+			_ebnen(NL,q,7.0,lerp(hv,0.9,(k+1)/12.0),10.0)
+		SONDER_FREI.append([w+see*30.0,14.0])
+		nv+=1
+	print("NATUR Villen-Suche ",nv," ",grund)
+	print("NATUR Orte ",NATUR_ORTE.size()," ",Time.get_ticks_msec()-t0," ms")
+
 # ================= 6. Norden (wie bisher, ohne Stadtfläche) =================
 func _norden()->Dictionary:
 	var NL=load("res://scripts/comic/nord_lib.gd").new(L,GL,K,G0)
@@ -872,10 +1049,11 @@ func _norden()->Dictionary:
 	NL.laden("res://assets/data/karte_nord.json",Rect2(insel.position-C,insel.size),[Rect2(STADT.position-C,STADT.size).grow(20)])
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
 	NL.zwischenstrassen();NL.kreuzungen();NL.kits_bauen();NL.sonderorte()
+	N=load("res://scripts/comic/natur_lib.gd").new(L,K,G0);N.kits_bauen()
 	for e in [["polizei",Vector2(1760,-5900)],["feuerwehr",Vector2(1900,-7650)]]:NL.dienst_reservieren(e[0],e[1])
 	var dn=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_nord.json"))
 	var hs=[];for h in dn.houses:hs.append(Vector2(h[0],h[1]))
-	NL.hinterland(hs);NL.grundstuecke();NL.fuellen();NL.landschaft_orte();NL.parken_strasse();NL.gelaende_ziel();NL.landschaft_natur()
+	NL.hinterland(hs);NL.grundstuecke();NL.fuellen();NL.landschaft_orte();_natur_orte(NL);NL.parken_strasse();NL.gelaende_ziel();_natur(NL)
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
 	NL.fahrbahnen();NL.platten();NL.wege();L._fertig(false)
 	L.weit_detail=300.0;L.weit_ink=120.0
@@ -1074,7 +1252,10 @@ func _gelaende_und_daten(ND:Dictionary):
 				continue
 			var thn=NO.TH[j]
 			if not is_nan(thn):H[j]=thn
+	HG=H
 	_gelaende(H,nx,nz,X0,Z0,ST)
+	_natur_fern()
+	_karte_bild(H,nx,nz,X0,Z0,ST)
 	_wasser()
 	var kb=StaticBody3D.new();kb.name="Kollision";W.add_child(kb)
 	var hm=HeightMapShape3D.new();hm.map_width=nx;hm.map_depth=nz
@@ -1161,7 +1342,7 @@ func _gelaende_und_daten(ND:Dictionary):
 		for p in b.P:P.append(Vector3(p.x+CX,L.FY(p.x,p.y)+0.33,p.y+CZ))
 		bahn.append(P)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
-		"rect":STADT,"sued_rect":STADT,"viertel":viertel+ND.viertel,"immo":immo,"dienste":dienste,"bahn":bahn,"neu":true}
+		"rect":STADT,"sued_rect":STADT,"viertel":viertel+ND.viertel,"immo":immo,"dienste":dienste,"bahn":bahn,"neu":true,"natur_orte":NATUR_ORTE}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	STN.free()
 	_owner(W,W)
@@ -1177,18 +1358,34 @@ const C_FELS:=Color(0.62,0.55,0.47)
 const C_TROCKEN:=Color(0.76,0.66,0.38)
 const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
+var HG:PackedFloat32Array
 func _farbe(i:int,k:int,h:float)->Color:
-	var j=(k*G0.rx+i)*4;var bo=G0._bo
-	var w=[bo[j]/255.0,bo[j+1]/255.0,bo[j+2]/255.0,bo[j+3]/255.0]
-	w.append(max(0.0,1.0-w[0]-w[1]-w[2]-w[3]))
-	var best=0
-	for q in 5:if w[q]>w[best]:best=q
-	var c=[C_GRAS,C_WALD,C_SAND,C_FELS,C_TROCKEN][best]
-	if h>620.0:c=C_SCHNEE
-	elif h<2.2:c=C_STRAND
+	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP
+	var i0=max(i-1,0);var i1=min(i+1,nx-1);var k0=max(k-1,0);var k1=min(k+1,G0.rz-1)
+	var stg=Vector2((HG[k*nx+i1]-HG[k*nx+i0])/((i1-i0)*G0.STEP),(HG[k1*nx+i]-HG[k0*nx+i])/((k1-k0)*G0.STEP)).length()
+	var w=Vector2(x,z);var c:Color
+	if STADT.has_point(w):
+		c=N.farbe(x,z,h,min(stg,0.3),G0.kuesten_abstand(x,z),0.0)
+		if h>2.5:c=c.lerp(Color(0.4,0.52,0.28),0.3)
+	else:c=N.farbe(x,z,h,stg,G0.kuesten_abstand(x,z),_trocken(w))
+	# im Spiel hellen Licht + Dunst die Farben auf -> Gelände etwas dunkler und satter
+	var g=c.v;c.v=g*0.82;c.s=min(c.s*1.12,1.0)
 	return c
 func _gelaende(H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float):
-	var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;mat.specular_mode=BaseMaterial3D.SPECULAR_DISABLED;mat.roughness=1.0
+	var mat=ShaderMaterial.new();var sh=Shader.new();sh.code="""shader_type spatial;
+render_mode diffuse_toon,specular_disabled;
+uniform sampler2D rausch:repeat_enable,filter_linear_mipmap;
+varying vec3 wp;
+void vertex(){wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;}
+void fragment(){
+	float a=texture(rausch,wp.xz/9.0).r;float b=texture(rausch,wp.xz/53.0).r;
+	ALBEDO=COLOR.rgb*(0.84+0.22*a+0.12*(b-0.5));ROUGHNESS=1.0;
+}"""
+	mat.shader=sh
+	var tex=NoiseTexture2D.new();tex.width=256;tex.height=256;tex.seamless=true;tex.generate_mipmaps=true
+	var fn=FastNoiseLite.new();fn.frequency=0.03;fn.fractal_octaves=3;tex.noise=fn
+	ResourceSaver.save(tex,ZIEL+"gelaende_rausch.res");tex.take_over_path(ZIEL+"gelaende_rausch.res")
+	mat.set_shader_parameter("rausch",tex)
 	var CH=48
 	for k0 in range(0,nz-1,CH):
 		for i0 in range(0,nx-1,CH):
@@ -1221,3 +1418,48 @@ func _wasser():
 	var mi=MeshInstance3D.new();var pm=PlaneMesh.new();pm.size=Vector2(40000,40000);mi.mesh=pm;mi.name="Wasser";W.add_child(mi)
 	var m=StandardMaterial3D.new();m.albedo_color=Color(0.3,0.62,0.85);m.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;m.specular_mode=BaseMaterial3D.SPECULAR_TOON;m.roughness=0.25
 	mi.material_override=m;mi.position.y=0.0;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+func _natur_fern():
+	# dünner Fernwald, immer geladen (Kacheln laden erst ab 480 m): jeder 3. Baum als einfacher Fernbaum
+	var fern=Node3D.new();fern.name="NaturFern";W.add_child(fern)
+	var G={}
+	for e in NATUR_FERN:
+		var key=Vector2i(int(floor(e[1].origin.x/800.0)),int(floor(e[1].origin.z/800.0)))
+		if not G.has(key):G[key]={}
+		if not G[key].has(e[0]):G[key][e[0]]=[]
+		G[key][e[0]].append(e[1])
+	for key in G:
+		var mitte=Vector3((key.x+0.5)*800.0,0,(key.y+0.5)*800.0)
+		for kn in G[key]:
+			var xs=G[key][kn];var buf=PackedFloat32Array()
+			for xf in xs:buf.append_array(L.xf_puffer(Transform3D(xf.basis,xf.origin-mitte)))
+			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=K.KITS[kn].mesh;mm.instance_count=xs.size();mm.buffer=buf
+			var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.name="NF_%d_%d_%s"%[key.x,key.y,kn];mmi.position=mitte;fern.add_child(mmi);mmi.set_meta("puffer",buf)
+			mmi.visibility_range_begin=470.0;mmi.visibility_range_end=1900.0;mmi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	print("NATUR Fernwald Felder ",G.size()," Bäume ",NATUR_FERN.size())
+
+func _karte_bild(H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float):
+	# Grundkarte für Karte/Minikarte: Geländefarben mit Schummerung, Stadtblöcke hellgrau, Wasser nach Tiefe
+	var b=JSON.parse_string(FileAccess.get_file_as_string("res://assets/ui/karte_bereich.json"))
+	var W2=1230;var H2=2000
+	var img=Image.create(W2,H2,false,Image.FORMAT_RGB8)
+	var hb=func(x,z):return G0._bilin(H,x,z)
+	for py in H2:
+		var z=b.z0+(py+0.5)/H2*(b.z1-b.z0)
+		for px in W2:
+			var x=b.x0+(px+0.5)/W2*(b.x1-b.x0)
+			var h=G0._bilin(H,x,z);var c:Color
+			if h<0.15:
+				c=Color(0.36,0.62,0.78).lerp(Color(0.16,0.36,0.56),clamp(-h/25.0,0.0,1.0))
+			else:
+				var w=Vector2(x,z)
+				var hx=G0._bilin(H,x+5,z)-G0._bilin(H,x-5,z);var hz=G0._bilin(H,x,z+5)-G0._bilin(H,x,z-5)
+				var stg=Vector2(hx,hz).length()/10.0
+				if STADT.grow(300).has_point(w) and _nm(w) and STADT.has_point(w):c=Color(0.78,0.77,0.74)
+				else:c=N.farbe(x,z,h,stg,G0.kuesten_abstand(x,z),_trocken(w) if not STADT.has_point(w) else 0.0)
+				var licht=clamp(1.0+(-hx+hz)*0.06,0.75,1.2)
+				c=Color(c.r*licht,c.g*licht,c.b*licht)
+			img.set_pixel(px,py,c)
+	img.resize(2460,3999,Image.INTERPOLATE_BILINEAR)
+	img.save_png("res://assets/ui/karte_basis.png")
+	print("KARTE Grundbild gespeichert")

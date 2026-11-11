@@ -100,7 +100,9 @@ jobs:
           grep -E "SCRIPT ERROR|c_" build/autos.log | head -20
           # Neue Welt (alte Karte, ein Höhenfeld, Fassaden + Bausätze). Läuft ohne Grafiktreiber: Kopien-Lagen stehen als Puffer im Knoten.
           timeout 5400 $GODOT --headless --path . -s tools/welt_neu_bake.gd > build/bake.log 2>&1 || true
-          grep -E "ZEIT|FELD|FLAECHEN|STADT|NORD Kacheln|GESPEICHERT|BERICHT|SCRIPT ERROR" build/bake.log | head -40
+          grep -E "ZEIT|FELD|FLAECHEN|STADT|NORD Kacheln|NATUR|KARTE|GESPEICHERT|BERICHT|SCRIPT ERROR" build/bake.log | head -40
+          # Die Bake schreibt die Grundkarte (assets/ui/karte_basis.png) neu -> neu importieren
+          (timeout 1200 $GODOT --headless --path . --import || true) > build/import2.log 2>&1
           ls assets/cache/comic/ | head; du -sh assets/cache/comic
           test -f assets/cache/comic/welt.scn && test -f assets/cache/comic/stadt_0_1.scn && test -f assets/cache/autos/c_trabant_gruen.scn
 

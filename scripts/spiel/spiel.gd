@@ -1080,6 +1080,15 @@ func karte_oeffnen(teleport:=false):
 	if "comic" in welt:
 		k.icons=[]
 		for s in welt.A.shops:k.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y,"name":s.typ})
+		for d in welt.get("DIENSTE") if welt.get("DIENSTE")!=null else []:k.icons.append({"typ":d.art,"x":d.p.x,"z":d.p.y})
+		for im in welt.get("IMMO") if welt.get("IMMO")!=null else []:k.icons.append({"typ":im.art,"x":im.p.x,"z":im.p.z})
+		if biker:
+			for c in biker.treffs:k.icons.append({"typ":"biker","x":biker.treffs[c].p[0].x,"z":biker.treffs[c].p[0].y})
+		if story:
+			for f in story.FIGUREN:
+				if story.punkte.has(f.id):
+					var pp=story.punkte[f.id];k.story.append([Vector2(pp.x,pp.z),f.buchst,f.farbe,"%s (%s)"%[String(f.id).capitalize(),f.art]])
+		k.queue_redraw()
 	var vs=get_viewport().get_visible_rect().size
 	var knopf=func(t:String,pos:Vector2,f:Callable):
 		var b=Button.new();b.text=t;b.theme=theme_ui;b.custom_minimum_size=Vector2(96,64);k.add_child(b);b.position=pos;b.pressed.connect(f);return b
@@ -1266,6 +1275,8 @@ func _notification(what):
 
 # ---------------- automatischer Test (Bilder) ----------------
 func _testlauf():
+	if test_modus=="galerie":
+		var g=load("res://scripts/spiel/galerie.gd").new();add_child(g);g.start(self);return
 	var s=load("res://scripts/spiel/testlauf.gd").new();s.spiel=self;add_child(s)
 
 

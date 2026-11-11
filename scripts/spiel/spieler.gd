@@ -20,7 +20,15 @@ func _ready():
 	floor_snap_length=0.5;floor_max_angle=deg_to_rad(50)
 	collision_mask=1|8   # Welt und stehende Autos; fahrender Verkehr wird von Hand geprüft
 	figur_bauen()
+	_kontaktschatten()
 
+func _kontaktschatten():
+	# weicher dunkler Fleck unter den Füßen: die Figur steht sichtbar auf dem Boden (auch ohne Schatten / weit weg)
+	var mi=MeshInstance3D.new();mi.name="Kontaktschatten";var q=QuadMesh.new();q.size=Vector2(1.3,1.3);q.orientation=PlaneMesh.FACE_Y;mi.mesh=q
+	var m=ShaderMaterial.new();m.shader=Shader.new()
+	m.shader.code="shader_type spatial;render_mode unshaded,depth_draw_never,cull_disabled,shadows_disabled;void fragment(){float d=length(UV-vec2(0.5))*2.0;ALBEDO=vec3(0.0);ALPHA=(1.0-smoothstep(0.35,1.0,d))*0.42;}"
+	mi.material_override=m;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;mi.position.y=0.04;mi.sorting_offset=-1.0
+	add_child(mi)
 func figur_bauen():
 	if figur:figur.queue_free()
 	var r=RandomNumberGenerator.new();r.seed=5

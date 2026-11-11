@@ -11,6 +11,7 @@ var rect_mat:ShaderMaterial
 var R:=88.0
 var kampf=null
 var story_punkte:=[]      # [Vector2, Buchstabe, Farbe]
+const KUI=preload("res://scripts/karte_ui.gd")
 const COL={"autohandel":Color(0.9,0.85,0.2),"werkstatt":Color(0.95,0.6,0.1),"waffen":Color(0.85,0.12,0.1),"kleider":Color(0.65,0.3,0.85),"zuhause":Color(0.15,0.7,0.3),
 	"bahnhof":Color(0.2,0.45,0.85),"hafen":Color(0.1,0.6,0.75),"flugplatz":Color(0.55,0.55,0.6),"militaer":Color(0.4,0.45,0.25),"lack":Color(0.85,0.25,0.65),"auto":Color(0.2,0.45,0.9),"premium":Color(0.85,0.7,0.15),"lager":Color(0.55,0.4,0.25),"park":Color(0.3,0.7,0.3),"canyon":Color(0.8,0.3,0.15),"stadt":Color(0.9,0.9,0.9),
 	"polizei":Color(0.15,0.35,0.95),"feuerwehr":Color(0.95,0.15,0.1),"taxi":Color(1.0,0.85,0.15),"biker":Color(0.1,0.1,0.1)}
@@ -53,11 +54,14 @@ func _draw():
 			pts.append(Vector2(R,R)+(q-Vector2(R,R)).limit_length(R-3))
 		if pts.size()>1:draw_polyline(pts,Color(0.99,0.8,0.3) if st.typ=="autobahn" else Color(0.98,0.97,0.94),max(st.w*2.0/zoom*R,2.0))
 	draw_arc(Vector2(R,R),R,0,TAU,64,Color(0,0,0,0.85),5.0)
+	# Symbole: nur was im Kreis liegt; Zuhause und Werkstatt bleiben am Rand sichtbar (Richtung)
 	for i in icons:
 		var p=w2m(Vector2(i.x,i.z))
 		var d=p-Vector2(R,R)
-		if d.length()>R-10:p=Vector2(R,R)+d.normalized()*(R-10)
-		draw_circle(p,8,Color(0,0,0,0.8));draw_circle(p,6.5,COL.get(i.typ,Color(0.6,0.6,0.6)))
+		if d.length()>R-12:
+			if not i.typ in ["zuhause","werkstatt"]:continue
+			p=Vector2(R,R)+d.normalized()*(R-12)
+		KUI.zeichne(self,p,i.typ,8.5)
 	if kampf!=null:
 		if kampf.sterne>=1.0:
 			var c0=w2m(Vector2(kampf.such_mitte.x,kampf.such_mitte.z))
