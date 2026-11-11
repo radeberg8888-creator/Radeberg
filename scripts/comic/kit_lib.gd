@@ -131,9 +131,10 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 		var fn=Node3D.new();fn.name="F_%d_%d"%[key.x,key.y];ziel.add_child(fn);fn.position=mitte
 		for kn in F[key]:
 			var k=KITS[kn];var xs:Array=F[key][kn]
-			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=k.mesh;mm.instance_count=xs.size()
-			for i in xs.size():mm.set_instance_transform(i,Transform3D(xs[i].basis,xs[i].origin-mitte))
-			var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.name=kn;fn.add_child(mmi)
+			var buf=PackedFloat32Array()
+			for i in xs.size():buf.append_array(L.xf_puffer(Transform3D(xs[i].basis,xs[i].origin-mitte)))
+			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=k.mesh;mm.instance_count=xs.size();mm.buffer=buf
+			var mmi=MultiMeshInstance3D.new();mmi.multimesh=mm;mmi.name=kn;fn.add_child(mmi);mmi.set_meta("puffer",buf)
 			mmi.visibility_range_end=sicht;mmi.visibility_range_end_margin=25.0
 			# Landschaft: eigene Sichtweiten (Fernbäume übernehmen ab 130 m, Gras nur nah)
 			if kn.begins_with("ld_fern"):mmi.visibility_range_begin=130.0;mmi.visibility_range_end=950.0;mmi.visibility_range_begin_margin=15.0;mmi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -142,9 +143,8 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 			elif kn.begins_with("ld_stein"):mmi.visibility_range_end=180.0
 			n_mm+=1
 			if k.get("ink")!=null:
-				var mi2=MultiMesh.new();mi2.transform_format=MultiMesh.TRANSFORM_3D;mi2.mesh=k.ink;mi2.instance_count=xs.size()
-				for i in xs.size():mi2.set_instance_transform(i,mm.get_instance_transform(i))
-				var mmk=MultiMeshInstance3D.new();mmk.multimesh=mi2;mmk.name=kn+"_ink";fn.add_child(mmk)
+				var mi2=MultiMesh.new();mi2.transform_format=MultiMesh.TRANSFORM_3D;mi2.mesh=k.ink;mi2.instance_count=xs.size();mi2.buffer=buf
+				var mmk=MultiMeshInstance3D.new();mmk.multimesh=mi2;mmk.name=kn+"_ink";fn.add_child(mmk);mmk.set_meta("puffer",buf)
 				mmk.visibility_range_end=INK_SICHT;mmk.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return {"felder":F.size(),"multimesh":n_mm}
 

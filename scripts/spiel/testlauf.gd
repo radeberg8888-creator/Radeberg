@@ -465,6 +465,22 @@ func _process(dt):
 		return
 	if spiel.test_modus=="ghetto":
 		_ghetto_test(dt);return
+	if spiel.test_modus=="zug":
+		if spiel.zug==null:print("ZUG fehlt");get_tree().quit();return
+		if schritt==0 and t>2.0:
+			var z=spiel.zug.zuege[0];z.s=z.strecken if false else spiel.zug.strecken[z.strecke].L*0.5;schritt=1;t=0
+		if schritt>=1 and t>1.5 and schritt<=3:
+			var w=spiel.zug.zuege[0].wagen[0]
+			spiel.welt.viertel_jetzt(Vector2(w.global_position.x,w.global_position.z))
+			if _cam_b==null:_cam_b=Camera3D.new();_cam_b.far=3000;spiel.add_child(_cam_b);spiel.ui.visible=false
+			var off=[Vector3(25,8,25),Vector3(-18,4,30),Vector3(0,60,60)][schritt-1]
+			_cam_b.look_at_from_position(w.global_position+off,w.global_position);_cam_b.current=true
+			await get_tree().process_frame;await get_tree().process_frame
+			get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/zug_%d.png"%schritt)
+			print("ZUG bei ",w.global_position," Schranken ",get_tree().get_nodes_in_group("schranke").size())
+			schritt+=1;t=0
+		if schritt>3:get_tree().quit()
+		return
 	if spiel.test_modus=="werkstatt":
 		_werkstatt_test(dt);return
 	if spiel.test_modus=="comic":
@@ -712,6 +728,12 @@ func _werkstatt_test(dt):
 		st.t_gas=0.45
 		if t>1.5 and t<1.6:shot("werkstatt_tor")
 		if int(t*2)!=int((t-dt)*2):print("  FAHRT ",spiel.auto.global_position," kmh ",snapped(spiel.auto.kmh(),0.1))
+		if t>6.0 and t<6.05:
+			var a=spiel.auto;var q=PhysicsShapeQueryParameters3D.new();var bs=BoxShape3D.new();bs.size=Vector3(2.4,1.2,5.0);q.shape=bs
+			q.transform=a.global_transform;q.exclude=[a.get_rid()];q.collision_mask=0xFFFFFFFF
+			for h in a.get_world_3d().direct_space_state.intersect_shape(q,16):
+				var c=h.collider;print("  BERUEHRT ",c," ",c.get_parent().name if c else ""," ",c.get_path() if c else "")
+			print("  AUTO vorn ",a.global_transform.basis.z," lokal Garage ",g._lokal(a.global_position))
 		if g.aktiv or t>12.0:st.t_gas=0.0;print("WERKSTATT drin ",g.aktiv);t=0;schritt=3
 		return
 	if schritt==3:

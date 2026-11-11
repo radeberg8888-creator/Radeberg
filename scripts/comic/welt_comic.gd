@@ -12,6 +12,7 @@ var LV=null
 var PARKEN:=[]   # [kind, Transform3D]
 var VIERTEL:=[]  # {name, datei, rect, node, laed, ab, weg}
 var SUED_RECT:=Rect2()
+var BAHN:=[]      # Gleise (PackedVector3Array je Strecke)
 var DIENSTE:=[]   # Polizei-, Feuer-, Taxiwachen {art,p,yaw}
 var IMMO:=[]     # kaufbare Lagerhallen / Autohandel aus dem Generator  – nach Entfernung nachgeladene Stadtviertel
 const LADEN_AB:=650.0
@@ -37,6 +38,7 @@ class CA:
 	var shops:=[];var icons:=[];var villen:=[]
 
 func aus_cache():
+	puffer_setzen(self)
 	# Schilder/Beschriftungen nur aus der Nähe zeichnen (jedes ist ein Zeichenaufruf)
 	for l in find_children("*","Label3D",true,false):
 		if l.visibility_range_end<=0.0 or l.visibility_range_end>90.0:l.visibility_range_end=90.0
@@ -48,6 +50,7 @@ func aus_cache():
 	A=CA.new();A.shops=d.shops
 	PARKEN=d.parken
 	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB),"baut":false,"weg_jetzt":false})
+	BAHN=d.get("bahn",[])
 	SUED_RECT=d.get("sued_rect",Rect2());IMMO=d.get("immo",[]);DIENSTE=d.get("dienste",[])
 
 # Viertel nachladen/entladen je nach Abstand der Kamera zum Viertel-Rechteck
@@ -79,10 +82,19 @@ func _process(dt:float):
 			ResourceLoader.load_threaded_request(v.datei);v.laed=true
 		elif v.node!=null and d>v.weg:
 			v.node.queue_free();v.node=null
+# Kopien-Lagen aus dem Bake (Meta "puffer") in die MultiMeshes schreiben
+static func puffer_setzen(n:Node):
+	for sch in n.find_children("Schranke*","Node3D",true,false):sch.add_to_group("schranke")
+	for m in n.find_children("*","MultiMeshInstance3D",true,false):
+		if m.has_meta("puffer") and m.multimesh:
+			var b:PackedFloat32Array=m.get_meta("puffer")
+			if m.multimesh.instance_count!=b.size()/12:m.multimesh.instance_count=b.size()/12
+			m.multimesh.buffer=b
 func _eingesetzt(v,n:Node):
 	v.baut=false
 	if v.node!=null or v.get("weg_jetzt",false):
 		v.weg_jetzt=false;n.queue_free();return
+	puffer_setzen(n)
 	v.node=n;add_child(n)
 # Sofort laden (Spielstart/Teleport), blockierend
 func viertel_jetzt(p:Vector2):
@@ -92,6 +104,7 @@ func viertel_jetzt(p:Vector2):
 			if v.laed:
 				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()
+			puffer_setzen(v.node)
 			add_child(v.node)
 # Ist der Boden an dieser Stelle schon da? (Verkehr/Parker nur dann aufstellen)
 var _vgitter:={}   # 300-m-Zelle -> Viertel (schnelle Abfrage)

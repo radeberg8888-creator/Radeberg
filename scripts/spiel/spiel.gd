@@ -38,6 +38,8 @@ var auto=null            # Fahrzeug, in dem der Spieler sitzt
 var ui:CanvasLayer
 var belebung=null
 var biker=null
+var zug=null
+var _fps_l:Label;var _fps_t:=0.0;var _fps_max:=0.0;var _fps_n:=0
 var lade:Control;var lade_bar:ProgressBar;var lade_text:Label
 var bereit:=false
 var geld:=500
@@ -332,8 +334,10 @@ func _spieler():
 	hud.kampf=kampf;mini.kampf=kampf
 	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
 	if "comic" in welt:
-		belebung=load("res://scripts/spiel/belebung.gd").new();add_child(belebung);belebung.setup(self)
-		biker=load("res://scripts/spiel/biker.gd").new();add_child(biker);biker.setup(self)
+		if not "belebung" in _arg("--ohne"):belebung=load("res://scripts/spiel/belebung.gd").new();add_child(belebung);belebung.setup(self)
+		if not "biker" in _arg("--ohne"):biker=load("res://scripts/spiel/biker.gd").new();add_child(biker);biker.setup(self)
+		if "BAHN" in welt and not welt.BAHN.is_empty() and _arg("--ohnezug")=="":
+			zug=load("res://scripts/spiel/zug.gd").new();add_child(zug);zug.setup(self,welt.BAHN)
 	admin_mod=load("res://scripts/spiel/admin.gd").new();admin_mod.spiel=self;add_child(admin_mod)
 	if not "comic" in welt:gras=GRAS.new();gras.welt=welt;add_child(gras)
 
@@ -392,6 +396,16 @@ func _physics_process(dt):
 
 var prof:={}
 func _pz(n,t):prof[n]=max(prof.get(n,0.0)*0.98,(Time.get_ticks_usec()-t)/1000.0)
+# Leistungsanzeige (oben Mitte): Bilder/s, längstes Bild der letzten halben Sekunde, Zeichenaufrufe, Dreiecke
+func _fps_anzeige(dt:float):
+	if _fps_l==null:
+		_fps_l=Label.new();_fps_l.add_theme_font_size_override("font_size",18);_fps_l.add_theme_color_override("font_outline_color",Color(0,0,0));_fps_l.add_theme_constant_override("outline_size",6)
+		_fps_l.position=Vector2(get_viewport().get_visible_rect().size.x*0.5-230,4);ui.add_child(_fps_l)
+	_fps_t+=dt;_fps_max=max(_fps_max,dt);_fps_n+=1
+	if _fps_t>=0.5:
+		_fps_l.text="%d FPS  max %d ms  DC %d  %.1fM Dreiecke"%[int(_fps_n/_fps_t),int(_fps_max*1000.0),int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)/1e6]
+		_fps_l.add_theme_color_override("font_color",Color(0.4,1,0.4) if _fps_max<0.04 else (Color(1,0.85,0.3) if _fps_max<0.08 else Color(1,0.35,0.3)))
+		_fps_t=0.0;_fps_max=0.0;_fps_n=0
 func _process(dt):
 	if not bereit:st.end_frame();return
 	var _t7=Time.get_ticks_usec();_lauf_schritt(dt);_pz('_lauf_schritt(dt)',_t7)
@@ -422,6 +436,8 @@ func _process(dt):
 	var _t6=Time.get_ticks_usec();wirt.schritt(dt);_pz('wirt.schritt(dt)',_t6)
 	if belebung:var _tb=Time.get_ticks_usec();belebung.schritt(dt);_pz('belebung',_tb)
 	if biker:var _tk=Time.get_ticks_usec();biker.schritt(dt);_pz('biker',_tk)
+	if zug:zug.schritt(dt)
+	_fps_anzeige(dt)
 	st.end_frame()
 
 # Tag und Nacht: Sonnenstand, Licht, Himmel, Straßenlaternen, Scheinwerfer
@@ -706,6 +722,7 @@ var FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car",
 	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","audi_rs7","rtw","hudson","mercedes","hoonicorn","bugatti","taxi"]
 func _ziel_anzahl()->int:return [14,22,30][int(st.e.sichtweite)]
 func _verkehr_pflege(p:Vector3):
+	if "verkehr" in _arg("--ohne"):return
 	var p2=Vector2(p.x,p.z)
 	for c in verkehr.duplicate():
 		if Vector2(c.global_position.x,c.global_position.z).distance_to(p2)>360.0:verkehr.erase(c);c.queue_free()
@@ -785,6 +802,7 @@ func _passanten_pool(n:int):
 		passanten.append(e)
 
 func _passanten_pflege(p:Vector3,dt:float):
+	if "passanten" in _arg("--ohne"):return
 	var p2=Vector2(p.x,p.z)
 	for e in passanten:
 		var n=e.n

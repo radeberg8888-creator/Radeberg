@@ -82,6 +82,7 @@ func _rudel_neu(club:String,mp:Vector2,im_revier:String):
 	for k in n-1:
 		var f=AUTO.new();spiel.add_child(f);f.setup("c_harley_"+club)
 		f.freeze_mode=RigidBody3D.FREEZE_MODE_KINEMATIC;f.freeze=true;f.modus="folger";f.set_meta("club",club)
+		f.set_meta("koll",[f.collision_layer,f.collision_mask]);f.collision_layer=0;f.collision_mask=0
 		f.global_transform=leit.global_transform;eintrag.folger.append(f)
 	rudel.append(eintrag)
 	spiel.verkehr.append(leit)   # Leittier fährt wie Verkehr (Abstand, Kreuzungen)
@@ -98,6 +99,9 @@ func _rudel_schritt(dt:float,mp:Vector2):
 			if is_instance_valid(f) and f.hp<1000.0:getroffen=true
 		if getroffen:_absteigen(e,null);continue
 		# Spur aufzeichnen, Folger fahren versetzt hinterher
+		if not L.global_transform.origin.is_finite() or not L.global_transform.basis.x.is_finite():
+			if not has_meta("nan"):set_meta("nan",1);print("BIKER NAN leit ",L.kind," ",L.linear_velocity," road ",L.ki_road," s ",L.ki_s)
+			continue
 		e.spur.push_front([_zeit,L.global_transform])
 		if e.spur.size()>400:e.spur.resize(400)
 		for k in e.folger.size():
@@ -132,6 +136,7 @@ func _absteigen(e,gegen):
 	spiel.verkehr.erase(e.leit)
 	for b in alle:
 		if not is_instance_valid(b) or b==spiel.auto:continue
+		if b.has_meta("koll"):b.collision_layer=b.get_meta("koll")[0];b.collision_mask=b.get_meta("koll")[1]
 		b.ki_ton_aus();b.parken();b.freeze=false;spiel.geparkt.append(b)
 		var fn=b.visual.get_node_or_null("Fahrer") if b.visual else null
 		if fn:fn.visible=false
@@ -151,12 +156,12 @@ func _treff_an(c):
 	var p:Vector2=tr.p[0];var t:Vector2=tr.p[1];var n=Vector2(-t.y,t.x)
 	var h=_boden(p)
 	# abgestellte Maschinen schräg in einer Reihe, Mitglieder davor (friedlich, solange man sie in Ruhe lässt)
-	for k in 5:
+	for k in (0 if "treffbikes" in spiel._arg("--ohne") else 5):
 		var q=p+t*(-6.0+k*2.4)
 		var b=AUTO.new();spiel.add_child(b);b.setup("c_harley_%s_p"%c)
 		b.global_transform=Transform3D(Basis(Vector3.UP,atan2(n.x,n.y)+0.5),Vector3(q.x,_boden(q)+0.5,q.y))
 		b.modus="geparkt";spiel.geparkt.append(b);tr.bikes.append(b)
-	for k in 5:
+	for k in (0 if "treffleute" in spiel._arg("--ohne") else 5):
 		var q=p+t*(-5.0+k*2.5)+n*3.0
 		var g=spiel.kampf.spawn(Vector3(q.x,_boden(q)+0.1,q.y),c,["pistole","mossberg","machete","pistole","mp5"][k],{"basis":"biker","friedlich":true,"stationaer":k%2==0,"hp":120.0})
 		tr.leute.append(g)

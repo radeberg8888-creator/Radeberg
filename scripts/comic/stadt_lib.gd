@@ -16,6 +16,45 @@ var CYL:CylinderMesh
 var CAP:CapsuleMesh
 var welt:Node3D
 var M:={}          # benannte Materialien
+var SPH_L:SphereMesh   # grobe Kugel (Blumen, kleine Büsche)
+var lot_ok:Callable    # Grundstück bebauen? (Wasser/Stadtrand)
+var stock_fn:Callable  # Mitte -> Grundstockwerke
+var leicht:=false      # Handy-Fassung: gemalte Fenster/Gitter, Bauteile als Kopien (MultiMesh)
+var MODULE:={}         # Bauteil-Schlüssel -> ArrayMesh (einmal gebaut)
+var INSTG:={}          # Schlüssel -> {Kachel -> PackedFloat32Array (12 Zahlen je Kopie)}
+var _im_haus:=false;var _haus_inst:=[]
+var MODUL_SCHATTEN:={} # Schlüssel -> wirft Schatten
+var weit_modul:=140.0
+var FERN_HAUS:=[]     # [Grundriss, Höhe, Wandfarbe, Fußhöhe] für die Fernansicht der Fassadenhäuser
+# Fernansicht: jedes Haus als Block (Wände + Dach, Vertexfarben, ein Material), in großen Feldern, ab weit_detail sichtbar
+func fern_haeuser(ziel:Node3D,feld:=600.0,von:=280.0,bis:=2400.0):
+	var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;mat.specular_mode=BaseMaterial3D.SPECULAR_DISABLED;mat.roughness=1.0
+	var G={}
+	for e in FERN_HAUS:
+		var lot:PackedVector2Array=e[0];var c=Vector2.ZERO
+		for v in lot:c+=v
+		c/=lot.size()
+		var key=Vector2i(int(floor(c.x/feld)),int(floor(c.y/feld)))
+		if not G.has(key):var s2=SurfaceTool.new();s2.begin(Mesh.PRIMITIVE_TRIANGLES);G[key]=s2
+		var st2:SurfaceTool=G[key];var y0=e[3]-0.4;var y1=e[3]+e[1];var col:Color=e[2];var dach=Color(0.36,0.34,0.35)
+		var sg=sign(_flaeche2(lot))
+		for i in lot.size():
+			var p=lot[i];var q=lot[(i+1)%lot.size()];var t=(q-p).normalized();var o=Vector3(t.y,0,-t.x)*sg
+			var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var Cc=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
+			var V=[A,B,Cc,A,Cc,D]
+			if (B-A).cross(Cc-A).dot(o)>0:V=[A,Cc,B,A,D,Cc]
+			for v in V:st2.set_color(col*(0.85 if abs(o.x)>abs(o.z) else 1.0));st2.set_normal(o);st2.add_vertex(v)
+		var idx=Geometry2D.triangulate_polygon(lot)
+		for i in range(0,idx.size(),3):
+			var a=Vector3(lot[idx[i]].x,y1,lot[idx[i]].y);var b=Vector3(lot[idx[i+1]].x,y1,lot[idx[i+1]].y);var c3=Vector3(lot[idx[i+2]].x,y1,lot[idx[i+2]].y)
+			var V=[a,b,c3]
+			if (b-a).cross(c3-a).y>0:V=[a,c3,b]
+			for v in V:st2.set_color(dach);st2.set_normal(Vector3.UP);st2.add_vertex(v)
+	for key in G:
+		var mi=MeshInstance3D.new();mi.mesh=_mesh_kompakt(G[key].commit_to_arrays());mi.material_override=mat;mi.name="FernHaus_%d_%d"%[key.x,key.y];ziel.add_child(mi)
+		mi.visibility_range_begin=von;mi.visibility_range_begin_margin=20.0;mi.visibility_range_end=bis;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	FERN_HAUS=[]
+	return G.size()
 
 var spiel_modus:=false   # im Spiel: Autos/Figuren nur als Plätze merken (echte Fahrzeuge/Passanten macht das Spiel)
 var PARKEN:=[]           # [typ, Transform3D] Parkplätze für echte Autos
@@ -146,6 +185,95 @@ void fragment(){
 	EMISSION=farbe*licht;
 }
 """
+# Gemaltes Fenster (eine Fläche statt ~40 Klötzchen): Rahmen, Sprossen, Glas mit Spiegelung, Vorhang,
+# Fensterläden mit Lamellen, Ziegelsturz. UV = Meter (x ab Fenstermitte, y ab Unterkante), UV2 = Fensterbreite/-höhe,
+# COLOR: r = Rahmenfarbe (0 weiß, 1..5 Türfarben), g = Glasart, b = Ladenfarbe, a = Zufall (Vorhang)
+const FENSTER:="""
+shader_type spatial;
+render_mode diffuse_toon, specular_toon;
+varying vec3 wp; varying vec4 vc; varying vec2 dim;
+void vertex(){ wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; vc=COLOR; dim=UV2; }
+const vec3 TUER[5]=vec3[5](vec3(0.2,0.35,0.55),vec3(0.55,0.15,0.15),vec3(0.2,0.45,0.3),vec3(0.35,0.22,0.12),vec3(0.15,0.15,0.18));
+const vec3 GLAS[4]=vec3[4](vec3(0.16,0.3,0.42),vec3(0.12,0.24,0.32),vec3(0.95,0.78,0.42),vec3(0.2,0.36,0.4));
+const vec3 INK=vec3(0.07,0.05,0.06);
+void fragment(){
+	float x=UV.x; float y=UV.y; float fw=dim.x; float fh=dim.y; float hw=fw*0.5; float ax=abs(x);
+	int fr=int(round(vc.r*255.0)); int gl=int(round(vc.g*255.0)); int sh=int(round(vc.b*255.0)); float seed=vc.a;
+	vec3 rahmen=fr==0?vec3(0.96,0.95,0.92):TUER[clamp(fr-1,0,4)];
+	vec3 c; float rough=0.9; vec3 em=vec3(0.0);
+	float aa=clamp(length(fwidth(UV))*1.5,0.0,0.05);
+	if(y>fh+0.055){
+		float bw=fw+0.4; float g=(x+bw*0.5)/(bw/9.0); float k=floor(g); float f=fract(g);
+		c=mod(k,3.0)==1.0?vec3(0.86,0.83,0.76):(mod(k,2.0)==0.0?vec3(0.68,0.3,0.2):vec3(0.55,0.24,0.18));
+		float yy=clamp((y-fh-0.055)/0.32,0.0,1.0);
+		float e=min(min(f,1.0-f)*bw/9.0,min(yy,1.0-yy)*0.32);
+		c*=1.0+0.2*(1.0-smoothstep(0.0,0.06,(1.0-yy)*0.32))-0.2*(1.0-smoothstep(0.0,0.05,yy*0.32));
+		c=mix(INK*1.8,c,smoothstep(0.006+aa,0.018+aa,e));
+	} else if(ax>hw+0.06){
+		vec3 lc=TUER[clamp(sh-1,0,4)];
+		float u=clamp((ax-hw-0.07)/0.52,0.0,1.0);
+		float sl=fract((y-0.12)/0.27);
+		c=lc*(0.92+0.12*u);
+		c=mix(c*0.5,c,smoothstep(0.0,0.14,sl));
+		float rd=min(min(u,1.0-u)*0.52,min(y+0.025,fh+0.05-y));
+		c=mix(INK,c,smoothstep(0.008+aa,0.022+aa,rd));
+	} else {
+		float edge=min(hw+0.045-ax,min(y+0.045,fh+0.045-y));
+		bool rah=ax>hw-0.045||y<0.045||y>fh-0.045||ax<0.03||abs(y-fh*0.62)<0.03;
+		if(rah){
+			c=rahmen*(0.86+0.16*step(fh*0.62,y));
+			c*=1.0-0.25*(1.0-smoothstep(0.0,0.02,min(abs(ax-hw+0.045),abs(y-fh+0.045))));
+		} else {
+			vec3 g=GLAS[clamp(gl,0,3)];
+			float s=fract((wp.x+wp.z)*0.35+wp.y*0.5);
+			float streif=smoothstep(0.0,0.05,s)*(1.0-smoothstep(0.12,0.17,s));
+			c=mix(g,vec3(0.75,0.88,0.98),streif*0.55);
+			c=mix(c,vec3(0.55,0.75,0.92),smoothstep(0.4,1.0,y/fh)*0.3);
+			if(seed<0.4&&x<-0.03&&y>fh*0.1&&y<fh-0.05){
+				vec3 vh=seed<0.16?vec3(0.96,0.95,0.92):(seed<0.28?vec3(0.95,0.3,0.4):vec3(0.98,0.8,0.15));
+				c=vh*(0.82+0.18*sin(x*55.0));
+			}
+			c*=mix(0.6,1.0,smoothstep(0.0,0.16,fh-0.045-y));
+			c*=mix(0.75,1.0,smoothstep(0.0,0.1,x+hw-0.045));
+			if(gl==2) em=g*0.25;
+			rough=0.35;
+		}
+		c=mix(INK,c,smoothstep(0.01+aa,0.026+aa,edge));
+	}
+	ALBEDO=c; ROUGHNESS=rough; EMISSION=em;
+}
+"""
+# Ecksteine (Putzbauten): abwechselnd lange/kurze Quader, gemalt. UV.x = Abstand von der Hauskante, UV.y = Höhe
+const ECK:="""
+shader_type spatial;
+render_mode diffuse_toon, specular_toon;
+varying vec4 vc; void vertex(){ vc=COLOR; }
+void fragment(){
+	float y=UV.y-0.7; float k=floor(y/0.32); float f=fract(y/0.32);
+	float lw=mod(k,2.0)==0.0?0.55:0.35;
+	if(UV.x>lw||f>0.9) discard;
+	float e=min(min(UV.x,lw-UV.x),min(f,0.9-f)*0.32);
+	vec3 c=vc.rgb*(1.0+0.16*(1.0-smoothstep(0.0,0.05,(0.9-f)*0.32))-0.18*(1.0-smoothstep(0.0,0.04,f*0.32)));
+	c=mix(vec3(0.07,0.05,0.06),c,smoothstep(0.006,0.018,e));
+	ALBEDO=c; ROUGHNESS=0.9;
+}
+"""
+# Gitter (Balkon/Feuertreppe): senkrechte Stäbe + Handlauf, Lücken durchsichtig. UV = Meter
+const GITTER:="""
+shader_type spatial;
+render_mode diffuse_toon, specular_toon, cull_disabled;
+uniform vec3 farbe:source_color=vec3(0.25,0.27,0.3);
+uniform float abstand=0.15;
+void fragment(){
+	float f=fract(UV.x/abstand); float d=min(f,1.0-f)*abstand;
+	float stab=1.0-smoothstep(0.012,0.022,d);
+	float oben=1.0-smoothstep(0.03,0.045,abs(UV.y-UV2.y+0.03));
+	float unten=1.0-smoothstep(0.02,0.035,UV.y);
+	float a=max(stab,max(oben,unten));
+	if(a<0.5) discard;
+	ALBEDO=farbe*(0.9+0.2*oben); ROUGHNESS=0.5;
+}
+"""
 const GRAS:=KOPF+"""
 uniform vec3 farbe:source_color=vec3(0.32,0.52,0.24);
 void fragment(){
@@ -191,6 +319,8 @@ func _materialien():
 	M.reifen=_toon(Color(0.1,0.1,0.11))
 	M.tuer=[_toon(Color(0.2,0.35,0.55)),_toon(Color(0.55,0.15,0.15)),_toon(Color(0.2,0.45,0.3)),_toon(Color(0.35,0.22,0.12)),_toon(Color(0.15,0.15,0.18))]
 	M.markise=[[_toon(Color(0.85,0.18,0.15)),M.weiss],[_toon(Color(0.15,0.5,0.35)),M.weiss],[_toon(Color(0.2,0.35,0.7)),_toon(Color(0.95,0.85,0.4))],[_toon(Color(0.95,0.55,0.15)),M.weiss]]
+	M.fenster=_shader(FENSTER,{});M.gitter=_shader(GITTER,{});M.eck=_shader(ECK,{})
+	SPH_L=SphereMesh.new();SPH_L.radial_segments=7;SPH_L.rings=3
 	M.blume=[_toon(Color(0.95,0.3,0.4)),_toon(Color(0.98,0.85,0.2)),_toon(Color(0.8,0.4,0.9))]
 
 # ---------------- Geometrie-Sammler ----------------
@@ -213,9 +343,22 @@ func koll_box(c:Vector3,s:Vector3,b:=Basis()):
 	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
 	var xf=Transform3D(b*Basis().scaled(s),c)
 	for v in BOX_FACES:KOLL_F.append(xf*v)
+var _im_modul:=false
+func _box_kopie(m:Material,xf:Transform3D,me:Mesh=null):
+	if me==null:me=BOX
+	var key="B%d_%d"%[m.get_instance_id(),me.get_instance_id()]
+	if not MODULE.has(key):
+		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,me.get_mesh_arrays());am.surface_set_material(0,m)
+		MODULE[key]=am;MODUL_SCHATTEN[key]=false;_MOD_PF[key]=[];_MOD_KF[key]=[]
+	_inst_add(key,xf)
 func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
 	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
+	# Handy-Fassung: kleine Kästen (Fensterbänke, Gesimse, Konsolen …) als Kopien eines Einheitswürfels
+	if leicht and not _im_modul and not strassen_modus and not fest_modus and not koll_kasten and max(s.x,max(s.y,s.z))<2.2:
+		_box_kopie(m,Transform3D(b*Basis().scaled(s),c))
+		if kontur>0.0 and (int(s.x>0.25)+int(s.y>0.25)+int(s.z>0.25))>=2:_box_kopie(ink,Transform3D(b*Basis().scaled(s+Vector3.ONE*kontur*2.0),c))
+		return
 	_st(m).append_from(BOX,0,Transform3D(b*Basis().scaled(s),c))
 	if koll_kasten and s.y>0.3:
 		# Leitplanken, Mittelwände usw. sind fest
@@ -223,7 +366,71 @@ func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 		for v in BOX_FACES:ziel.append(xf*v)
 	if kontur>0.0 and (int(s.x>0.25)+int(s.y>0.25)+int(s.z>0.25))>=2:
 		_st(ink).append_from(BOX,0,Transform3D(b*Basis().scaled(s+Vector3.ONE*kontur*2.0),c))
+# Fläche mit Farbe/UV/UV2 (gemalte Fenster, Gitter): a,b,c,d umlaufend, n = Außenseite
+func _quad_attr(m:Material,a:Vector3,b:Vector3,c:Vector3,d:Vector3,ua:Vector2,ub:Vector2,uc:Vector2,ud:Vector2,n:Vector3,col:=Color(1,1,1,1),uv2:=Vector2.ZERO):
+	var s=_st(m)
+	var V=[a,b,c,a,c,d];var U=[ua,ub,uc,ua,uc,ud]
+	if (b-a).cross(c-a).dot(n)>0:V=[a,c,b,a,d,c];U=[ua,uc,ub,ua,ud,uc]
+	for i in 6:
+		s.set_color(col);s.set_uv(U[i]);s.set_uv2(uv2);s.set_normal(n);s.add_vertex(V[i])
+
+# Bauteil als Kopie: einmal am Ursprung bauen (bau baut bei Vector3.ZERO, Blick +Z), dann nur Lage merken.
+# Pfosten/Kollision des Bauteils werden je Kopie mitversetzt.
+var _MOD_PF:={};var _MOD_KF:={}
+func _modul(key:String,xf:Transform3D,bau:Callable,schatten:=false):
+	if not MODULE.has(key):
+		var a_st=st;var a_m=mats;var a_z=zaehler;st={};mats={};zaehler={}
+		var pf0=PFOSTEN.size();var kf0=KOLL_F.size();var a_h=hoehen_an;hoehen_an=false
+		var a_s=strassen_modus;var a_f=fest_modus;strassen_modus=false;fest_modus=false;_im_modul=true
+		bau.call()
+		_im_modul=false
+		var am=ArrayMesh.new()
+		for k in st.keys():
+			var arr=st[k].commit_to_arrays()
+			if arr.is_empty() or arr[Mesh.ARRAY_VERTEX]==null or arr[Mesh.ARRAY_VERTEX].size()==0:continue
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);am.surface_set_material(am.get_surface_count()-1,mats[k])
+		MODULE[key]=am;MODUL_SCHATTEN[key]=schatten
+		_MOD_PF[key]=PFOSTEN.slice(pf0);PFOSTEN.resize(pf0)
+		_MOD_KF[key]=KOLL_F.slice(kf0);KOLL_F.resize(kf0)
+		st=a_st;mats=a_m;zaehler=a_z;hoehen_an=a_h;strassen_modus=a_s;fest_modus=a_f
+	_inst_add(key,xf)
+	for pf in _MOD_PF[key]:PFOSTEN.append([xf*pf[0],pf[1],pf[2]])
+	for v in _MOD_KF[key]:KOLL_F.append(xf*v)
+func _inst_add(key:String,xf:Transform3D):
+	if _im_haus:_haus_inst.append([key,xf]);return
+	if hoehen_an:xf.origin.y+=FY(xf.origin.x,xf.origin.z)
+	_inst_put(key,xf)
+static func xf_puffer(xf:Transform3D)->PackedFloat32Array:
+	var b=xf.basis;var o=xf.origin
+	return PackedFloat32Array([b.x.x,b.y.x,b.z.x,o.x,b.x.y,b.y.y,b.z.y,o.y,b.x.z,b.y.z,b.z.z,o.z])
+var kachel_modul:=0.0   # >0: eigene (größere) Kacheln für Kopien -> weniger Zeichenaufrufe
+func _inst_put(key:String,xf:Transform3D):
+	var t=kachel_modul if kachel_modul>0.0 else (kachel if kachel>0.0 else 150.0)
+	var tk=Vector2i(int(floor(xf.origin.x/t)),int(floor(xf.origin.z/t)))
+	if not INSTG.has(key):INSTG[key]={}
+	if not INSTG[key].has(tk):INSTG[key][tk]=PackedFloat32Array()
+	INSTG[key][tk].append_array(xf_puffer(xf))
+# Kopien ausgeben. Die Lagen stehen zusätzlich als Meta "puffer" am Knoten: ohne Grafiktreiber (Bake) speichert
+# Godot MultiMesh-Daten nicht – das Spiel setzt den Puffer beim Laden (welt_comic.puffer_setzen).
+func _module_aus():
+	for key in INSTG:
+		for tk in INSTG[key]:
+			var buf:PackedFloat32Array=INSTG[key][tk]
+			var mm=MultiMesh.new();mm.transform_format=MultiMesh.TRANSFORM_3D;mm.mesh=MODULE[key]
+			mm.instance_count=buf.size()/12;mm.buffer=buf
+			var mi=MultiMeshInstance3D.new();mi.multimesh=mm;mi.name="K_%s_%d_%d"%[key,tk.x,tk.y];welt.add_child(mi)
+			mi.set_meta("puffer",buf)
+			mi.visibility_range_end=weit_modul;mi.visibility_range_end_margin=15.0
+			if not MODUL_SCHATTEN.get(key,false):mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	INSTG.clear()
+func _kopie_ok(xf:Transform3D)->bool:
+	if not leicht or _im_modul or strassen_modus or fest_modus or koll_kasten:return false
+	var sc=xf.basis.get_scale();return max(sc.x,max(sc.y,sc.z))<2.6
 func mesh(m:Material,me:Mesh,xf:Transform3D,kontur:=1.06):
+	if _kopie_ok(xf) and (me==SPH or me==SPH_L or me==CYL):
+		_box_kopie(m,xf,me)
+		if kontur>1.0:_box_kopie(ink,Transform3D(xf.basis*Basis().scaled(Vector3.ONE*kontur),xf.origin),me)
+		return
 	_st(m).append_from(me,0,xf)
 	if kontur>1.0:_st(ink).append_from(me,0,Transform3D(xf.basis*Basis().scaled(Vector3.ONE*kontur),xf.origin))
 func kugel(m:Material,c:Vector3,r:Vector3,kontur:=1.07):
@@ -233,6 +440,10 @@ func zyl(m:Material,a:Vector3,b:Vector3,r:float,kontur:=1.0):
 	var d=b-a;var L=d.length();if L<0.001:return
 	var q=Quaternion(Vector3.UP,d/L) if abs((d/L).dot(Vector3.UP))<0.9999 else (Quaternion() if d.y>0 else Quaternion(Vector3.RIGHT,PI))
 	var xf=Transform3D(Basis(q)*Basis().scaled(Vector3(r*2.0,L*0.5,r*2.0)),(a+b)*0.5)
+	if _kopie_ok(xf) and L<6.0:
+		_box_kopie(m,xf,CYL)
+		if kontur>1.0:_box_kopie(ink,Transform3D(Basis(q)*Basis().scaled(Vector3(r*2.0*kontur+0.05,L*0.5+0.025,r*2.0*kontur+0.05)),(a+b)*0.5),CYL)
+		return
 	_st(m).append_from(CYL,0,xf)
 	if kontur>1.0:_st(ink).append_from(CYL,0,Transform3D(Basis(q)*Basis().scaled(Vector3(r*2.0*kontur+0.05,L*0.5+0.025,r*2.0*kontur+0.05)),(a+b)*0.5))
 func kapsel(m:Material,a:Vector3,b:Vector3,r:float,kontur:=true):
@@ -274,6 +485,13 @@ var strassen_modus:=false   # Geometrie folgt nur dem Höhenfeld (Straßen, Auto
 var hoehen_an:=false
 var weit_detail:=520.0;var weit_ink:=260.0
 var kachel:=0.0   # >0: Meshes in Kacheln dieser Größe teilen (Sichtweite/Culling auf dem Handy)
+var kompakt:=false   # Bake: Ecken zusammenlegen (Index) + Vertex-Kompression (halber Speicher/Dateigröße)
+func _mesh_kompakt(a2:Array)->ArrayMesh:
+	var am=ArrayMesh.new()
+	if not kompakt:am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a2);return am
+	var s2=SurfaceTool.new();s2.create_from_arrays(a2);s2.index()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,s2.commit_to_arrays(),[],{},Mesh.ARRAY_FLAG_COMPRESS_ATTRIBUTES)
+	return am
 func _mesh_aus(k:String):
 	var arr=st[k].commit_to_arrays()
 	if arr.is_empty() or arr[Mesh.ARRAY_VERTEX]==null:return
@@ -289,6 +507,7 @@ func _mesh_aus(k:String):
 		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);_mi(am,m,0.0)
 		return
 	var N=arr[Mesh.ARRAY_NORMAL];var UV=arr[Mesh.ARRAY_TEX_UV];var I=arr[Mesh.ARRAY_INDEX]
+	var CO=arr[Mesh.ARRAY_COLOR];var U2=arr[Mesh.ARRAY_TEX_UV2]
 	var cnt=I.size() if I!=null and I.size()>0 else V.size()
 	var g={}
 	for t in range(0,cnt,3):
@@ -296,26 +515,31 @@ func _mesh_aus(k:String):
 		if I!=null and I.size()>0:ia=[I[t],I[t+1],I[t+2]]
 		var c=(V[ia[0]]+V[ia[1]]+V[ia[2]])/3.0
 		var key=Vector2i(floor(c.x/kachel),floor(c.z/kachel))
-		if not g.has(key):g[key]=[PackedVector3Array(),PackedVector3Array(),PackedVector2Array()]
+		if not g.has(key):g[key]=[PackedVector3Array(),PackedVector3Array(),PackedVector2Array(),PackedColorArray(),PackedVector2Array()]
 		var e=g[key]
 		for j in ia:
 			e[0].append(V[j]);e[1].append(N[j] if N!=null else Vector3.UP)
 			if UV!=null:e[2].append(UV[j])
+			if CO!=null:e[3].append(CO[j])
+			if U2!=null:e[4].append(U2[j])
 	var weit=weit_ink if m==ink else weit_detail
 	for key in g:
 		var e=g[key];var a2=[];a2.resize(Mesh.ARRAY_MAX)
 		a2[Mesh.ARRAY_VERTEX]=e[0];a2[Mesh.ARRAY_NORMAL]=e[1]
 		if UV!=null:a2[Mesh.ARRAY_TEX_UV]=e[2]
-		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a2);_mi(am,m,weit).name="M_%s_%d_%d"%[k,key.x,key.y]
+		if CO!=null:a2[Mesh.ARRAY_COLOR]=e[3]
+		if U2!=null:a2[Mesh.ARRAY_TEX_UV2]=e[4]
+		var am=_mesh_kompakt(a2);_mi(am,m,weit).name="M_%s_%d_%d"%[k,key.x,key.y]
 var kein_schatten:={}   # Materialien flacher Bodenflächen (Fahrbahn, Bankett): werfen keinen Schatten
 func _mi(am:Mesh,m:Material,weit:float):
 	var mi=MeshInstance3D.new();mi.mesh=am;mi.material_override=m;welt.add_child(mi)
 	if m==ink or kein_schatten.has(m):mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if weit>0.0:mi.visibility_range_end=weit;mi.visibility_range_end_margin=20.0
 	return mi
-func _fertig():
+func _fertig(mit_kopien:=true):
 	for k in st.keys():_mesh_aus(k)
 	st.clear()
+	if mit_kopien:_module_aus()
 # ---------------- Umgebung ----------------
 func _umgebung():
 	var we=WorldEnvironment.new();var e=Environment.new();we.environment=e;welt.add_child(we)
@@ -475,7 +699,13 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 	# Sockel
 	box(M.stein_d,P.call(w*0.5,0.35,0.05),Vector3(w,0.7,0.12),b,0.03)
 	# Ecksteine (Putzbauten): echte 3D-Quader, abwechselnd lang/kurz
-	if not stil.ziegel:
+	if not stil.ziegel and leicht:
+		var tc:Color=stil.trim.albedo_color if stil.trim is StandardMaterial3D else Color(0.86,0.83,0.76)
+		for ei in 2:
+			if not ecken[ei]:continue
+			var x0=[0.0,w][ei];var x1=[0.56,w-0.56][ei]
+			_quad_attr(M.eck,P.call(x0,0.7,0.045),P.call(x1,0.7,0.045),P.call(x1,H-0.4,0.045),P.call(x0,H-0.4,0.045),Vector2(0,0.7),Vector2(0.56,0.7),Vector2(0.56,H-0.4),Vector2(0,H-0.4),b.z,tc)
+	elif not stil.ziegel:
 		for ei in 2:
 			if not ecken[ei]:continue
 			var x0=[0.0,w][ei]
@@ -492,7 +722,7 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 	box(trim,P.call(w*0.5,H-0.2,0.22),Vector3(w+0.3,0.4,0.5),b,0.04)
 	var kx=0.4
 	while kx<w-0.2:
-		box(trim,P.call(kx,H-0.55,0.12),Vector3(0.18,0.3,0.26),b,0.02);kx+=0.9
+		box(trim,P.call(kx,H-0.55,0.12),Vector3(0.18,0.3,0.26),b,0.0 if leicht else 0.02);kx+=0.9 if not leicht else 1.35
 	box(stil.wand,P.call(w*0.5,H+0.35,-0.15),Vector3(w,0.7,0.3),b,0.035)
 	box(M.stein_d,P.call(w*0.5,H+0.74,-0.15),Vector3(w+0.1,0.1,0.42),b,0.03)
 	# Obergeschosse: Fenster
@@ -513,6 +743,7 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 		for k in n:_fenster(P,b,(k+0.5)*w/n,1.0,1.0,1.55,stil,0)
 
 func _fenster(P:Callable,b:Basis,x:float,y0:float,fw:float,fh:float,stil:Dictionary,i:int):
+	if leicht:_fenster_l(P,b,x,y0,fw,fh,stil,i);return
 	var glas:Material=M.glas[rng.randi()%M.glas.size()] if rng.randf()<0.35 else stil.glas
 	var t=0.09
 	# Laibung (dunkler Rücksprung) + Glas leicht zurück
@@ -556,7 +787,45 @@ func _fenster(P:Callable,b:Basis,x:float,y0:float,fw:float,fh:float,stil:Diction
 		box(M.holz,P.call(x,y0+0.05,0.32),Vector3(fw,0.22,0.24),b,0.025)
 		for q in 6:kugel(M.blume[rng.randi()%3] if q%2==0 else M.laub[0],P.call(x-fw*0.4+q*fw*0.16,y0+0.22,0.32),Vector3(0.11,0.1,0.11),1.0)
 
+# Handy-Fassung: gemaltes Fenster (2-6 Dreiecke) + Fensterbank/Verdachung als Kasten
+func _fenster_l(P:Callable,b:Basis,x:float,y0:float,fw:float,fh:float,stil:Dictionary,i:int):
+	var gl=rng.randi()%4 if rng.randf()<0.35 else max(M.glas.find(stil.glas),0)
+	var fr=0 if stil.fenster!=1 else 1+max(M.tuer.find(stil.tuer),0)
+	var sh=1+max(M.tuer.find(stil.tuer),0) if (not stil.ziegel and stil.laeden) else 0
+	var col=Color(fr/255.0,gl/255.0,sh/255.0,rng.randf());var n=b.z;var z=0.015;var dim=Vector2(fw,fh)
+	var Q=func(u0:float,u1:float,v0:float,v1:float):
+		_quad_attr(M.fenster,P.call(x+u0,y0+v0,z),P.call(x+u1,y0+v0,z),P.call(x+u1,y0+v1,z),P.call(x+u0,y0+v1,z),Vector2(u0,v0),Vector2(u1,v0),Vector2(u1,v1),Vector2(u0,v1),n,col,dim)
+	Q.call(-fw*0.5-0.045,fw*0.5+0.045,-0.045,fh+0.045)
+	if sh>0:
+		Q.call(-fw*0.5-0.6,-fw*0.5-0.065,-0.025,fh+0.05);Q.call(fw*0.5+0.065,fw*0.5+0.6,-0.025,fh+0.05)
+	if stil.ziegel:Q.call(-(fw+0.4)*0.5,(fw+0.4)*0.5,fh+0.055,fh+0.375)
+	box(M.stein,P.call(x,y0-0.07,0.13),Vector3(fw+0.35,0.12,0.26),b,0.025)
+	if not stil.ziegel:
+		box(stil.trim,P.call(x,y0+fh+0.18,0.1),Vector3(fw+0.45,0.14,0.22),b,0.025)
+		if i%2==1:box(stil.trim,P.call(x,y0+fh+0.32,0.1),Vector3(fw*0.7,0.12,0.18),b,0.0)
+	var zz=rng.randf()
+	if zz<0.1:box(M.weiss,P.call(x+0.2,y0-0.45,0.3),Vector3(0.7,0.45,0.5),b,0.03)
+	elif zz<0.25:
+		box(M.holz,P.call(x,y0+0.05,0.32),Vector3(fw,0.22,0.24),b,0.025)
+		var alt=SPH;SPH=SPH_L
+		for q in 4:kugel(M.blume[rng.randi()%3] if q%2==0 else M.laub[0],P.call(x-fw*0.36+q*fw*0.24,y0+0.24,0.32),Vector3(0.15,0.12,0.13),1.0)
+		SPH=alt
+
+# senkrechtes Gitterfeld (Geländer): von a nach e (unten), Höhe h, gemalte Stäbe
+func _gitter(a:Vector3,e:Vector3,h:float,n:Vector3,abst:=0.15):
+	var l=a.distance_to(e)
+	_quad_attr(M.gitter,a,e,e+Vector3(0,h,0),a+Vector3(0,h,0),Vector2(0,0),Vector2(l,0),Vector2(l,h),Vector2(0,h),n,Color(1,1,1,1),Vector2(l,h))
+
 func _balkon(P:Callable,b:Basis,x:float,y0:float,stil:Dictionary):
+	if leicht:
+		box(M.stein,P.call(x,y0-0.05,0.55),Vector3(1.9,0.15,1.1),b,0.03)
+		_gitter(P.call(x-0.95,y0+0.03,1.08),P.call(x+0.95,y0+0.03,1.08),0.85,b.z)
+		for sd in [-1,1]:_gitter(P.call(x+sd*0.95,y0+0.03,0.02),P.call(x+sd*0.95,y0+0.03,1.08),0.85,b.x*sd)
+		if rng.randf()<0.5:
+			var alt=SPH;SPH=SPH_L
+			for k in 3:kugel(M.laub[k%3],P.call(x-0.6+k*0.6,y0+0.3,0.9),Vector3(0.22,0.25,0.22),1.05)
+			SPH=alt
+		return
 	box(M.stein,P.call(x,y0-0.05,0.55),Vector3(1.9,0.15,1.1),b,0.03)
 	box(M.metall,P.call(x,y0+0.85,1.08),Vector3(1.9,0.06,0.06),b,0.0)
 	for sd in [-1,1]:box(M.metall,P.call(x+sd*0.93,y0+0.85,0.55),Vector3(0.06,0.06,1.1),b,0.0)
@@ -573,8 +842,9 @@ func _feuertreppe(P:Callable,b:Basis,w:float,eg:float,oh:float,stock:int):
 		box(M.metall,P.call(x0+bw*0.5,y,0.65),Vector3(bw,0.07,1.25),b,0.02)
 		box(M.metall,P.call(x0+bw*0.5,y+0.95,1.28),Vector3(bw,0.05,0.05),b,0.0)
 		box(M.metall,P.call(x0+bw*0.5,y+0.5,1.28),Vector3(bw,0.04,0.04),b,0.0)
+		if leicht:_gitter(P.call(x0,y+0.02,1.28),P.call(x0+bw,y+0.02,1.28),0.95,b.z,0.25)
 		var q=0.0
-		while q<=bw:
+		while q<=bw and not leicht:
 			box(M.metall,P.call(x0+q,y+0.48,1.28),Vector3(0.035,0.95,0.035),b,0.0);q+=0.25
 		for sd in [0.0,bw]:box(M.metall,P.call(x0+sd,y+0.95,0.65),Vector3(0.05,0.05,1.25),b,0.0)
 		# schräge Leiter zum nächsten Podest
@@ -618,6 +888,7 @@ func _laden(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary,mit_schild:=true
 	var lb=Label3D.new();lb.text=stil.get("laden_name",_laeden[rng.randi()%_laeden.size()]) if mit_schild else "";lb.font_size=96;lb.pixel_size=0.0045
 	lb.modulate=Color(0.12,0.1,0.12);lb.outline_size=0;lb.shaded=false;lb.double_sided=false
 	lb.transform=Transform3D(b,P.call(w*0.5,3.15,0.27));welt.add_child(lb)
+	if leicht:lb.visibility_range_end=45.0
 	# Markise: gestreift, schräg (an den Hausenden etwas eingerückt, damit sich Markisen an der Ecke nicht schneiden)
 	var tief=1.6;var y0=2.85;var m0=0.6;var mw=w-1.2
 	var streifen=int(mw/0.55)
@@ -697,6 +968,11 @@ func _ampel(p:Vector3,blick:Vector3,gruen:bool):
 	box(M.gelb,p+Vector3(0,1.1,0)-blick*0.1,Vector3(0.14,0.22,0.12),b,0.02)
 
 func _laterne(p:Vector3,zur_strasse:Vector3):
+	if leicht:
+		_modul("laterne",Transform3D(Basis(Vector3.UP,atan2(zur_strasse.x,zur_strasse.z)),p),func():_laterne_roh(Vector3.ZERO,Vector3(0,0,1)),true)
+		return
+	_laterne_roh(p, zur_strasse)
+func _laterne_roh(p:Vector3,zur_strasse:Vector3):
 	PFOSTEN.append([p,0.15,5.3])
 	zyl(M.metall,p,p+Vector3(0,0.5,0),0.14,1.2)
 	zyl(M.metall,p,p+Vector3(0,5.2,0),0.07,1.3)
@@ -708,6 +984,12 @@ func _laterne(p:Vector3,zur_strasse:Vector3):
 	box(M.lampe,e+Vector3(0,-0.17,0),Vector3(0.35,0.06,0.55),b,0.0)
 
 func _baum(p:Vector3):
+	if leicht:
+		var v=rng.randi()%4
+		_modul("baum%d"%v,Transform3D(Basis(Vector3.UP,rng.randf()*TAU),p),func():_baum_roh(Vector3.ZERO),true)
+		return
+	_baum_roh(p)
+func _baum_roh(p:Vector3):
 	PFOSTEN.append([p,0.25,3.0])
 	# runder Erdfleck mit Steinring
 	zyl(M.erde,p+Vector3(0,0.0,0),p+Vector3(0,0.03,0),0.9)
@@ -727,6 +1009,11 @@ func _baum(p:Vector3):
 	kugel(lm,c+Vector3(0,1.2,0),Vector3(1.2,1.0,1.2),1.07)
 
 func _bank(p:Vector3,blick:Vector3):
+	if leicht:
+		_modul("bank",Transform3D(Basis(Vector3.UP,atan2(blick.x,blick.z)),p),func():_bank_roh(Vector3.ZERO,Vector3(0,0,1)),false)
+		return
+	_bank_roh(p, blick)
+func _bank_roh(p:Vector3,blick:Vector3):
 	var b=Basis(Vector3.UP,atan2(blick.x,blick.z))
 	for sd in [-0.8,0.8]:
 		box(M.metall,p+b*Vector3(sd,0.22,0),Vector3(0.08,0.44,0.5),b,0.02)
@@ -735,10 +1022,20 @@ func _bank(p:Vector3,blick:Vector3):
 	for q in 2:box(M.holz,p+b*Vector3(0,0.68+q*0.17,-0.27),Vector3(1.9,0.13,0.05),b,0.02)
 
 func _muell(p:Vector3):
+	if leicht:
+		_modul("muell",Transform3D(Basis(Vector3.UP,0.0),p),func():_muell_roh(Vector3.ZERO),false)
+		return
+	_muell_roh(p)
+func _muell_roh(p:Vector3):
 	zyl(M.laub[2],p,p+Vector3(0,0.85,0),0.27,1.15)
 	zyl(M.dunkel,p+Vector3(0,0.85,0),p+Vector3(0,0.92,0),0.3,1.1)
 
 func _hydrant(p:Vector3):
+	if leicht:
+		_modul("hydrant",Transform3D(Basis(Vector3.UP,0.0),p),func():_hydrant_roh(Vector3.ZERO),false)
+		return
+	_hydrant_roh(p)
+func _hydrant_roh(p:Vector3):
 	zyl(M.rot,p,p+Vector3(0,0.65,0),0.13,1.2)
 	kugel(M.rot,p+Vector3(0,0.68,0),Vector3(0.14,0.12,0.14),1.1)
 	for sd in [-1,1]:zyl(M.rot,p+Vector3(0,0.45,0),p+Vector3(sd*0.24,0.45,0),0.06,1.2)
@@ -1783,10 +2080,19 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 	for i in range(0,idx.size(),3):
 		_tri(so,Vector3(poly[idx[i]].x,y1,poly[idx[i]].y),Vector3(poly[idx[i+1]].x,y1,poly[idx[i+1]].y),Vector3(poly[idx[i+2]].x,y1,poly[idx[i+2]].y),Vector3.UP)
 	var ss=_st(seite,true);var sg=sign(_flaeche2(poly))
+	# Handy-Fassung: Bordstein für die Physik als schräge Auffahrt (senkrechte Kante stoppt tiefe Autos)
+	var schraeg=leicht and koll_an and y1>0.05 and y1<0.4
+	var a_k=koll_an
+	if schraeg:koll_an=false
 	for i in poly.size():
 		var p=poly[i];var q=poly[(i+1)%poly.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
 		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
+		if schraeg:
+			var pa=p+n*0.7;var qa=q+n*0.7
+			var E=Vector3(pa.x,0.0,pa.y);var F=Vector3(qa.x,0.0,qa.y)
+			KOLL_F.append_array([D,C,F,D,F,E])
+	koll_an=a_k
 
 func _stadt():
 	hoehen_an=true
@@ -1965,9 +2271,19 @@ func _kreuzungen():
 				for k in JN:
 					if k.p.distance_to(e)<18.0:neu=false
 				if neu:JN.append({"p":e,"r":max(a.w,nr.w)+SWB+1.0,"a":a,"b":nr})
+var _jn_raster:={};var _jn_n:=-1
 func _nah_kreuzung(p:Vector2,extra:=0.0)->bool:
-	for k in JN:
-		if k.p.distance_to(p)<k.r+extra:return true
+	if _jn_n!=JN.size():
+		_jn_raster={};_jn_n=JN.size()
+		for k in JN:
+			var c=Vector2i(int(floor(k.p.x/40.0)),int(floor(k.p.y/40.0)))
+			if not _jn_raster.has(c):_jn_raster[c]=[]
+			_jn_raster[c].append(k)
+	var c0=Vector2i(int(floor(p.x/40.0)),int(floor(p.y/40.0)))
+	for dx in range(-1,2):
+		for dz in range(-1,2):
+			for k in _jn_raster.get(c0+Vector2i(dx,dz),[]):
+				if k.p.distance_to(p)<k.r+extra:return true
 	return false
 
 func _aussen_gehweg(pc:PackedVector2Array):
@@ -2014,8 +2330,10 @@ func _block(pc:PackedVector2Array)->int:
 		for v in aussen:c+=v
 		c/=aussen.size()
 		var basis=5 if c.length()<95 else (4 if c.length()<160 else 3)
+		if stock_fn.is_valid():basis=stock_fn.call(c)
 		var alle=lots.map(func(x):return x[0])
 		for lot in lots:
+			if lot_ok.is_valid() and not lot_ok.call(lot[0]):continue
 			_gebaeude(lot[0],aussen,innen,clampi(basis+rng.randi_range(-1,1)+(1 if lot[1] else 0),2,7),lot[1],alle)
 			anz+=1
 		for q in innen:
@@ -2139,9 +2457,13 @@ func _gebaeude(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,stoc
 	var alt=st;var altm=mats;var altz=zaehler;st={};mats={};zaehler={}
 	var n0=welt.get_child_count()
 	var kf0=KOLL_F.size()
-	koll_an=true
+	koll_an=true;_im_haus=true;_haus_inst=[]
 	_gebaeude_roh(lot,aussen,innen,stock,ecke,alle)
-	koll_an=false
+	koll_an=false;_im_haus=false
+	for e in _haus_inst:
+		var xf:Transform3D=e[1];xf.origin.y+=hb;_inst_put(e[0],xf)
+	if leicht and not FERN_HAUS.is_empty() and FERN_HAUS[-1][3]==0.0:FERN_HAUS[-1][3]=hb+0.001
+	_haus_inst=[]
 	for i in range(kf0,KOLL_F.size()):
 		var v=KOLL_F[i];v.y+=(FY(v.x,v.z) if v.y<KB+0.03 else hb);KOLL_N.append(v)
 	KOLL_F.resize(kf0)
@@ -2170,6 +2492,11 @@ func _gebaeude_roh(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,
 		"balkon":(not ziegel and rng.randf()<0.5),"fenster":rng.randi_range(0,2),
 		"markise":M.markise[rng.randi()%M.markise.size()],"laden_name":LADEN_NAMEN[rng.randi()%LADEN_NAMEN.size()]}
 	var laden=ecke or rng.randf()<0.45
+	if leicht:
+		var fc=Color(0.8,0.75,0.65)
+		if wand is ShaderMaterial and wand.get_shader_parameter("farbe")!=null:fc=wand.get_shader_parameter("farbe")
+		elif wand is StandardMaterial3D:fc=wand.albedo_color
+		FERN_HAUS.append([lot,H+0.7,fc,0.0])
 	var sg=sign(_flaeche2(lot));var n=lot.size()
 	# Wände + Dach
 	var sw=_st(wand,true)
@@ -2855,12 +3182,21 @@ func _skelett_teile(p:Node3D,sk:Skeleton3D,o:Dictionary,U,F):
 # Höhenfeld: ein Hügelviertel im Nordwesten (Plateau), Straßen steigen weich an.
 # Jeder Block liegt auf EINER Höhe (in 2-m-Stufen) – zur tieferen Straße hin entsteht eine Stützmauer.
 const PLATEAU:=Vector2(-125,-100)
+# Höhenfeld: ohne HF der Probeblock-Hügel; mit HF (glattes Stadt-Höhenraster) für ganze Viertel.
+# Straßen, Gehwege, Blöcke und Hausfüße fragen alle dieses eine Feld -> keine Stufen zwischen Straßen.
+var HF:PackedFloat32Array;var HF_X0:=0.0;var HF_Z0:=0.0;var HF_C:=4.0;var HF_N:=0;var HF_M:=0
 func FY(x:float,z:float)->float:
+	if HF_N>0:
+		var fx=clamp((x-HF_X0)/HF_C,0.0,HF_N-1.001);var fz=clamp((z-HF_Z0)/HF_C,0.0,HF_M-1.001)
+		var i=int(fx);var k=int(fz);var u=fx-i;var v=fz-k
+		var a=HF[k*HF_N+i];var b=HF[k*HF_N+i+1];var c=HF[(k+1)*HF_N+i];var d=HF[(k+1)*HF_N+i+1]
+		return lerp(lerp(a,b,u),lerp(c,d,u),v)
 	var d=Vector2(x,z).distance_to(PLATEAU)
 	return 6.0*(1.0-smoothstep(40.0,92.0,d))
 var LG:PackedFloat32Array
-const LGX0:=-202.0
-const LGZ0:=-172.0
+var LGX0:=-202.0
+var LGZ0:=-172.0
+var LGW:=404.0;var LGH:=344.0
 const LGC:=0.5
 var LGN:=0;var LGM:=0
 func Y_at(x:float,z:float)->float:
@@ -2873,13 +3209,13 @@ func _Y_alt(x:float,z:float)->float:
 	return FY(x,z)
 func _lot_mark(lot:PackedVector2Array)->float:
 	if LG.is_empty():
-		LGN=int(404.0/LGC);LGM=int(344.0/LGC);LG=PackedFloat32Array();LG.resize(LGN*LGM);LG.fill(-1e9)
+		LGN=int(LGW/LGC);LGM=int(LGH/LGC);LG=PackedFloat32Array();LG.resize(LGN*LGM);LG.fill(-1e9)
 	# Grundstück um 1,3 m erweitert: Gesimse, Fensterbänke, Markisen ragen über die Bauflucht
 	var g=_groesstes(Geometry2D.offset_polygon(lot,1.3,Geometry2D.JOIN_MITER))
 	if g.size()>=3:lot=g
-	var hb=0.0
+	var hb=0.0 if HF_N==0 else -1e9
 	for v in lot:hb=max(hb,FY(v.x,v.y))
-	if hb<0.05:return 0.0
+	if HF_N==0 and hb<0.05:return 0.0
 	var bb=_bbox(lot)
 	var k0=max(0,int((bb.position.y-LGZ0)/LGC));var k1=min(LGM-1,int((bb.end.y-LGZ0)/LGC))
 	for k in range(k0,k1+1):
