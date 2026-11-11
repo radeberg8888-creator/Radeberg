@@ -986,16 +986,16 @@ func _natur_orte(NL):
 		SONDER_FREI.append([mitte,rx]);NATUR_ORTE.append({"art":art,"p":[mitte.x,h,mitte.y],"yaw":yaw})
 	# Cannabisplantage (1x): abseits (80-900 m von der Straße), möglichst eben – Bedingungen werden schrittweise gelockert
 	var g=N.hanf_groesse();var rh=g.length()*0.5
-	for stufe in 4:
+	for stufe in 5:
 		var ok=false
-		for v in 15000:
+		for v in 20000:
 			var w=Vector2(rng.randf_range(-4000,4300),rng.randf_range(-10800,-2200))
 			if _trocken(w)>0.4:continue
-			if not gut.call(w,rh,900.0,80.0 if stufe<3 else 30.0,[6.0,10.0,16.0,24.0][stufe]):continue
+			if not gut.call(w,rh,[900.0,900.0,1500.0,3000.0,5000.0][stufe],[80.0,80.0,40.0,20.0,10.0][stufe],[6.0,10.0,16.0,24.0,40.0][stufe]):continue
 			var h=G0._nat(w.x,w.y);var yaw=rng.randf()*TAU
 			setze.call(N.hanf_platz(w,h,yaw),w,rh+6.0,h,"hanf",yaw);ok=true;break
 		if ok:break
-	print("NATUR Hanf-Suche ",grund);grund.clear()
+	print("NATUR Hanf-Suche ",grund," gefunden ",NATUR_ORTE.size());grund.clear()
 	# Jagdhütten (4x) mitten im Wald, 60-400 m von der Straße
 	var nj=0
 	for v in 20000:
