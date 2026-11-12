@@ -23,6 +23,7 @@ var BER:={}
 var NETZ:=[]       # {n,P(lokal),w,typ}
 var BAHN:=[];var UEBERGANG:=[];var SCHRANKEN:=[]
 var AB:=[];var RAMPEN:=[]
+var ALLE_ALLE:=[]   # alle Stadtflächen (für die Karte: hellgrau)
 var ALLE_FL:=[]     # bebaute Stadtflächen (Fassadenblöcke, Hafen, Industrie, Flughafen; lokal) – Natur bleibt draußen
 var N               # natur_lib
 var NATUR_ORTE:=[]  # {art, p (Welt), yaw}
@@ -566,7 +567,7 @@ func _stadt_bauen(faces:Array,d):
 	# Straßenausstattung über alle Stadtblöcke
 	var alle=fass.duplicate()
 	for e in kit:alle.append(e[0])
-	L.STADT_STUECKE=alle;ALLE_FL=fass.duplicate()
+	L.STADT_STUECKE=alle;ALLE_FL=fass.duplicate();ALLE_ALLE=alle
 	for e in kit:
 		if e[1] in ["docks","industrie","flug"]:ALLE_FL.append(e[0])
 	L.strassen_modus=true;L._markierungen();L.strassen_modus=false
@@ -872,6 +873,12 @@ func _natur_maske():
 	# 4-m-Raster über Stadt + Rand: 1 = Stadtfläche, Gleis, Autobahn (dort kein Bewuchs)
 	var r=STADT.grow(300.0);NM_X0=r.position.x;NM_Z0=r.position.y;NM_NX=int(r.size.x/NM_ST)+1;NM_NZ=int(r.size.y/NM_ST)+1
 	NM.resize(NM_NX*NM_NZ);NM.fill(0)
+	for pc in ALLE_ALLE:
+		var bb=L._bbox(pc)
+		for k in range(int((bb.position.y+C.y-NM_Z0)/NM_ST),int((bb.end.y+C.y-NM_Z0)/NM_ST)+1):
+			for i in range(int((bb.position.x+C.x-NM_X0)/NM_ST),int((bb.end.x+C.x-NM_X0)/NM_ST)+1):
+				if i<0 or k<0 or i>=NM_NX or k>=NM_NZ:continue
+				if Geometry2D.is_point_in_polygon(Vector2(NM_X0+i*NM_ST,NM_Z0+k*NM_ST)-C,pc):NM[k*NM_NX+i]=2
 	for pc in ALLE_FL:
 		var bb=L._bbox(pc)
 		for k in range(int((bb.position.y+C.y-NM_Z0)/NM_ST),int((bb.end.y+C.y-NM_Z0)/NM_ST)+1):
@@ -896,25 +903,36 @@ func _nm(w:Vector2)->bool:
 	var i=int((w.x-NM_X0)/NM_ST+0.5);var k=int((w.y-NM_Z0)/NM_ST+0.5)
 	if i<0 or k<0 or i>=NM_NX or k>=NM_NZ:return false
 	return NM[k*NM_NX+i]==1
+func _nm_wert(w:Vector2)->int:
+	var i=int((w.x-NM_X0)/NM_ST+0.5);var k=int((w.y-NM_Z0)/NM_ST+0.5)
+	if i<0 or k<0 or i>=NM_NX or k>=NM_NZ:return 0
+	return NM[k*NM_NX+i]
+var NDBG:={}
+func _ndbg(k:String)->int:
+	NDBG[k]=NDBG.get(k,0)+1;return 0
 func _natur_ok(NL,w:Vector2)->int:   # 0 nein, 1 Landschaft, 2 Stadtgrün
 	for f in SONDER_FREI:
 		if w.distance_to(f[0])<f[1]:return 0
 	if not STADT.grow(260.0).has_point(w):return NL._land_ok(w,4.0)
 	var i=NL._ix(w.x);var k=NL._kz(w.y)
-	if i<1 or k<1 or i>=NL.GNX-1 or k>=NL.GNZ-1:return 0
+	if i<1 or k<1 or i>=NL.GNX-1 or k>=NL.GNZ-1:return _ndbg("rand")
 	var j=k*NL.GNX+i
-	if NL.WASSER[j]==1 or NAT0[G0rj(w)]<1.0:return 0
-	if _nm(w):return 0
+	# in der Stadt zählt das Stadt-Höhenfeld (die alte Natur war dort teils Meer); außerhalb das Wasser der Insel
+	if not STADT.has_point(w) and NL.WASSER[j]==1:return _ndbg("wasser")
+	if _nm(w):return _ndbg("flaeche")
 	var p=w-C
-	if SU.frei(p)<4.0:return 0
+	if SU.frei(p)<4.0:return _ndbg("strasse")
 	for d in [Vector2.ZERO,Vector2(3,0),Vector2(-3,0),Vector2(0,3),Vector2(0,-3)]:
-		if SU._belegt(p+d):return 0
-	if not STADT.has_point(w) and (NL.frei(p)<4.0 or NL._belegt(p)):return 0
+		if SU._belegt(p+d):return _ndbg("belegt")
+	if not STADT.has_point(w) and (NL.frei(p)<4.0 or NL._belegt(p)):return _ndbg("nord")
+	_ndbg("ok")
 	return 2
 func G0rj(w:Vector2)->int:
 	var i=clampi(int((w.x-G0.X0)/G0.STEP+0.5),0,G0.rx-1);var k=clampi(int((w.y-G0.Z0)/G0.STEP+0.5),0,G0.rz-1);return k*G0.rx+i
+var HFN:=0   # im Norden-Schritt ist L.HF_N abgeschaltet -> für die Stadthöhe kurz wieder einschalten
 func _natur_h(NL,w:Vector2)->float:
-	if STADT.has_point(w):return L.FY(w.x-C.x,w.y-C.y)
+	if STADT.has_point(w):
+		var a=L.HF_N;L.HF_N=HFN;var h=L.FY(w.x-C.x,w.y-C.y);L.HF_N=a;return h
 	return NL.h_end(w)
 func _trocken(w:Vector2)->float:
 	# Wüste nur in den echten Wüstengebieten (Sandboden, weit weg von der Stadt, nicht am Strand)
@@ -932,11 +950,14 @@ func _natur(NL):
 			var art=_natur_ok(NL,w)
 			if art==0:continue
 			var h=_natur_h(NL,w)
-			if h<0.3:continue
+			if h<0.3:
+				if art==2:_ndbg("tief_stadt" if STADT.has_point(w) else "tief_ring")
+				continue
 			var stg=Vector2(_natur_h(NL,w+Vector2(3,0))-_natur_h(NL,w-Vector2(3,0)),_natur_h(NL,w+Vector2(0,3))-_natur_h(NL,w-Vector2(0,3))).length()/6.0
 			var p=w-C
 			var nah=(SU.frei(p) if STADT.grow(260.0).has_point(w) else NL.frei(p))<120.0
 			var kit=N.waehle(w.x,w.y,h,stg,G0.kuesten_abstand(w.x,w.y),_trocken(w),nah,art==2)
+			if art==2:_ndbg("kit_"+("leer" if kit=="" else "da")+("_stadt" if STADT.has_point(w) else "_ring"))
 			if kit=="":continue
 			if art==2 and N.rng.randf()<0.2:continue   # Stadtgrün etwas lockerer
 			var sc=N.rng.randf_range(0.85,1.25)
@@ -947,6 +968,7 @@ func _natur(NL):
 				nb+=1;NL.PLATZ.append([fk,xf])
 				if nb%3==0:NATUR_FERN.append([fk,Transform3D(xf.basis,Vector3(w.x,h-0.1,w.y))])
 		x+=RS
+	print("NATUR Stadt-Prüfung ",NDBG)
 	print("NATUR ",NL.PLATZ.size()-n0," Bäume ",nb," Fern ",NATUR_FERN.size()," ",st," ",Time.get_ticks_msec()-t0," ms")
 
 func _ebnen(NL,mitte:Vector2,r:float,h:float,rand:float):
@@ -1041,6 +1063,7 @@ func _norden()->Dictionary:
 	var NL=load("res://scripts/comic/nord_lib.gd").new(L,GL,K,G0)
 	var flach=Node3D.new();var alt_w=L.welt;L.welt=flach
 	var alt=[L.kachel,L.weit_detail,L.weit_ink,L.leicht,L.hoehen_an,L.HF_N]
+	HFN=L.HF_N
 	L.leicht=false;L.hoehen_an=false;L.HF_N=0
 	var insel=Rect2(-4400,-11300,9100,14800)
 	NL.maske_bauen(insel,[STADT.grow(20),STADT.grow(20)])
@@ -1342,7 +1365,7 @@ func _gelaende_und_daten(ND:Dictionary):
 		for p in b.P:P.append(Vector3(p.x+CX,L.FY(p.x,p.y)+0.33,p.y+CZ))
 		bahn.append(P)
 	var daten={"H":H,"nx":nx,"nz":nz,"X0":X0,"Z0":Z0,"STEP":ST,"roads":roads,"junctions":junctions,"parken":parken,"shops":shops,
-		"rect":STADT,"sued_rect":STADT,"viertel":viertel+ND.viertel,"immo":immo,"dienste":dienste,"bahn":bahn,"neu":true,"natur_orte":NATUR_ORTE}
+		"rect":STADT,"sued_rect":STADT,"viertel":viertel+ND.viertel,"immo":immo,"dienste":dienste,"bahn":bahn,"neu":true,"natur_orte":NATUR_ORTE,"welt_id":str(int(Time.get_unix_time_from_system()))}
 	var f=FileAccess.open(ZIEL+"daten.bin",FileAccess.WRITE);f.store_var(daten,false);f.close()
 	STN.free()
 	_owner(W,W)
@@ -1455,7 +1478,7 @@ func _karte_bild(H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float):
 				var w=Vector2(x,z)
 				var hx=G0._bilin(H,x+5,z)-G0._bilin(H,x-5,z);var hz=G0._bilin(H,x,z+5)-G0._bilin(H,x,z-5)
 				var stg=Vector2(hx,hz).length()/10.0
-				if STADT.grow(300).has_point(w) and _nm(w) and STADT.has_point(w):c=Color(0.78,0.77,0.74)
+				if STADT.has_point(w) and _nm_wert(w)>0:c=Color(0.78,0.77,0.74) if _nm_wert(w)==1 else Color(0.72,0.74,0.66)
 				else:c=N.farbe(x,z,h,stg,G0.kuesten_abstand(x,z),_trocken(w) if not STADT.has_point(w) else 0.0)
 				var licht=clamp(1.0+(-hx+hz)*0.06,0.75,1.2)
 				c=Color(c.r*licht,c.g*licht,c.b*licht)

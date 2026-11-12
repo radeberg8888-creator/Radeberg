@@ -136,12 +136,50 @@ func _ready():
 	laden()
 	if test_modus!="":st.e.sichtweite=0;st.e.schatten=false
 	einstellungen_anwenden()
+	if welt.has_method("viertel_jetzt"):
+		# Stadt um den Spieler noch unter dem Ladebildschirm aufbauen (sonst stehen erst nur Fern-Klötze da
+		# und das Nachladen ruckelt direkt nach dem Start)
+		var sp=Vector2(spieler.global_position.x,spieler.global_position.z);var nah=[]
+		for v in welt.VIERTEL:
+			if v.node==null and welt._rect_abst(v.rect,sp)<v.ab:nah.append(v)
+		nah.sort_custom(func(a,b):return welt._rect_abst(a.rect,sp)<welt._rect_abst(b.rect,sp))
+		for i in nah.size():
+			var v=nah[i]
+			if v.node!=null:continue
+			if v.baut:v.weg_jetzt=true
+			_lade("Stadt wird aufgebaut … %d/%d"%[i+1,nah.size()],0.95+0.04*i/max(nah.size(),1))
+			await get_tree().process_frame
+			if v.laed:v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
+			else:v.node=load(v.datei).instantiate()
+			welt.puffer_setzen(v.node);welt.add_child(v.node)
+		_log("viertel ok %d"%nah.size())
+		# ein paar Bilder hinter dem Ladebildschirm zeichnen: Shader werden jetzt übersetzt, nicht im Spiel
+		_lade("Gleich geht's los …",0.99)
+		for k in 6:await get_tree().process_frame
+		_log("vorgerendert")
 	lade.queue_free()
 	hud.visible=true;mini.visible=true
 	bereit=true
 	_log("SPIEL LAEUFT")
 	hud.zeige("Willkommen in Radeberg!",4.0)
 	if test_modus!="":_testlauf()
+	if _arg("--startbild")!="":_startbild()
+
+func _startbild():
+	# Startprüfung: Bilder + geladene Viertel + längster Frame in den ersten 60 s
+	DirAccess.make_dir_recursive_absolute("/home/claude/shots_godot/start")
+	var t0=Time.get_ticks_msec();var maxms=0.0;var letzt=t0;var nr=0
+	while Time.get_ticks_msec()-t0<60000:
+		await get_tree().process_frame
+		var jetzt=Time.get_ticks_msec();maxms=max(maxms,jetzt-letzt);letzt=jetzt
+		if (jetzt-t0)/15000>nr-1 and nr<4:
+			var gel=0;var lad=0
+			for v in welt.VIERTEL:
+				if v.node!=null:gel+=1
+				if v.laed or v.baut:lad+=1
+			print("START t=",(jetzt-t0)/1000," s geladen ",gel," laedt ",lad," max frame ms ",maxms," pos ",spieler.global_position)
+			get_viewport().get_texture().get_image().save_png("/home/claude/shots_godot/start/t%d.png"%nr);nr+=1;maxms=0
+	get_tree().quit()
 
 func _arg(k:String)->String:
 	for a in OS.get_cmdline_user_args():
@@ -1250,7 +1288,7 @@ func _taxi(dt):
 # ---------------- Speichern / Laden ----------------
 func speichern():
 	var p=spieler.global_position
-	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z],"missionen":mis.erledigt.keys(),"kampf":kampf.daten(),"wirt":wirt.daten()}
+	var d={"geld":geld,"zeit":zeit,"outfit":spieler.outfit,"pos":[p.x,p.y,p.z],"welt_id":welt.get("WELT_ID") if "WELT_ID" in welt else "","missionen":mis.erledigt.keys(),"kampf":kampf.daten(),"wirt":wirt.daten()}
 	var f=FileAccess.open(SAVE,FileAccess.WRITE);f.store_string(JSON.stringify(d));f.close()
 
 func laden():
