@@ -362,7 +362,7 @@ func _spieler():
 	# Knöpfe und Karte erst zeigen, wenn der Ladebildschirm weg ist
 	if lade!=null and is_instance_valid(lade):hud.visible=false;mini.visible=false;ui.move_child(lade,-1)
 	if "comic" in welt:
-		mini.strassen=welt.S.roads;mini.icons=[]
+		mini.strassen=welt.S.roads;mini.kreuzungen=welt.S.junctions;mini.icons=[]
 		for s in welt.A.shops:mini.icons.append({"typ":s.typ,"x":s.c.x,"z":s.c.y})
 		for im in welt.get("IMMO") if welt.get("IMMO")!=null else []:mini.icons.append({"typ":im.art,"x":im.p.x,"z":im.p.z})
 		for d in welt.get("DIENSTE") if welt.get("DIENSTE")!=null else []:mini.icons.append({"typ":d.art,"x":d.p.x,"z":d.p.y})
@@ -1113,7 +1113,7 @@ func karte_oeffnen(teleport:=false):
 	var p=(auto if auto else spieler).global_position
 	k.player=Vector2(p.x,p.z);k.player_dir=kam.blick_yaw()
 	if "comic" in welt:
-		k.strassen=welt.S.roads;k.stadt=welt.B.rect;k.zoom=14.0;k.mitte_w=k.player
+		k.strassen=welt.S.roads;k.kreuzungen=welt.S.junctions;k.stadt=welt.B.rect;k.zoom=14.0;k.mitte_w=k.player
 	ui.add_child(k);panel=k
 	if "comic" in welt:
 		k.icons=[]

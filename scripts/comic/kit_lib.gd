@@ -147,6 +147,7 @@ func aufstellen(ziel:Node3D,platz:Array,feld:=100.0,sicht:=260.0,lod_sicht:=1600
 			elif kn.begins_with("nt_busch") or kn.begins_with("nt_totholz"):mmi.visibility_range_end=150.0
 			elif kn.begins_with("nt_eiche") or kn.begins_with("nt_birke") or kn.begins_with("nt_tanne") or kn.begins_with("nt_kiefer"):mmi.visibility_range_end=135.0
 			elif kn.begins_with("nt_fels"):mmi.visibility_range_end=600.0
+			elif kn.begins_with("kn_"):mmi.visibility_range_end=700.0   # Gefängnis: große Teile, von weitem sichtbar
 			n_mm+=1
 			if k.get("ink")!=null:
 				var mi2=MultiMesh.new();mi2.transform_format=MultiMesh.TRANSFORM_3D;mi2.mesh=k.ink;mi2.instance_count=xs.size();mi2.buffer=buf

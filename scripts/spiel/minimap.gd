@@ -43,6 +43,7 @@ func _punkt(p:Vector2,c:Color,r:float):
 	if d.length()<R-4:draw_circle(q,r,Color(0,0,0,0.8));draw_circle(q,r-1.5,c)
 
 var strassen:=[]
+var kreuzungen:=[]
 func _draw():
 	# Straßen der Comic-Welt als Linien (Bild der Grundkarte hat nur Gelände)
 	for st in strassen:
@@ -53,6 +54,10 @@ func _draw():
 			var q=w2m(P[i])
 			pts.append(Vector2(R,R)+(q-Vector2(R,R)).limit_length(R-3))
 		if pts.size()>1:draw_polyline(pts,Color(0.99,0.8,0.3) if st.typ=="autobahn" else Color(0.98,0.97,0.94),max(st.w*2.0/zoom*R,2.0))
+	for j in kreuzungen:
+		if j.p.distance_to(mitte)>zoom:continue
+		var q=w2m(j.p)
+		if (q-Vector2(R,R)).length()<R-3:draw_circle(q,max(j.r/zoom*R,1.0),Color(0.98,0.97,0.94))
 	draw_arc(Vector2(R,R),R,0,TAU,64,Color(0,0,0,0.85),5.0)
 	# Symbole: nur was im Kreis liegt; Zuhause und Werkstatt bleiben am Rand sichtbar (Richtung)
 	for i in icons:

@@ -18,12 +18,40 @@ func start(sp):
 	var nur=spiel._arg("--nur")
 	if nur=="figur":await _figur();get_tree().quit();return
 	if nur=="punkt":
-		var q=Vector2(1982.6,-9101.3);spiel.welt.viertel_jetzt(q);spiel.spieler.global_position=Vector3(q.x,_boden(q)+80,q.y)
+		var pa=spiel._arg("--punkt").split(",");var q=Vector2(float(pa[0]),float(pa[1])) if pa.size()>=2 else Vector2(1982.6,-9101.3);spiel.welt.viertel_jetzt(q);spiel.spieler.global_position=Vector3(q.x,_boden(q)+80,q.y)
 		for k in 30:await get_tree().process_frame
 		await get_tree().create_timer(3.0).timeout
 		var hq=_boden(q)
-		cam.look_at_from_position(Vector3(q.x,hq+2.0,q.y),Vector3(q.x+60,hq+2.0,q.y+30));cam.current=true
+		var nv=0
+		for m in get_tree().root.find_children("nd_villa_*","MultiMeshInstance3D",true,false):
+			if m.name.ends_with("ink"):continue
+			for i in m.multimesh.instance_count:
+				var gx=m.global_transform*m.multimesh.get_instance_transform(i)
+				if Vector2(gx.origin.x,gx.origin.z).distance_to(q)<300 and nv<8:
+					nv+=1;var hs=[]
+					for o in [Vector3(0,0,-16),Vector3(-8,0,-8),Vector3(8,0,-24),Vector3(-8,0,-24)]:
+						var w=gx*o;hs.append([snappedf(_boden(Vector2(w.x,w.z))-gx.origin.y,0.01),snappedf(spiel.welt.G.h_at(w.x,w.z)-gx.origin.y,0.01)])
+					print("VILLA y ",gx.origin.y," boden-diff ",hs)
+		var vs=spiel._arg("--verstecke")
+		if vs!="":
+			for n in get_tree().root.find_children(vs,"",true,false):n.visible=false;print("VERSTECKT ",n.get_path())
+		var ri=Vector2(60,30) if pa.size()<4 else Vector2(float(pa[2]),float(pa[3]))
+		cam.look_at_from_position(Vector3(q.x,hq+2.0,q.y),Vector3(q.x+ri.x,hq+4.0,q.y+ri.y));cam.current=true
 		await _foto("Punkt_boden")
+		for px in [Vector2(1000,280),Vector2(1300,60),Vector2(250,380)]:
+			var o=cam.project_ray_origin(px);var d=cam.project_ray_normal(px)
+			for m in get_tree().root.find_children("*","GeometryInstance3D",true,false):
+				if not m.is_visible_in_tree():continue
+				if m is MultiMeshInstance3D:
+					var mm=m.multimesh;if mm.mesh==null:continue
+					var ab=mm.mesh.get_aabb()
+					for i in mm.instance_count:
+						var gx=m.global_transform*mm.get_instance_transform(i)
+						var a2=gx*ab
+						if a2.intersects_segment(o,o+d*80.0):print("TREFFER ",px," MMI ",m.get_path()," inst ",i," pos ",gx.origin," aabb ",a2.size)
+				elif m is MeshInstance3D:
+					var a2=m.global_transform*m.get_aabb()
+					if a2.intersects_segment(o,o+d*80.0):print("TREFFER ",px," MESH ",m.get_path()," ",m.mesh.surface_get_material(0).resource_path if m.mesh and m.mesh.get_surface_count()>0 and m.mesh.surface_get_material(0) else (m.material_override.resource_path if m.material_override else "-")," ",a2.size)
 		print("DC boden ",RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)," tri ",RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
 		cam.look_at_from_position(Vector3(q.x-120,hq+70.0,q.y-120),Vector3(q.x,hq,q.y))
 		await _foto("Punkt_luft")

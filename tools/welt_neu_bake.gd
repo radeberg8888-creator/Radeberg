@@ -26,6 +26,7 @@ var AB:=[];var RAMPEN:=[]
 var ALLE_ALLE:=[]   # alle Stadtflächen (für die Karte: hellgrau)
 var ALLE_FL:=[]     # bebaute Stadtflächen (Fassadenblöcke, Hafen, Industrie, Flughafen; lokal) – Natur bleibt draußen
 var N               # natur_lib
+var KN              # knast_lib (Gefängnis)
 var NATUR_ORTE:=[]  # {art, p (Welt), yaw}
 var NATUR_FERN:=[] # [kit, Transform3D Welt] dünner Fernwald (immer geladen)
 # Raster über STADT (10 m): Stadtfläche (nahe Straße, Land), Wasser
@@ -984,6 +985,14 @@ func _ebnen(NL,mitte:Vector2,r:float,h:float,rand:float):
 			if t>=1.0:continue
 			NL.TH[j]=lerp(h,cur,t);NL.HS[j]=NL.TH[j]
 func _natur_orte(NL):
+	# Gefängnis (JVA) mitten auf der freigehaltenen Fläche im Norden
+	var kn:Vector2=NL.ORTE.knast[0];var hk=NL.hs_welt(kn.x,kn.y)
+	_ebnen(NL,kn,150.0,hk,60.0)
+	for e in KN.anlage():
+		var xf:Transform3D=e[1]
+		NL.PLATZ.append([e[0],Transform3D(xf.basis,Vector3(kn.x-C.x+xf.origin.x,hk-NL.H0-0.1,kn.y-C.y+xf.origin.z))])
+	SONDER_FREI.append([kn,150.0])
+	NATUR_ORTE.append({"art":"knast","p":[kn.x,hk,kn.y],"yaw":0.0})
 	# Jagdhütten im Wald, eine große versteckte Cannabisplantage, Strandvillen mit Bootssteg
 	var t0=Time.get_ticks_msec();var rng=N.rng
 	var grund={}
@@ -1073,6 +1082,7 @@ func _norden()->Dictionary:
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
 	NL.zwischenstrassen();NL.kreuzungen();NL.kits_bauen();NL.sonderorte()
 	N=load("res://scripts/comic/natur_lib.gd").new(L,K,G0);N.kits_bauen()
+	KN=load("res://scripts/comic/knast_lib.gd").new(L,K);KN.kits_bauen()
 	for e in [["polizei",Vector2(1760,-5900)],["feuerwehr",Vector2(1900,-7650)]]:NL.dienst_reservieren(e[0],e[1])
 	var dn=JSON.parse_string(FileAccess.get_file_as_string("res://assets/data/karte_nord.json"))
 	var hs=[];for h in dn.houses:hs.append(Vector2(h[0],h[1]))
@@ -1107,9 +1117,16 @@ func _norden()->Dictionary:
 			var n=Node3D.new();n.name="Nord_%d_%d"%[key.x,key.y];n.position=Vector3(CX,H0,CZ);T[key]=n
 		return T[key]
 	var schl=func(v:Vector3)->Vector2i:return Vector2i(int(floor(v.x/KACHEL)),int(floor(v.z/KACHEL)))
+	# Norden-Geometrie (Platten, Ränder, Mauern) hat in der Stadt nichts zu suchen – dort baut die Stadt selbst.
+	# Früher fiel sie weg, weil es dort keine Nord-Kacheln gab; seit dem Stadtgrün gibt es welche -> schwebende Platten.
+	var in_stadt=func(key:Vector2i)->bool:return STADT.grow(-20.0).has_point(Vector2(key)*KACHEL+C+Vector2(KACHEL,KACHEL)*0.5)
+	var weg=0
 	for c in flach.get_children():
 		var teile=c.name.split("_");var key=Vector2i(int(teile[teile.size()-2]),int(teile[teile.size()-1]))
-		flach.remove_child(c);kachel.call(key).add_child(c)
+		flach.remove_child(c)
+		if in_stadt.call(key):c.free();weg+=1;continue
+		kachel.call(key).add_child(c)
+	print("NORD Geometrie in der Stadt verworfen ",weg)
 	flach.free();L.welt=alt_w
 	var PL={}
 	for p in NL.PLATZ:
@@ -1119,6 +1136,7 @@ func _norden()->Dictionary:
 	var KK={}
 	for i in range(0,KF.size(),3):
 		var key=schl.call((KF[i]+KF[i+1]+KF[i+2])/3.0)
+		if in_stadt.call(key):continue
 		if not KK.has(key):KK[key]=PackedVector3Array()
 		KK[key].append_array([KF[i],KF[i+1],KF[i+2]])
 	var PK={}
@@ -1275,6 +1293,7 @@ func _gelaende_und_daten(ND:Dictionary):
 				continue
 			var thn=NO.TH[j]
 			if not is_nan(thn):H[j]=thn
+	_grundstuecke_ebnen(H,NO,nx,nz,X0,Z0,ST)
 	HG=H
 	_gelaende(H,nx,nz,X0,Z0,ST)
 	_natur_fern()
@@ -1486,3 +1505,35 @@ func _karte_bild(H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float):
 	img.resize(2460,3999,Image.INTERPOLATE_BILINEAR)
 	img.save_png("res://assets/ui/karte_basis.png")
 	print("KARTE Grundbild gespeichert")
+
+func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float):
+	# Jedes Grundstück im Norden (Villa, Haus, Trailer …) liegt eben auf seiner Bausatz-Höhe: Gitterpunkte im
+	# Grundstück (+3 m) genau darunter, ein 12-m-Rand weich angeglichen. Vorher konnte das Gelände bis 2 m
+	# über/unter der Bodenplatte liegen (Figur sank durch die Terrasse).
+	var n=0;var gew=PackedFloat32Array();gew.resize(nx*nz);gew.fill(0.0)
+	var ziel=PackedFloat32Array();ziel.resize(nx*nz)
+	for t in NO.TERR:
+		var poly=PackedVector2Array()
+		for e in t[0]:poly.append(e+NO.C)
+		var h:float=t[1]-0.22
+		var gross=Geometry2D.offset_polygon(poly,3.0)
+		if gross.is_empty():continue
+		var pg:PackedVector2Array=gross[0]
+		var bb=Rect2(pg[0],Vector2.ZERO)
+		for q in pg:bb=bb.expand(q)
+		bb=bb.grow(12.0)
+		for k in range(max(int((bb.position.y-Z0)/ST),0),min(int((bb.end.y-Z0)/ST)+2,nz)):
+			for i in range(max(int((bb.position.x-X0)/ST),0),min(int((bb.end.x-X0)/ST)+2,nx)):
+				var w=Vector2(X0+i*ST,Z0+k*ST);var j=k*nx+i
+				if STADT.has_point(w):continue
+				var g:float
+				if Geometry2D.is_point_in_polygon(w,pg):g=1.0
+				else:
+					var d=1e9
+					for a in pg.size():d=min(d,Geometry2D.get_closest_point_to_segment(w,pg[a],pg[(a+1)%pg.size()]).distance_to(w))
+					g=1.0-smoothstep(0.0,12.0,d)
+				if g>gew[j]:gew[j]=g;ziel[j]=h
+		n+=1
+	for j in nx*nz:
+		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
+	print("GRUNDSTUECKE geebnet ",n)

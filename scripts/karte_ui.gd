@@ -42,6 +42,7 @@ func w2m(p:Vector2)->Vector2:
 func m2w(p:Vector2)->Vector2:
 	var r=map_rect();return mitte_w+(p-r.position-r.size*0.5)/_skala()
 
+var kreuzungen:=[]
 func _draw():
 	if mitte_w==null:mitte_w=player if zoom>1.5 else Vector2(X0+WX*0.5,Z0+WZ*0.5)
 	draw_rect(Rect2(Vector2.ZERO,get_viewport_rect().size),Color(0.2,0.42,0.6))
@@ -61,6 +62,10 @@ func _draw():
 			var bw=max(st.w*2.0*sk,2.0 if st.typ!="autobahn" else 3.5)
 			if pass_==0:draw_polyline(pts,Color(0.1,0.08,0.09),bw+3.0)
 			else:draw_polyline(pts,Color(0.99,0.78,0.25) if st.typ=="autobahn" else (Color(0.97,0.95,0.9) if st.typ!="rampe" else Color(0.95,0.85,0.6)),bw)
+		# Kreuzungen als Scheiben: die Straßenstücke enden kurz vor der Kreuzung, sonst sähe das Netz zerstückelt aus
+		for j in kreuzungen:
+			var jr=max(j.r*sk,1.2 if pass_==1 else 2.7)
+			draw_circle(w2m(j.p),jr+(1.5 if pass_==0 else 0.0),Color(0.1,0.08,0.09) if pass_==0 else Color(0.97,0.95,0.9))
 	for i in icons:
 		var p=w2m(Vector2(i.x,i.z))
 		if r.has_point(p):icon(p,i.typ,15.0)

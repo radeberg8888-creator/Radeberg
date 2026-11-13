@@ -854,17 +854,8 @@ func plateaus():
 	var wf=ORTE.wflug[0];_plateau(wf,520,90,hs_welt(wf.x,wf.y))
 func sonderorte():
 	var n0=PLATZ.size()
-	# Gefängnis: ovale Mauer mit Wachtürmen, drei Zellenblöcke, Hof
-	var kn=ORTE.knast[0];var hk=hs_welt(kn.x,kn.y)
-	KNAST_WAND=[kn,230.0,190.0,hk]
-	for a in range(0,360,45):
-		var p=kn+Vector2(cos(deg_to_rad(a))*236,sin(deg_to_rad(a))*196);_platz_bei("nd_wachturm",p,0.0,hk)
-	for k in 3:_platz_bei("nd_zellen",kn+Vector2(-60+k*60,-70+k*10),0.0,hk)
-	_platz_bei("nd_kaserne",kn+Vector2(0,80),PI,hk)
-	_platz_bei("nd_knast_haupt",kn+Vector2(0,-130),0.0,hk)
-	_platz_bei("nd_sporthof",kn+Vector2(-110,20),0.0,hk);_platz_bei("nd_sporthof",kn+Vector2(110,20),0.0,hk)
-	_platz_bei("nd_torhaus",kn+Vector2(0,175),0.0,hk)
-	for k in 2:_platz_bei("nd_zellen",kn+Vector2(-150+k*300,-60),0.0,hk)
+	# Gefängnis: kommt jetzt komplett aus knast_lib (Bake setzt es); hier nur die Fläche freihalten
+	var kn=ORTE.knast[0]
 	# Militärflugplatz: Kasernen, Hangars, Jets, Panzer, Radar, Tower
 	var mi=ORTE.militaer[0];var hm=hs_welt(mi.x,mi.y-20)
 	for k in 4:_platz_bei("fl_hangar",mi+Vector2(-500+k*90,-80),0.0,hm)
