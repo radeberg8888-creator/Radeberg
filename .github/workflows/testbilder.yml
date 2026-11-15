@@ -1,0 +1,71 @@
+name: Testbilder (ohne Release)
+
+# Baut die Welt wie der APK-Lauf, macht aber nur Prüfbilder + Messwerte und lädt sie als Artefakt hoch.
+# Läuft auf dem Zweig "test" (kein Release, kein APK) oder per Hand.
+on:
+  push:
+    branches: [ test ]
+  workflow_dispatch:
+    inputs:
+      nur:
+        description: "Galerie-Auswahl (--nur=...)"
+        default: "nord"
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  bilder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Speicherplatz freimachen
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+
+      - name: Godot (Cache)
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}
+
+      - name: Godot herunterladen
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip && rm Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+
+      - name: Importieren und Welt bauen
+        run: |
+          sudo apt-get install -y xvfb > /dev/null 2>&1 || true
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          mkdir -p build
+          (timeout 7000 $GODOT --headless --path . --import || true) > build/import.log 2>&1
+          (timeout 3000 $GODOT --headless --path . --import || true) >> build/import.log 2>&1
+          timeout 1800 xvfb-run -a -s "-screen 0 640x480x24" $GODOT --rendering-method gl_compatibility --rendering-driver opengl3 --path . -s tools/comic_autos_bake.gd > build/autos.log 2>&1 || true
+          timeout 5400 $GODOT --headless --path . -s tools/welt_neu_bake.gd > build/bake.log 2>&1 || true
+          grep -E "ZEIT|NORD|NATUR|STRASSEN|GRUNDST|SCRIPT ERROR" build/bake.log | head -40
+          (timeout 1200 $GODOT --headless --path . --import || true) > build/import2.log 2>&1
+
+      - name: Prüfbilder rendern
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          export GALERIE_OUT=$PWD/build/testbilder/
+          mkdir -p $GALERIE_OUT
+          NUR="${{ github.event.inputs.nur }}"; [ -z "$NUR" ] && NUR=nord
+          timeout 3000 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 || true
+          grep -E "MESS|NORD Orte|SCRIPT ERROR" build/galerie.log | head -80
+          cp build/galerie.log build/bake.log $GALERIE_OUT/ || true
+          ls $GALERIE_OUT | wc -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testbilder
+          path: build/testbilder/
+          retention-days: 7

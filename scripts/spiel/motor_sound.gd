@@ -1,11 +1,14 @@
 extends Node
-# Motorsound aus zwei Schleifen je Fahrzeugklasse (Leerlauf / hohe Drehzahl, tools/sounds_gen.py),
-# Tonhöhe folgt der Drehzahl, Gangwechsel, Überblendung zwischen den Schleifen. Dazu Hupe.
+# Motorsound aus fünf Drehzahl-Schleifen je Fahrzeugklasse (tools/sounds_gen.py stufen): zwischen den zwei
+# nächsten Stufen wird überblendet und nur leicht umgepitcht – starkes Umpitchen einer Leerlauf-Schleife
+# klang hoch gedreht wie ein Elektromotor. Gangwechsel, Last. Dazu Hupe.
 const KLASSE:={"c_jdm":"vier","c_kompakt":"vier","c_e30":"vier","c_luxus":"v8","c_muscle":"v8","c_suv":"diesel","c_trabant":"trabant","c_wartburg":"wartburg","c_taxi":"vier","c_polizei":"vier","c_sport":"v8","c_rtw":"diesel","c_feuerwehr":"diesel"}
 const DREH:={"trabant":[900.0,4500.0,4],"wartburg":[850.0,4800.0,4],"vier":[800.0,6000.0,5],"v8":[850.0,7500.0,6],"diesel":[650.0,2600.0,5],
 	"turbo6":[900.0,7800.0,5],"reihe6":[850.0,7000.0,5],"kompakt4":[900.0,6800.0,5],"v8leise":[650.0,6000.0,6],"v8gross":[750.0,6500.0,4],"v6diesel":[700.0,4500.0,6]}
 const VMAX:={"trabant":125.0,"wartburg":145.0,"vier":180.0,"v8":290.0,"diesel":120.0,"turbo6":235.0,"reihe6":205.0,"kompakt4":180.0,"v8leise":215.0,"v8gross":225.0,"v6diesel":175.0}
 var lo:AudioStreamPlayer;var hi:AudioStreamPlayer;var horn:AudioStreamPlayer
+var st:=[]          # 5 Stufen-Spieler
+var st_rpm:=[]      # Drehzahl je Stufe
 var klasse:=""
 var rpm:=800.0
 var lautst:=0.0
@@ -28,6 +31,8 @@ static func schleife(name:String)->AudioStream:
 func _ready():
 	lo=AudioStreamPlayer.new();hi=AudioStreamPlayer.new();horn=AudioStreamPlayer.new()
 	for p in [lo,hi,horn]:add_child(p)
+	for i in 5:
+		var sp=AudioStreamPlayer.new();add_child(sp);st.append(sp)
 	var g=AudioStreamGenerator.new();g.mix_rate=22050
 	horn.stream=_hupton()
 
@@ -35,6 +40,12 @@ func waehle(kind:String):
 	var k=klasse_von(kind)
 	if k==klasse:return
 	klasse=k;lo.stream=schleife("motor_%s_leer"%k);hi.stream=schleife("motor_%s_hoch"%k)
+	st_rpm=[]
+	if ResourceLoader.exists("res://assets/sounds/motor_%s_s0.wav"%k):
+		var d=DREH.get(k,DREH.vier)
+		for i in 5:
+			st[i].stream=schleife("motor_%s_s%d"%[k,i]);st[i].stop()
+			st_rpm.append(d[0]*pow(d[1]*0.9/d[0],i/4.0))
 
 func setze(kmh:float,gas:float,an:bool):
 	if klasse=="":waehle("c_trabant")
@@ -45,6 +56,22 @@ func setze(kmh:float,gas:float,an:bool):
 	var ziel=leer+(maxr-leer)*(0.28+0.72*f)*(0.8+0.2*float(gi)/gaenge) if kmh>3.0 else leer+gas*(maxr*0.5-leer)
 	rpm=lerp(rpm,ziel,0.18)
 	lautst=lerp(lautst,(0.55+gas*0.45) if an else 0.0,0.12)
+	if st_rpm.size()==5:
+		# zwei benachbarte Stufen, Überblendung im Logarithmus der Drehzahl
+		var i=0
+		while i<3 and rpm>st_rpm[i+1]:i+=1
+		var ff=clamp((log(rpm)-log(st_rpm[i]))/(log(st_rpm[i+1])-log(st_rpm[i])),0.0,1.0)
+		for j in 5:
+			var w=(1.0-ff) if j==i else (ff if j==i+1 else 0.0)
+			var p:AudioStreamPlayer=st[j]
+			p.pitch_scale=clamp(rpm/st_rpm[j],0.5,2.0)
+			p.volume_db=linear_to_db(max(lautst*sqrt(w)*(0.85+0.15*gas),0.0001))-10.0
+			if an and w>0.001 and not p.playing:p.play(randf()*0.5)
+			elif (w<=0.001 or not an) and p.playing and lautst<0.01:p.stop()
+		if lo.playing:lo.stop();hi.stop()
+		if not an and lautst<0.01:
+			for p in st:p.stop()
+		return
 	var hoch_r=maxr*0.65
 	var m=clamp((rpm-leer)/(hoch_r-leer),0.0,1.0)
 	lo.pitch_scale=clamp(rpm/leer,0.5,4.0);hi.pitch_scale=clamp(rpm/hoch_r,0.3,2.5)

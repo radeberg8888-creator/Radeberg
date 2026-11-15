@@ -2,7 +2,7 @@ extends Node
 # Bilder-Rundgang für den Spieler: jedes Viertel auf einer echten Straße (Fahrerhöhe + Luftbild),
 # Bahnübergang mit Zug, große Karte mit Legende. Aufruf: --test=galerie [--nur=a,b]
 var spiel
-const OUT:="/home/claude/shots_godot/galerie/"
+var OUT:="/home/claude/shots_godot/galerie/"
 const ORTE:=[["Innenstadt",Vector2(250,-350)],["Altstadt",Vector2(-150,-650)],["Nordstadt",Vector2(496,-168)],["Oststadt",Vector2(2550,850)],
 	["Suedstadt",Vector2(250,1560)],["Ghetto",Vector2(-262,1040)],["Strand",Vector2(-2300,700)],["Industrie",Vector2(900,640)],
 	["Docks",Vector2(500,2090)],["Wohnviertel_West",Vector2(-1083,-504)],["Sonnenhuegel",Vector2(-150,-1450)],["Ostvorort",Vector2(2900,-300)],
@@ -11,12 +11,14 @@ var cam:Camera3D
 
 func start(sp):
 	spiel=sp
+	if OS.get_environment("GALERIE_OUT")!="":OUT=OS.get_environment("GALERIE_OUT")
 	DirAccess.make_dir_recursive_absolute(OUT)
 	await get_tree().create_timer(2.0).timeout
 	cam=Camera3D.new();cam.far=4000;cam.fov=62;spiel.add_child(cam)
 	spiel.ui.visible=false;spiel.zeit=11.0*60.0;spiel.st.e.sichtweite=2;spiel.st.e.schatten=true;spiel.einstellungen_anwenden()
 	var nur=spiel._arg("--nur")
 	if nur=="figur":await _figur();get_tree().quit();return
+	if nur=="nord":await _nordstaedte();get_tree().quit();return
 	if nur=="punkt":
 		var pa=spiel._arg("--punkt").split(",");var q=Vector2(float(pa[0]),float(pa[1])) if pa.size()>=2 else Vector2(1982.6,-9101.3);spiel.welt.viertel_jetzt(q);spiel.spieler.global_position=Vector3(q.x,_boden(q)+80,q.y)
 		for k in 30:await get_tree().process_frame
@@ -195,3 +197,80 @@ func _natur():
 	# Landstraße im Norden + Waldrand
 	for e in [["Land_Wald",Vector2(-400,-4200)],["Land_Hang",Vector2(1200,-6500)],["Land_Kueste",Vector2(-3000,-3000)]]:
 		await _ort(e[0],e[1])
+
+# ---------- Prüfung der Orte im Norden: 5 Bilder je Ort + Messung Gelände gegen Straße ----------
+func _nordstaedte():
+	var S=spiel.welt.S;var G=spiel.welt.G
+	var stadt:Rect2=spiel.welt.B.rect
+	# Ortsstraßen außerhalb der Stadt zu Orten zusammenfassen (Zellen 300 m, Nachbarn verbinden)
+	var zellen={}
+	for ri in S.roads.size():
+		var r=S.roads[ri]
+		if r.typ in ["autobahn","rampe","strasse","land"] or r.P.size()<2:continue
+		var m:Vector2=r.P[r.P.size()/2]
+		if stadt.grow(150).has_point(m):continue
+		var k=Vector2i(int(floor(m.x/300.0)),int(floor(m.y/300.0)))
+		if not zellen.has(k):zellen[k]=[]
+		zellen[k].append(ri)
+	var orte=[];var gesehen={}
+	for k in zellen:
+		if gesehen.has(k):continue
+		var stapel=[k];var ro=[];gesehen[k]=true
+		while not stapel.is_empty():
+			var c=stapel.pop_back();ro.append_array(zellen[c])
+			for d in [Vector2i(1,0),Vector2i(-1,0),Vector2i(0,1),Vector2i(0,-1),Vector2i(1,1),Vector2i(-1,-1),Vector2i(1,-1),Vector2i(-1,1)]:
+				if zellen.has(c+d) and not gesehen.has(c+d):gesehen[c+d]=true;stapel.append(c+d)
+		if ro.size()>=5:orte.append(ro)
+	print("NORD Orte gefunden ",orte.size())
+	var nr=0
+	for ro in orte:
+		nr+=1
+		var sum=Vector2.ZERO;var n=0
+		for ri in ro:sum+=S.roads[ri].P[S.roads[ri].P.size()/2];n+=1
+		var mitte=sum/n
+		# Messung: Gelände über Fahrbahn (sticht durch) / Fahrbahn über Gelände (man kann drunter)
+		var ueber=0.0;var unter=0.0;var wo_u=Vector2.ZERO;var wo_d=Vector2.ZERO
+		for ri in ro:
+			var r=S.roads[ri]
+			for i in r.P.size():
+				var p:Vector2=r.P[i];var t:Vector2=r.T[i] if i<r.T.size() else Vector2(1,0);var nn=Vector2(-t.y,t.x)
+				for q in [-0.9,-0.45,0.0,0.45,0.9]:
+					var w=p+nn*r.w*q;var g=G.h_at(w.x,w.y)-float(r.h[i])
+					if g>ueber:ueber=g;wo_u=w
+					if -g>unter:unter=-g;wo_d=w
+		print("MESS Ort %d bei (%d,%d): Strassen %d  Gelaende ueber Fahrbahn max %.2f m bei %s  Fahrbahn ueber Gelaende max %.2f m bei %s"%[nr,mitte.x,mitte.y,ro.size(),ueber,str(wo_u.round()),unter,str(wo_d.round())])
+		# 3 Straßenbilder (Mitte, zwei Enden), schräg von oben, Luftbild
+		var ausw=[]
+		var bm=-1;var bd=1e9
+		for ri in ro:
+			var d=S.roads[ri].P[S.roads[ri].P.size()/2].distance_to(mitte)
+			if d<bd:bd=d;bm=ri
+		ausw.append(bm)
+		var fern=-1;var fd=-1.0
+		for ri in ro:
+			var d=S.roads[ri].P[S.roads[ri].P.size()/2].distance_to(mitte)
+			if d>fd:fd=d;fern=ri
+		ausw.append(fern)
+		var dritte=-1;var dd=-1.0
+		for ri in ro:
+			var m=S.roads[ri].P[S.roads[ri].P.size()/2]
+			var d=min(m.distance_to(mitte),m.distance_to(S.roads[fern].P[S.roads[fern].P.size()/2]))
+			if d>dd:dd=d;dritte=ri
+		ausw.append(dritte)
+		spiel.welt.viertel_jetzt(mitte)
+		var k=0
+		for ri in ausw:
+			k+=1
+			var r=S.roads[ri];var i=r.P.size()/2;var p:Vector2=r.P[i];var t:Vector2=r.T[i]
+			spiel.welt.viertel_jetzt(p)
+			spiel.spieler.global_position=Vector3(p.x,float(r.h[i])+60.0,p.y)
+			for f in 15:await get_tree().process_frame
+			await get_tree().create_timer(1.5).timeout
+			var h=float(r.h[i])
+			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
+			await _foto("Nord_%02d_%d_strasse"%[nr,k])
+		var hm=G.h_at(mitte.x,mitte.y)
+		cam.look_at_from_position(Vector3(mitte.x-70,hm+28.0,mitte.y+70),Vector3(mitte.x,hm,mitte.y))
+		await _foto("Nord_%02d_4_schraeg"%nr)
+		cam.look_at_from_position(Vector3(mitte.x-160,hm+140.0,mitte.y+160),Vector3(mitte.x,hm,mitte.y))
+		await _foto("Nord_%02d_5_luft"%nr)

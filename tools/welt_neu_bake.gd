@@ -1294,6 +1294,7 @@ func _gelaende_und_daten(ND:Dictionary):
 			var thn=NO.TH[j]
 			if not is_nan(thn):H[j]=thn
 	_grundstuecke_ebnen(H,NO,nx,nz,X0,Z0,ST)
+	_strassen_korridor(H,NO,nx,nz,X0,Z0,ST)
 	HG=H
 	_gelaende(H,nx,nz,X0,Z0,ST)
 	_natur_fern()
@@ -1537,3 +1538,35 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
 	print("GRUNDSTUECKE geebnet ",n)
+
+func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float):
+	# Zuletzt und mit Vorrang: jede Straße im Norden liegt in einem ebenen Band auf Fahrbahnhöhe.
+	# Das Band reicht eine ganze Rasterzelle (10 m) über Fahrbahn + Gehweg hinaus – nur so liegen alle vier
+	# Gitterpunkte um jeden Punkt der Fahrbahn auf Straßenhöhe und das Gelände kann weder durch den Belag
+	# stechen noch darunter absacken. Danach eine Böschung/ein Einschnitt zum Gelände.
+	var best={}   # j -> [abstand, y, kern, R]
+	for r in NO.ROADS:
+		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
+		var wk:float=r.w+r.sw;var kern=wk+ST*1.05
+		for i in P.size()-1:
+			var a=P[i]+NO.C;var b=P[i+1]+NO.C;var lg=a.distance_to(b);var s=0.0
+			while s<=lg:
+				var p=a.lerp(b,s/max(lg,0.01));var y=lerp(Y[i],Y[i+1],s/max(lg,0.01))+NO.H0
+				s+=3.0
+				if STADT.has_point(p):continue
+				var dh=abs(y-G0._bilin(H,p.x,p.y))
+				var R=kern+(14.0 if r.stadt else clamp(dh*2.5+10.0,16.0,70.0))
+				for k in range(max(int((p.y-R-Z0)/ST),0),min(int((p.y+R-Z0)/ST)+2,nz)):
+					for ii in range(max(int((p.x-R-X0)/ST),0),min(int((p.x+R-X0)/ST)+2,nx)):
+						var w=Vector2(X0+ii*ST,Z0+k*ST);var d=w.distance_to(p)
+						if d>R:continue
+						var j=k*nx+ii
+						if not best.has(j) or best[j][0]>d:best[j]=[d,y,kern,R]
+	var n=0
+	for j in best:
+		var e=best[j];var d:float=e[0];var y:float=e[1]-0.15
+		if NO.WASSER[j]==1 and H[j]<0.0 and d>e[2]-ST:continue   # Brücken: kein Damm im Wasser
+		if d<=e[2]:H[j]=y
+		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
+		n+=1
+	print("STRASSEN Korridor Zellen ",n)

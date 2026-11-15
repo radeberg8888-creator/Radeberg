@@ -192,7 +192,37 @@ def stadt(sek=60.0):
     y[:x] = y[:x] * w + y[-x:] * (1 - w); y = y[:-x]
     return norm(y, 0.5)
 
+STUFEN = 5
+def stufen_rpm(c):
+    # Drehzahlstufen für die Schleifen (geometrisch zwischen Leerlauf und 90 % Höchstdrehzahl)
+    return list(np.geomspace(c["leer"], c["hoch"] * 0.9, STUFEN))
+def demo_stufen(k, sek=8.0):
+    # Hörprobe genau wie im Spiel: Drehzahl steigt, zwischen den zwei nächsten Stufen überblenden,
+    # Tonhöhe je Stufe nur leicht angepasst (keine "Elektro"-Verzerrung durch starkes Umpitchen)
+    c = KLASSEN[k]; rs = stufen_rpm(c); loops = [motor_schleife(k, r) for r in rs]
+    n = int(sek * SR); out = np.zeros(n); t = np.arange(n) / SR
+    rpm = c["leer"] + (c["hoch"] * 0.92 - c["leer"]) * np.clip((t - 1.0) / (sek - 2.0), 0, 1) ** 1.3
+    pos = [0.0] * STUFEN
+    blk = 512
+    for a in range(0, n, blk):
+        r = rpm[a]; i = np.searchsorted(rs, r) - 1; i = int(np.clip(i, 0, STUFEN - 2))
+        f = np.clip((np.log(r) - np.log(rs[i])) / (np.log(rs[i + 1]) - np.log(rs[i])), 0, 1)
+        for j, w in ((i, 1 - f), (i + 1, f)):
+            if w < 0.001: pos[j] += blk * r / rs[j]; continue
+            L = loops[j]; st = r / rs[j]
+            idx = (pos[j] + np.arange(min(blk, n - a)) * st) % len(L)
+            out[a:a + len(idx)] += np.interp(idx, np.arange(len(L)), L) * np.sqrt(w)
+            pos[j] += blk * st
+    return norm(out, 0.85)
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "stufen":
+        for k, c in KLASSEN.items():
+            for i, r in enumerate(stufen_rpm(c)):
+                wav("motor_%s_s%d" % (k, i), motor_schleife(k, r))
+        for k, nm in [("v8gross", "musclecar_v8_neu"), ("v8", "sportwagen_v8_neu")]:
+            mp3(nm, demo_stufen(k))
+        sys.exit(0)
     for k, c in KLASSEN.items():
         wav("motor_%s_leer" % k, motor_schleife(k, c["leer"]))
         wav("motor_%s_hoch" % k, motor_schleife(k, c["hoch"] * 0.65))

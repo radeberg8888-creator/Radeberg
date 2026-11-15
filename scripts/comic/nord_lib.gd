@@ -381,10 +381,27 @@ func _wahl(st:String,typ:String)->String:
 	return KITLISTE["ghetto/busch"][0]
 
 # ---------------- Aufstellen mit Höhe und Terrasse ----------------
+var LOT:=PackedByteArray()   # 1 = Rasterpunkt liegt auf einem Grundstück (gelaende_ziel)
+func strasse_y(p:Vector2)->Array:   # [Abstand zur Mittellinie, Fahrbahnhöhe lokal, road] der nächsten Straße
+	var best=1e9;var res=[1e9,0.0,-1];var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)))
+	for rad in [0,1,2]:
+		for i in range(-rad,rad+1):
+			for j in range(-rad,rad+1):
+				if max(abs(i),abs(j))!=rad:continue
+				for sg in SEG.get(k+Vector2i(i,j),[]):
+					var r=ROADS[sg.x];var a:Vector2=r.P[sg.y];var b:Vector2=r.P[sg.y+1]
+					var t=clamp((p-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0);var f=a.lerp(b,t)
+					if p.distance_to(f)<best:best=p.distance_to(f);res=[best,lerp(r.Y[sg.y],r.Y[sg.y+1],t),sg.x]
+		if res[2]>=0 and rad>=1:break
+	return res
 func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	var k=K.KITS[kit]
 	var mitte=F+n*k.d*0.5
 	var h=hy(F)*0.6+hy(mitte)*0.4
+	# Grundstück an einer Straße: Vorderkante bündig mit der Fahrbahn (sonst schwebt die Einfahrt oder
+	# die Straße liegt im Hang) – wie in der Stadt
+	var sy=strasse_y(F)
+	if sy[2]>=0 and sy[0]<ROADS[sy[2]].w+ROADS[sy[2]].sw+8.0:h=sy[1]+0.1
 	var aussen=Vector3(-n.x,0,-n.y);var rechts=Vector3.UP.cross(aussen)
 	var xf=Transform3D(Basis(rechts,Vector3.UP,aussen),Vector3(F.x,h-0.14,F.y))
 	PLATZ.append([kit,xf])
@@ -1183,7 +1200,7 @@ func gelaende_ziel():
 		if dist[j]>4 or WASSER[j]==1 or not is_nan(TH[j]):continue
 		TH[j]=lerp(HS[j],NAT[j],smoothstep(0.0,4.0,float(dist[j])))
 	# 2) Grundstücks-Terrassen
-	var LOT=PackedByteArray();LOT.resize(GNX*GNZ)
+	LOT=PackedByteArray();LOT.resize(GNX*GNZ)
 	for e in TERR:
 		var P:Array=e[0];var h:float=e[1]
 		var mn=Vector2(INF,INF);var mx=-mn
