@@ -267,10 +267,11 @@ func _nordstaedte():
 		for ri in ausw:
 			k+=1
 			var r=S.roads[ri];var i=r.P.size()/2;var p:Vector2=r.P[i];var t:Vector2=r.T[i]
-			spiel.welt.viertel_jetzt(p)
 			spiel.spieler.global_position=Vector3(p.x,float(r.h[i])+60.0,p.y)
-			for f in 15:await get_tree().process_frame
-			await get_tree().create_timer(1.5).timeout
+			for rund in 3:
+				spiel.welt.viertel_jetzt(p)
+				for f in 15:await get_tree().process_frame
+				await get_tree().create_timer(1.5).timeout
 			var h=float(r.h[i])
 			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
 			await _foto("Nord_%02d_%d_strasse"%[nr,k])
