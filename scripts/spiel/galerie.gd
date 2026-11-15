@@ -316,49 +316,62 @@ func _messen(name:String):
 	print("STIL Leistung %s: %.1f ms/Bild (CI-Software-Grafik, nur Vergleich) DC %d Dreiecke %.2fM"%[name,ms,RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)/1e6])
 func _stilprobe():
 	var S=spiel.welt.S
-	# Szene 1: Hangstraße im Ort mit der Feuerwache (Nordosten), Szene 2: Innenstadt-Kreuzung
-	var ansichten=[]
-	var ri=_hang_strasse(Vector2(1752,-7559),600.0)
-	if ri<0:ri=_hang_strasse(Vector2(-2504,-8463),700.0)
-	var r=S.roads[ri];var i=r.P.size()/4
-	var p:Vector2=r.P[i];var t:Vector2=r.T[i]
-	if float(r.h[min(i+6,r.P.size()-1)])<float(r.h[i]):t=-t   # bergauf schauen
-	spiel.welt.viertel_jetzt(p)
-	var autos=_autos_parken(r,i+2 if t.dot(r.T[i])>0 else max(i-12,1),PROBE_AUTOS.slice(0,6))
-	var h=float(r.h[i]);var nn=Vector2(-t.y,t.x)
-	spiel.spieler.global_position=Vector3(p.x+t.x*4.0,h+0.2,p.y+t.y*4.0);spiel.spieler.rotation.y=atan2(-t.x,-t.y)
-	ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.6,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+5.0,p.y+t.y*40.0)])
-	var a0:Vector3=autos[0].global_position if autos.size()>0 else Vector3(p.x,h,p.y)
-	ansichten.append(["autos_nah",a0+Vector3(nn.x*-6.0-t.x*5.0,1.8,nn.y*-6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
-	ansichten.append(["ort_schraeg",Vector3(p.x-t.x*60.0+nn.x*40.0,h+30.0,p.y-t.y*60.0+nn.y*40.0),Vector3(p.x+t.x*30.0,h,p.y+t.y*30.0)])
-	# Innenstadt
-	var q=Vector2(250,-350);var best=null;var bd=1e9
-	for rr in S.roads:
-		if rr.typ in ["autobahn","rampe"]:continue
-		for k in range(2,rr.P.size()-2,3):
-			var d=rr.P[k].distance_to(q)
-			if d<bd:bd=d;best=[rr,k]
-	var r2=best[0];var k2:int=best[1];var p2:Vector2=r2.P[k2];var t2:Vector2=r2.T[k2];var h2=float(r2.h[k2])
-	spiel.welt.viertel_jetzt(p2)
-	var autos2=_autos_parken(r2,max(k2-3,1),["c_jdm_rot","c_trabant_gruen","c_sport_rot"])
-	ansichten.append(["stadt_strasse",Vector3(p2.x-t2.x*12.0,h2+3.2,p2.y-t2.y*12.0),Vector3(p2.x+t2.x*40.0,h2+3.0,p2.y+t2.y*40.0)])
-	var b0:Vector3=autos2[1].global_position
-	ansichten.append(["stadt_trabi",b0+Vector3(-t2.x*5.5+(-t2.y)*4.0,1.5,-t2.y*5.5+t2.x*4.0),b0+Vector3(0,0.5,0)])
-	for rund in 3:
-		spiel.welt.viertel_jetzt(p);spiel.welt.viertel_jetzt(p2)
-		for f in 20:await get_tree().process_frame
-		await get_tree().create_timer(1.5).timeout
 	var sonne:DirectionalLight3D=null
 	for l in get_tree().root.find_children("*","DirectionalLight3D",true,false):sonne=l;break
-	for a in ansichten:
-		cam.look_at_from_position(a[1],a[2]);cam.current=true
-		await _foto("Stil_%s_1_vorher"%a[0])
-	cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("vorher")
-	var n=STIL.anwenden(spiel.welt);print("STIL Materialien umgestellt ",n)
-	var kon=STIL.kontur_knoten();get_tree().root.add_child(kon)
-	STIL.licht(spiel.env,sonne)
-	for f in 10:await get_tree().process_frame
-	for a in ansichten:
-		cam.look_at_from_position(a[1],a[2]);cam.current=true
-		await _foto("Stil_%s_2_nachher"%a[0])
-	cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("nachher")
+	var env_alt=spiel.env.duplicate();var sonne_alt=[sonne.light_color,sonne.light_energy] if sonne else []
+	var kon=null
+	# zwei Orte nacheinander, jeweils erst vorher, dann nachher (sonst entlädt der zweite Ort den ersten)
+	for ort in 2:
+		var ansichten=[];var p:Vector2;var autos=[]
+		if ort==0:
+			var ri=_hang_strasse(Vector2(1752,-7559),600.0)
+			if ri<0:ri=_hang_strasse(Vector2(-2504,-8463),700.0)
+			var r=S.roads[ri];var i=r.P.size()/4
+			p=r.P[i];var t:Vector2=r.T[i]
+			if float(r.h[min(i+6,r.P.size()-1)])<float(r.h[i]):t=-t
+			await _laden(p)
+			autos=_autos_parken(r,i+2 if t.dot(r.T[i])>0 else max(i-12,1),PROBE_AUTOS.slice(0,6))
+			var h=float(r.h[i]);var nn=Vector2(-t.y,t.x)
+			spiel.spieler.global_position=Vector3(p.x+t.x*4.0,h+0.3,p.y+t.y*4.0);spiel.spieler.rotation.y=atan2(-t.x,-t.y)
+			ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.6,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+5.0,p.y+t.y*40.0)])
+			var a0:Vector3=autos[0].global_position
+			ansichten.append(["autos_nah",a0+Vector3(-nn.x*6.0-t.x*5.0,1.8,-nn.y*6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
+			ansichten.append(["ort_schraeg",Vector3(p.x-t.x*60.0+nn.x*40.0,h+30.0,p.y-t.y*60.0+nn.y*40.0),Vector3(p.x+t.x*30.0,h,p.y+t.y*30.0)])
+		else:
+			var q=Vector2(250,-350);var best=null;var bd=1e9
+			for rr in S.roads:
+				if rr.typ in ["autobahn","rampe"]:continue
+				for k in range(2,rr.P.size()-2,3):
+					var d=rr.P[k].distance_to(q)
+					if d<bd:bd=d;best=[rr,k]
+			var r2=best[0];var k2:int=best[1];p=r2.P[k2];var t2:Vector2=r2.T[k2];var h2=float(r2.h[k2])
+			await _laden(p)
+			autos=_autos_parken(r2,max(k2-3,1),["c_jdm_rot","c_trabant_gruen","c_sport_rot","c_skyline_dummy"].slice(0,3))
+			spiel.spieler.global_position=Vector3(p.x+t2.x*3.0,h2+0.3,p.y+t2.y*3.0)
+			ansichten.append(["stadt_strasse",Vector3(p.x-t2.x*12.0,h2+3.2,p.y-t2.y*12.0),Vector3(p.x+t2.x*40.0,h2+3.0,p.y+t2.y*40.0)])
+			var b0:Vector3=autos[1].global_position
+			ansichten.append(["stadt_trabi",b0+Vector3(-t2.x*5.5-t2.y*4.0,1.5,-t2.y*5.5+t2.x*4.0),b0+Vector3(0,0.5,0)])
+		for c in autos:c.freeze=true
+		for a in ansichten:
+			cam.look_at_from_position(a[1],a[2]);cam.current=true
+			await _foto("Stil_%s_1_vorher"%a[0])
+		if ort==0:cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("vorher")
+		var n=STIL.anwenden(spiel.welt);print("STIL Materialien umgestellt ",n)
+		kon=STIL.kontur_knoten();get_tree().root.add_child(kon)
+		STIL.licht(spiel.env,sonne)
+		for f in 10:await get_tree().process_frame
+		for a in ansichten:
+			cam.look_at_from_position(a[1],a[2]);cam.current=true
+			await _foto("Stil_%s_2_nachher"%a[0])
+		if ort==0:cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("nachher")
+		# zurück auf den alten Stil für den nächsten Ort
+		STIL.zuruecksetzen();kon.queue_free()
+		spiel.env.adjustment_enabled=env_alt.adjustment_enabled;spiel.env.fog_density=env_alt.fog_density;spiel.env.ambient_light_energy=env_alt.ambient_light_energy
+		if sonne:sonne.light_color=sonne_alt[0];sonne.light_energy=sonne_alt[1]
+		for c in autos:c.queue_free()
+func _laden(p:Vector2):
+	spiel.spieler.global_position=Vector3(p.x,spiel.welt.G.h_at(p.x,p.y)+40.0,p.y)
+	for rund in 3:
+		spiel.welt.viertel_jetzt(p)
+		for f in 20:await get_tree().process_frame
+		await get_tree().create_timer(1.5).timeout
