@@ -18,6 +18,7 @@ static func _tex(n:String)->Texture2D:
 const CODE:="""shader_type spatial;
 render_mode diffuse_toon,specular_disabled;
 uniform vec4 farbe:source_color=vec4(1.0);
+uniform bool vfarbe=false;   // Farbe steckt in den Eckpunkten (zusammengefasste Kachel-Meshes)
 uniform sampler2D t_holz:repeat_enable,filter_linear_mipmap;
 uniform sampler2D t_schindel:repeat_enable,filter_linear_mipmap;
 uniform sampler2D t_backstein:repeat_enable,filter_linear_mipmap;
@@ -28,7 +29,7 @@ uniform sampler2D t_putz:repeat_enable,filter_linear_mipmap;
 void fragment(){
 	vec3 wp=(INV_VIEW_MATRIX*vec4(VERTEX,1.0)).xyz;
 	vec3 n=normalize((INV_VIEW_MATRIX*vec4(NORMAL,0.0)).xyz);
-	vec3 c=farbe.rgb;
+	vec3 c=vfarbe?COLOR.rgb:farbe.rgb;
 	float mx=max(c.r,max(c.g,c.b));float mn=min(c.r,min(c.g,c.b));float sat=mx-mn;
 	float lum=dot(c,vec3(0.3,0.59,0.11));
 	float d=0.82;
@@ -77,6 +78,7 @@ static func _mat(m:StandardMaterial3D)->Material:
 	if _shader==null:_shader=Shader.new();_shader.code=CODE
 	var s=ShaderMaterial.new();s.shader=_shader
 	s.set_shader_parameter("farbe",m.albedo_color)
+	s.set_shader_parameter("vfarbe",m.vertex_color_use_as_albedo)
 	for t in TEX:s.set_shader_parameter("t_"+t,_tex(t))
 	_cache[m]=s
 	return s
@@ -84,13 +86,13 @@ static func _mat(m:StandardMaterial3D)->Material:
 static func _geeignet(m)->bool:
 	if not (m is StandardMaterial3D):return false
 	var s:StandardMaterial3D=m
-	if s.albedo_texture!=null or s.vertex_color_use_as_albedo:return false
+	if s.albedo_texture!=null:return false
 	if s.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED:return false
 	if s.shading_mode==BaseMaterial3D.SHADING_MODE_UNSHADED:return false   # Tusche-Hüllen, Lichter
 	if s.cull_mode==BaseMaterial3D.CULL_FRONT:return false
 	if s.emission_enabled:return false
 	var c=s.albedo_color
-	if c.r+c.g+c.b<0.12:return false
+	if not s.vertex_color_use_as_albedo and c.r+c.g+c.b<0.12:return false
 	return true
 
 static var _terr_shader:Shader
@@ -108,7 +110,13 @@ static func anwenden(wurzel:Node):
 				_terrain(g)
 			else:meshes[g.mesh]=true
 		elif g is MultiMeshInstance3D and g.multimesh!=null and g.multimesh.mesh!=null:meshes[g.multimesh.mesh]=true
-	var n=0
+	var n=0;var arten={}
+	for me in meshes:
+		for i in me.get_surface_count():
+			var m=me.surface_get_material(i);var k=m.get_class() if m else "null"
+			if m is StandardMaterial3D and m.vertex_color_use_as_albedo:k+="_vc"
+			arten[k]=arten.get(k,0)+1
+	print("STIL Materialarten ",arten," Meshes ",meshes.size())
 	for me in meshes:
 		for i in me.get_surface_count():
 			var m=me.surface_get_material(i)
