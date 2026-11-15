@@ -1077,6 +1077,24 @@ func fahrbahnen():
 					var a_out=a+o*2.6-Vector3(0,0.41,0);var b_out=b+o2*2.6-Vector3(0,0.41,0)
 					if sd>0:L._tri(sb,a_in,a_out,b_out,Vector3.UP);L._tri(sb,a_in,b_out,b_in,Vector3.UP)
 					else:L._tri(sb,a_in,b_in,b_out,Vector3.UP);L._tri(sb,a_in,b_out,a_out,Vector3.UP)
+	# Schürze: senkrechte Erd-/Mauerkante 3 m nach unten am äußeren Rand (Gehweg bzw. Bankett). Liegt das
+	# Gelände tiefer, sieht man eine Böschungsmauer statt eines Spalts – und niemand fährt unter die Straße.
+	var sch=T(Color(0.5,0.46,0.4))
+	for ri in ROADS.size():
+		var r=ROADS[ri];var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
+		var aus=r.w+(r.sw if r.stadt else 2.6);var oben=0.11 if r.stadt else -0.35
+		var ss=L._st(sch,true)
+		for i in n-1:
+			var d:Vector2=(P[i+1]-P[i]).normalized();var nn=Vector2(-d.y,d.x)
+			for sd in [1,-1]:
+				var a=P[i]+nn*aus*sd;var b=P[i+1]+nn*aus*sd
+				var mid=(a+b)*0.5
+				if auf_fahrbahn(mid,ri,0.8) or nah_kreuzung(mid,r.w+r.sw+2.0):continue
+				var ya=Y[i]+oben;var yb=Y[i+1]+oben
+				var A=Vector3(a.x,ya,a.y);var B=Vector3(b.x,yb,b.y);var A2=Vector3(a.x,ya-3.0,a.y);var B2=Vector3(b.x,yb-3.0,b.y)
+				var nrm=Vector3(nn.x*sd,0,nn.y*sd)
+				if sd>0:L._tri(ss,A,A2,B2,nrm);L._tri(ss,A,B2,B,nrm)
+				else:L._tri(ss,A,B2,A2,nrm);L._tri(ss,A,B,B2,nrm)
 	L.koll_an=alt
 	for ri in ROADS.size():
 		var r=ROADS[ri];var s=4.0;var Lg:float=r.S[-1]

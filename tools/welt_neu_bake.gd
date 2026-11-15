@@ -1563,12 +1563,16 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 						var w=Vector2(X0+ii*ST,Z0+k*ST);var d=w.distance_to(p)
 						if d>R:continue
 						var j=k*nx+ii
-						if not best.has(j) or best[j][0]>d:best[j]=[d,y,kern,R]
+						if not best.has(j):best[j]=[d,y,kern,R,(y if d<=kern else INF)]
+						else:
+							var e=best[j]
+							if d<=kern:e[4]=min(e[4],y)   # im Kern: niedrigste Fahrbahn aller nahen Straßen
+							if e[0]>d:e[0]=d;e[1]=y;e[2]=kern;e[3]=R
 	var n=0
 	for j in best:
 		var e=best[j];var d:float=e[0];var y:float=e[1]-0.15
 		if NO.WASSER[j]==1 and H[j]<0.0 and d>e[2]-ST:continue   # Brücken: kein Damm im Wasser
-		if d<=e[2]:H[j]=y
+		if d<=e[2]:H[j]=min(y,e[4]-0.15)
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)

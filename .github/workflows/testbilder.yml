@@ -72,10 +72,7 @@ jobs:
           for f in *.png; do [ -f "$f" ] && convert "$f" -quality 82 "${f%.png}.jpg" && rm "$f"; done
           ls | head -80
           cd ../..
-          git config user.name "testbilder-bot"; git config user.email "actions@github.com"
-          mkdir -p /tmp/erg && cp -r build/testbilder/* /tmp/erg/
-          git checkout --orphan testbilder-ergebnis
-          git rm -rq --cached . ; find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -r /tmp/erg/* .
-          echo "Lauf ${{ github.run_number }} – ${{ github.sha }}" > LAUF.txt
-          git add -A && git commit -qm "Testbilder Lauf ${{ github.run_number }}" && git push -f origin testbilder-ergebnis
+          cd build/testbilder && echo "Lauf ${{ github.run_number }} – ${{ github.sha }}" > LAUF.txt
+          git init -q -b testbilder-ergebnis && git config user.name "testbilder-bot" && git config user.email "actions@github.com"
+          git add -A && git commit -qm "Testbilder Lauf ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" testbilder-ergebnis
