@@ -19,6 +19,7 @@ func start(sp):
 	var nur=spiel._arg("--nur")
 	if nur=="figur":await _figur();get_tree().quit();return
 	if nur=="nord":await _nordstaedte();get_tree().quit();return
+	if nur=="stil":await _stilprobe();get_tree().quit();return
 	if nur=="punkt":
 		var pa=spiel._arg("--punkt").split(",");var q=Vector2(float(pa[0]),float(pa[1])) if pa.size()>=2 else Vector2(1982.6,-9101.3);spiel.welt.viertel_jetzt(q);spiel.spieler.global_position=Vector3(q.x,_boden(q)+80,q.y)
 		for k in 30:await get_tree().process_frame
@@ -280,3 +281,84 @@ func _nordstaedte():
 		await _foto("Nord_%02d_4_schraeg"%nr)
 		cam.look_at_from_position(Vector3(mitte.x-160,hm+140.0,mitte.y+160),Vector3(mitte.x,hm,mitte.y))
 		await _foto("Nord_%02d_5_luft"%nr)
+
+# ---------- Stil-Probe: gleiche Ansichten vorher/nachher (gemalte Texturen, Tusche-Konturen, Licht) ----------
+const STIL=preload("res://scripts/stil.gd")
+const PROBE_AUTOS:=["c_trabant_blau","c_jdm_blau","c_muscle_schwarz","c_wartburg_gruen","c_e30_silber","c_polizei","c_trabant_rot","c_jdm_weiss"]
+func _hang_strasse(nahe:Vector2,radius:float):
+	var S=spiel.welt.S;var best=-1;var bs=0.0
+	for ri in S.roads.size():
+		var r=S.roads[ri]
+		if r.typ in ["autobahn","rampe"] or r.P.size()<8:continue
+		if r.P[r.P.size()/2].distance_to(nahe)>radius:continue
+		var i0=r.P.size()/4;var i1=r.P.size()*3/4
+		var lg=r.P[i0].distance_to(r.P[i1])
+		if lg<40.0:continue
+		var st=abs(float(r.h[i1])-float(r.h[i0]))/lg
+		if st>bs and st<0.16:bs=st;best=ri
+	print("STIL Hangstrasse ",best," Steigung ",bs)
+	return best
+func _autos_parken(r,i0:int,kinds:Array)->Array:
+	var out=[];var k=0;var i=i0
+	while k<kinds.size() and i<r.P.size()-1:
+		var p:Vector2=r.P[i];var t:Vector2=r.T[i];var nn=Vector2(-t.y,t.x);var sd=1.0 if k%2==0 else -1.0
+		var q=p+nn*sd*(r.w-1.3)
+		var c=load("res://scripts/spiel/fahrzeug.gd").new();spiel.add_child(c);c.setup(kinds[k])
+		var yaw=atan2(t.x,t.y)+(0.0 if sd>0 else PI)
+		c.global_transform=Transform3D(Basis(Vector3.UP,yaw),Vector3(q.x,_boden(q)+0.5,q.y))
+		c.modus="geparkt";spiel.geparkt.append(c);out.append(c)
+		k+=1;i+=2
+	return out
+func _messen(name:String):
+	var t0=Time.get_ticks_usec()
+	for f in 30:await get_tree().process_frame
+	var ms=(Time.get_ticks_usec()-t0)/30000.0
+	print("STIL Leistung %s: %.1f ms/Bild (CI-Software-Grafik, nur Vergleich) DC %d Dreiecke %.2fM"%[name,ms,RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)/1e6])
+func _stilprobe():
+	var S=spiel.welt.S
+	# Szene 1: Hangstraße im Ort mit der Feuerwache (Nordosten), Szene 2: Innenstadt-Kreuzung
+	var ansichten=[]
+	var ri=_hang_strasse(Vector2(1752,-7559),600.0)
+	if ri<0:ri=_hang_strasse(Vector2(-2504,-8463),700.0)
+	var r=S.roads[ri];var i=r.P.size()/4
+	var p:Vector2=r.P[i];var t:Vector2=r.T[i]
+	if float(r.h[min(i+6,r.P.size()-1)])<float(r.h[i]):t=-t   # bergauf schauen
+	spiel.welt.viertel_jetzt(p)
+	var autos=_autos_parken(r,i+2 if t.dot(r.T[i])>0 else max(i-12,1),PROBE_AUTOS.slice(0,6))
+	var h=float(r.h[i]);var nn=Vector2(-t.y,t.x)
+	spiel.spieler.global_position=Vector3(p.x+t.x*4.0,h+0.2,p.y+t.y*4.0);spiel.spieler.rotation.y=atan2(-t.x,-t.y)
+	ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.6,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+5.0,p.y+t.y*40.0)])
+	var a0:Vector3=autos[0].global_position if autos.size()>0 else Vector3(p.x,h,p.y)
+	ansichten.append(["autos_nah",a0+Vector3(nn.x*-6.0-t.x*5.0,1.8,nn.y*-6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
+	ansichten.append(["ort_schraeg",Vector3(p.x-t.x*60.0+nn.x*40.0,h+30.0,p.y-t.y*60.0+nn.y*40.0),Vector3(p.x+t.x*30.0,h,p.y+t.y*30.0)])
+	# Innenstadt
+	var q=Vector2(250,-350);var best=null;var bd=1e9
+	for rr in S.roads:
+		if rr.typ in ["autobahn","rampe"]:continue
+		for k in range(2,rr.P.size()-2,3):
+			var d=rr.P[k].distance_to(q)
+			if d<bd:bd=d;best=[rr,k]
+	var r2=best[0];var k2:int=best[1];var p2:Vector2=r2.P[k2];var t2:Vector2=r2.T[k2];var h2=float(r2.h[k2])
+	spiel.welt.viertel_jetzt(p2)
+	var autos2=_autos_parken(r2,max(k2-3,1),["c_jdm_rot","c_trabant_gruen","c_sport_rot"])
+	ansichten.append(["stadt_strasse",Vector3(p2.x-t2.x*12.0,h2+3.2,p2.y-t2.y*12.0),Vector3(p2.x+t2.x*40.0,h2+3.0,p2.y+t2.y*40.0)])
+	var b0:Vector3=autos2[1].global_position
+	ansichten.append(["stadt_trabi",b0+Vector3(-t2.x*5.5+(-t2.y)*4.0,1.5,-t2.y*5.5+t2.x*4.0),b0+Vector3(0,0.5,0)])
+	for rund in 3:
+		spiel.welt.viertel_jetzt(p);spiel.welt.viertel_jetzt(p2)
+		for f in 20:await get_tree().process_frame
+		await get_tree().create_timer(1.5).timeout
+	var sonne:DirectionalLight3D=null
+	for l in get_tree().root.find_children("*","DirectionalLight3D",true,false):sonne=l;break
+	for a in ansichten:
+		cam.look_at_from_position(a[1],a[2]);cam.current=true
+		await _foto("Stil_%s_1_vorher"%a[0])
+	cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("vorher")
+	var n=STIL.anwenden(spiel.welt);print("STIL Materialien umgestellt ",n)
+	var kon=STIL.kontur_knoten();get_tree().root.add_child(kon)
+	STIL.licht(spiel.env,sonne)
+	for f in 10:await get_tree().process_frame
+	for a in ansichten:
+		cam.look_at_from_position(a[1],a[2]);cam.current=true
+		await _foto("Stil_%s_2_nachher"%a[0])
+	cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("nachher")
