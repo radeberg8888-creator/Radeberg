@@ -1334,7 +1334,9 @@ func _gelaende_und_daten(ND:Dictionary):
 	for r in NO.ROADS:
 		var Q=PackedVector2Array();var Hh=PackedFloat32Array();var Tg=PackedVector2Array();var tf=[];var el=[]
 		for i in r.P.size():
-			var p:Vector2=r.P[i];Q.append(p+C);Hh.append(H0+NO.hy(p)+0.07)
+			# Höhe = gebaute Fahrbahn (Profil Y + 0,06), nicht die geglättete Fläche – sonst fahren Verkehr und
+			# Karte auf einer anderen Höhe als der Asphalt
+			var p:Vector2=r.P[i];Q.append(p+C);Hh.append(H0+(float(r.Y[i]) if r.has("Y") and i<r.Y.size() else NO.hy(p))+0.06)
 			Tg.append((r.P[min(i+1,r.P.size()-1)]-r.P[max(i-1,0)]).normalized());tf.append(false);el.append(false)
 		roads.append({"lane_x":r.w*(0.5 if r.get("orig","")=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":Tg,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true,"belag":r.get("belag","asphalt")})
 	for j in NO.JUNC:

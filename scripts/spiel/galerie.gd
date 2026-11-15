@@ -206,12 +206,17 @@ func _nordstaedte():
 	var zellen={}
 	for ri in S.roads.size():
 		var r=S.roads[ri]
-		if r.typ in ["autobahn","rampe","strasse","land"] or r.P.size()<2:continue
+		if r.typ in ["autobahn","rampe"] or r.P.size()<2:continue
 		var m:Vector2=r.P[r.P.size()/2]
 		if stadt.grow(150).has_point(m):continue
 		var k=Vector2i(int(floor(m.x/300.0)),int(floor(m.y/300.0)))
 		if not zellen.has(k):zellen[k]=[]
 		zellen[k].append(ri)
+	# nur dichte Zellen (Ortskern: mind. 3 Straßenstücke) – Landstraßen allein verbinden keine Orte
+	var dicht={}
+	for k in zellen:
+		if zellen[k].size()>=3:dicht[k]=zellen[k]
+	zellen=dicht
 	var orte=[];var gesehen={}
 	for k in zellen:
 		if gesehen.has(k):continue
