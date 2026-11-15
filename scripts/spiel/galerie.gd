@@ -20,6 +20,7 @@ func start(sp):
 	if nur=="figur":await _figur();get_tree().quit();return
 	if nur=="nord":await _nordstaedte();get_tree().quit();return
 	if nur=="stil":await _stilprobe();get_tree().quit();return
+	if nur=="stil2":await _stilprobe2();get_tree().quit();return
 	if nur=="punkt":
 		var pa=spiel._arg("--punkt").split(",");var q=Vector2(float(pa[0]),float(pa[1])) if pa.size()>=2 else Vector2(1982.6,-9101.3);spiel.welt.viertel_jetzt(q);spiel.spieler.global_position=Vector3(q.x,_boden(q)+80,q.y)
 		for k in 30:await get_tree().process_frame
@@ -376,3 +377,105 @@ func _laden(p:Vector2):
 		spiel.welt.viertel_jetzt(p)
 		for f in 20:await get_tree().process_frame
 		await get_tree().create_timer(1.5).timeout
+
+# ---------- Stil-Probe 2: Musterhäuser, matte Scheiben, weiche Schatten / ohne Schatten ----------
+const MH=preload("res://scripts/musterhaus.gd")
+func _haeuser_tauschen(mitte:Vector2,radius:float)->Node3D:
+	# alte Hausbausätze im Umkreis ausblenden (Instanz auf Größe 0) und an ihrer Stelle Musterhäuser bauen
+	var neu=Node3D.new();neu.name="Musterstrasse";spiel.welt.add_child(neu)
+	var farben=[[Color(0.72,0.24,0.2),Color(0.2,0.3,0.25)],[Color(0.86,0.76,0.56),Color(0.35,0.25,0.18)],[Color(0.45,0.52,0.62),Color(0.62,0.2,0.18)],[Color(0.6,0.72,0.62),Color(0.9,0.9,0.86)],[Color(0.9,0.88,0.8),Color(0.2,0.28,0.45)],[Color(0.55,0.5,0.62),Color(0.95,0.93,0.88)]]
+	var plaetze=[];var n=0
+	for m in spiel.welt.find_children("*","MultiMeshInstance3D",true,false):
+		var nm:String=m.name
+		if not (nm.begins_with("nd_") or nm.begins_with("ld_")):continue
+		if m.multimesh==null or m.multimesh.mesh==null:continue
+		var ab:AABB=m.multimesh.mesh.get_aabb()
+		if ab.size.x<6.0 or ab.size.z<6.0 or ab.size.y<4.0:continue
+		var mm=m.multimesh
+		for i in mm.instance_count:
+			var xf:Transform3D=mm.get_instance_transform(i);var w=m.global_transform*xf
+			if Vector2(w.origin.x,w.origin.z).distance_to(mitte)>radius:continue
+			mm.set_instance_transform(i,Transform3D(Basis().scaled(Vector3(0.0001,0.0001,0.0001)),xf.origin))
+			if not nm.ends_with("ink"):
+				var dup=false
+				for q in plaetze:
+					if q.origin.distance_to(w.origin)<3.0:dup=true
+				if not dup:plaetze.append(w)
+	for w in plaetze:
+		var f=farben[n%farben.size()];n+=1
+		var h=MH.bauen(f[0],f[1],Color(0.42,0.36,0.33) if n%2==0 else Color(0.35,0.36,0.4),n%3!=0)
+		var b=w.basis.orthonormalized();var vor=b*Vector3(0,0,1)
+		h.global_transform=Transform3D(b,w.origin-vor*9.0)
+		neu.add_child(h)
+		MH.briefkasten(neu,w.origin+b*Vector3(2.0,0,1.0),atan2(vor.x,vor.z))
+	print("STIL2 Häuser getauscht ",plaetze.size())
+	return neu
+func _beschriftung_merken(name:String,text:String):
+	var f=FileAccess.open(OUT+"beschriftung.txt",FileAccess.READ_WRITE if FileAccess.file_exists(OUT+"beschriftung.txt") else FileAccess.WRITE)
+	f.seek_end();f.store_line(name+"|"+text);f.close()
+func _stilprobe2():
+	var S=spiel.welt.S
+	var sonne:DirectionalLight3D=null
+	for l in get_tree().root.find_children("*","DirectionalLight3D",true,false):sonne=l;break
+	var sonne_alt=[sonne.light_color,sonne.light_energy,sonne.shadow_blur,sonne.directional_shadow_max_distance] if sonne else []
+	var adj=[spiel.env.adjustment_enabled,spiel.env.fog_density,spiel.env.ambient_light_energy]
+	for ort in 2:
+		var ansichten=[];var p:Vector2;var autos=[];var extra:Node3D=null
+		if ort==0:
+			var ri=_hang_strasse(Vector2(1752,-7559),600.0)
+			if ri<0:ri=_hang_strasse(Vector2(-2504,-8463),700.0)
+			var r=S.roads[ri];var i=r.P.size()/4
+			p=r.P[i];var t:Vector2=r.T[i]
+			if float(r.h[min(i+6,r.P.size()-1)])<float(r.h[i]):t=-t
+			await _laden(p)
+			autos=_autos_parken(r,i+2 if t.dot(r.T[i])>0 else max(i-12,1),["c_trabant_blau","c_jdm_blau","c_muscle_schwarz","c_wartburg_gruen"])
+			var h=float(r.h[i]);var nn=Vector2(-t.y,t.x)
+			spiel.spieler.global_position=Vector3(p.x+t.x*4.0,h+0.3,p.y+t.y*4.0);spiel.spieler.rotation.y=atan2(-t.x,-t.y)
+			ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.4,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+4.0,p.y+t.y*40.0)])
+			ansichten.append(["haus_nah",Vector3(p.x+t.x*16.0-nn.x*3.0,h+1.8,p.y+t.y*16.0-nn.y*3.0),Vector3(p.x+t.x*26.0+nn.x*22.0,h+3.5,p.y+t.y*26.0+nn.y*22.0)])
+			ansichten.append(["haus_nah2",Vector3(p.x+t.x*20.0+nn.x*3.0,h+1.8,p.y+t.y*20.0+nn.y*3.0),Vector3(p.x+t.x*30.0-nn.x*22.0,h+3.5,p.y+t.y*30.0-nn.y*22.0)])
+			var a0:Vector3=autos[0].global_position
+			ansichten.append(["autos",a0+Vector3(-nn.x*6.0-t.x*5.0,1.6,-nn.y*6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
+		else:
+			var q=Vector2(250,-350);var best=null;var bd=1e9
+			for rr in S.roads:
+				if rr.typ in ["autobahn","rampe"]:continue
+				for k in range(2,rr.P.size()-2,3):
+					var d=rr.P[k].distance_to(q)
+					if d<bd:bd=d;best=[rr,k]
+			var r2=best[0];var k2:int=best[1];p=r2.P[k2];var t2:Vector2=r2.T[k2];var h2=float(r2.h[k2])
+			await _laden(p)
+			autos=_autos_parken(r2,max(k2-3,1),["c_jdm_rot","c_trabant_gruen","c_sport_rot"])
+			spiel.spieler.global_position=Vector3(p.x+t2.x*3.0,h2+0.3,p.y+t2.y*3.0)
+			ansichten.append(["stadt_strasse",Vector3(p.x-t2.x*12.0,h2+3.2,p.y-t2.y*12.0),Vector3(p.x+t2.x*40.0,h2+3.0,p.y+t2.y*40.0)])
+			var b0:Vector3=autos[1].global_position
+			ansichten.append(["stadt_trabi",b0+Vector3(-t2.x*5.5-t2.y*4.0,1.5,-t2.y*5.5+t2.x*4.0),b0+Vector3(0,0.5,0)])
+		for c in autos:c.freeze=true
+		for a in ansichten:
+			cam.look_at_from_position(a[1],a[2]);cam.current=true
+			await _foto("S2_%s_1"%a[0])
+		if ort==0:extra=_haeuser_tauschen(p,140.0)
+		if ort==0:
+			# Gullydeckel mittig auf der Straße
+			var r=S.roads[_hang_strasse(Vector2(1752,-7559),600.0)]
+			for k in range(1,r.P.size()-1,4):MH.gully(extra,Vector3(r.P[k].x+r.T[k].y*1.6,float(r.h[k])+0.01,r.P[k].y-r.T[k].x*1.6))
+		var n=STIL.anwenden(spiel.welt);print("STIL2 Materialien ",n," matt ",STIL.matt(get_tree().root))
+		var kon=STIL.kontur_knoten();get_tree().root.add_child(kon)
+		STIL.licht(spiel.env,sonne);STIL.schatten(sonne,"weich")
+		for f in 10:await get_tree().process_frame
+		for a in ansichten:
+			cam.look_at_from_position(a[1],a[2]);cam.current=true
+			await _foto("S2_%s_2"%a[0])
+		if ort==0:cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("nachher weiche Schatten")
+		STIL.schatten(sonne,"aus")
+		for f in 5:await get_tree().process_frame
+		for a in ansichten:
+			cam.look_at_from_position(a[1],a[2]);cam.current=true
+			await _foto("S2_%s_3"%a[0])
+		if ort==0:cam.look_at_from_position(ansichten[0][1],ansichten[0][2]);await _messen("nachher ohne Schatten")
+		STIL.zuruecksetzen();kon.queue_free()
+		if extra:extra.queue_free()
+		spiel.env.adjustment_enabled=adj[0];spiel.env.fog_density=adj[1];spiel.env.ambient_light_energy=adj[2]
+		if sonne:
+			sonne.shadow_enabled=true;sonne.light_color=sonne_alt[0];sonne.light_energy=sonne_alt[1];sonne.shadow_blur=sonne_alt[2];sonne.directional_shadow_max_distance=sonne_alt[3]
+		for c in autos:c.queue_free()

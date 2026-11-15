@@ -34,8 +34,10 @@ void fragment(){
 	float mx=max(c.r,max(c.g,c.b));float mn=min(c.r,min(c.g,c.b));float sat=mx-mn;
 	float lum=dot(c,vec3(0.3,0.59,0.11));
 	float d=0.82;
+	bool ohne=(lum>0.8&&sat<0.12)||lum<0.17;   // Weiß (Blenden, Markierungen) und Glas bleiben glatt
 	vec2 hor=normalize(vec2(-n.z,n.x)+vec2(0.0001));
-	if(n.y>0.8){
+	if(ohne){d=0.82;}
+	else if(n.y>0.8){
 		if(c.g>c.r*1.08&&c.g>c.b*1.08)d=texture(t_gras,wp.xz/3.5).r;
 		else if(sat<0.09&&lum<0.42)d=texture(t_asphalt,wp.xz/7.0).r;
 		else if(sat<0.2&&lum>=0.42)d=texture(t_platten,wp.xz/2.4).r;
@@ -200,3 +202,33 @@ static func licht(env:Environment,sonne:DirectionalLight3D):
 		sm.sky_top_color=Color(0.22,0.48,0.86);sm.sky_horizon_color=Color(0.72,0.84,0.95)
 	env.fog_enabled=true;env.fog_light_color=Color(0.74,0.84,0.95);env.fog_density=max(env.fog_density,0.0009)
 	if sonne:sonne.light_color=Color(1.0,0.93,0.8);sonne.light_energy=1.15
+
+# Spiegelungen weg: glänzende Materialien (Autoscheiben, Lack, Fenster) matt machen
+static func matt(wurzel:Node):
+	var n=0
+	for g in wurzel.find_children("*","GeometryInstance3D",true,false):
+		var ms=[]
+		if g.material_override:ms.append(g.material_override)
+		var me=null
+		if g is MeshInstance3D:me=g.mesh
+		elif g is MultiMeshInstance3D and g.multimesh:me=g.multimesh.mesh
+		if me:
+			for i in me.get_surface_count():
+				if me.surface_get_material(i):ms.append(me.surface_get_material(i))
+		if g is MeshInstance3D:
+			for i in g.get_surface_override_material_count():
+				if g.get_surface_override_material(i):ms.append(g.get_surface_override_material(i))
+		for m in ms:
+			if m is StandardMaterial3D and (m.roughness<0.6 or m.metallic>0.1 or m.metallic_specular>0.4):
+				m.roughness=0.9;m.metallic=0.0;m.metallic_specular=0.15;n+=1
+	return n
+
+# Schatten: weich (höhere Auflösung, kürzere Reichweite, Weichzeichnung) oder ganz aus
+static func schatten(sonne:DirectionalLight3D,modus:String):
+	if sonne==null:return
+	if modus=="aus":sonne.shadow_enabled=false;return
+	sonne.shadow_enabled=true
+	RenderingServer.directional_shadow_atlas_set_size(4096,true)
+	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH)
+	sonne.shadow_blur=2.0;sonne.directional_shadow_max_distance=70.0
+	sonne.shadow_opacity=0.75
