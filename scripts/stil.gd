@@ -108,6 +108,9 @@ static func anwenden(wurzel:Node):
 			if p is VehicleBody3D or p is CharacterBody3D:aus=true;break
 			p=p.get_parent()
 		if aus:continue
+		# Pflanzen behalten ihren Look (sonst bekämen Baumkronen Holzbretter-Streifen)
+		var nm=String(g.name).to_lower()
+		if nm.begins_with("nt_") or nm.begins_with("ld_") or nm.contains("baum") or nm.contains("busch") or nm.contains("gras") or nm.contains("hecke"):continue
 		if g is MeshInstance3D and g.mesh!=null:
 			if g.material_override is ShaderMaterial and g.material_override.get_shader_parameter("rausch")!=null:
 				_terrain(g)

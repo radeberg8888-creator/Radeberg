@@ -395,7 +395,7 @@ func _haeuser_tauschen(mitte:Vector2,radius:float)->Node3D:
 		for i in mm.instance_count:
 			var xf:Transform3D=mm.get_instance_transform(i);var w=m.global_transform*xf
 			if Vector2(w.origin.x,w.origin.z).distance_to(mitte)>radius:continue
-			mm.set_instance_transform(i,Transform3D(Basis().scaled(Vector3(0.0001,0.0001,0.0001)),xf.origin))
+			var vs=neu.get_meta("versteckt",[]);vs.append([m,i,xf]);neu.set_meta("versteckt",vs)
 			if not nm.ends_with("ink"):
 				var dup=false
 				for q in plaetze:
@@ -405,14 +405,33 @@ func _haeuser_tauschen(mitte:Vector2,radius:float)->Node3D:
 		var f=farben[n%farben.size()];n+=1
 		var h=MH.bauen(f[0],f[1],Color(0.42,0.36,0.33) if n%2==0 else Color(0.35,0.36,0.4),n%3!=0)
 		var b=w.basis.orthonormalized();var vor=b*Vector3(0,0,1)
+		neu.add_child(h);h.set_meta("mh",true)
 		h.global_transform=Transform3D(b,w.origin-vor*9.0)
-		neu.add_child(h)
 		MH.briefkasten(neu,w.origin+b*Vector3(2.0,0,1.0),atan2(vor.x,vor.z))
 	print("STIL2 Häuser getauscht ",plaetze.size())
 	return neu
 func _beschriftung_merken(name:String,text:String):
 	var f=FileAccess.open(OUT+"beschriftung.txt",FileAccess.READ_WRITE if FileAccess.file_exists(OUT+"beschriftung.txt") else FileAccess.WRITE)
 	f.seek_end();f.store_line(name+"|"+text);f.close()
+func _haus_strasse()->int:
+	# Ortsstraße im Norden mit den meisten Häusern in 35 m (Steigung als Bonus)
+	var S=spiel.welt.S;var best=-1;var bw=-1.0
+	var orte=[Vector2(1752,-7559),Vector2(-2504,-8463),Vector2(-1577,-9220)]
+	for ri in S.roads.size():
+		var r=S.roads[ri]
+		if r.typ in ["autobahn","rampe"] or r.P.size()<8:continue
+		var m:Vector2=r.P[r.P.size()/2];var nah=false
+		for o in orte:
+			if m.distance_to(o)<500.0:nah=true
+		if not nah:continue
+		var i0=r.P.size()/4;var i1=r.P.size()*3/4;var lg=r.P[i0].distance_to(r.P[i1])
+		if lg<40.0:continue
+		var st=abs(float(r.h[i1])-float(r.h[i0]))/lg
+		var w=float(r.P.size())*(1.0+st*6.0)
+		if r.typ in ["strasse","land"]:w*=0.3
+		if w>bw:bw=w;best=ri
+	print("STIL2 Strasse ",best)
+	return best
 func _stilprobe2():
 	var S=spiel.welt.S
 	var sonne:DirectionalLight3D=null
@@ -422,18 +441,24 @@ func _stilprobe2():
 	for ort in 2:
 		var ansichten=[];var p:Vector2;var autos=[];var extra:Node3D=null
 		if ort==0:
-			var ri=_hang_strasse(Vector2(1752,-7559),600.0)
-			if ri<0:ri=_hang_strasse(Vector2(-2504,-8463),700.0)
+			var ri=_haus_strasse()
 			var r=S.roads[ri];var i=r.P.size()/4
 			p=r.P[i];var t:Vector2=r.T[i]
 			if float(r.h[min(i+6,r.P.size()-1)])<float(r.h[i]):t=-t
 			await _laden(p)
+			extra=_haeuser_tauschen(p,160.0)
+			for k in range(1,r.P.size()-1,4):MH.gully(extra,Vector3(r.P[k].x+r.T[k].y*1.6,float(r.h[k])+0.01,r.P[k].y-r.T[k].x*1.6))
+			extra.visible=false
 			autos=_autos_parken(r,i+2 if t.dot(r.T[i])>0 else max(i-12,1),["c_trabant_blau","c_jdm_blau","c_muscle_schwarz","c_wartburg_gruen"])
 			var h=float(r.h[i]);var nn=Vector2(-t.y,t.x)
 			spiel.spieler.global_position=Vector3(p.x+t.x*4.0,h+0.3,p.y+t.y*4.0);spiel.spieler.rotation.y=atan2(-t.x,-t.y)
 			ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.4,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+4.0,p.y+t.y*40.0)])
-			ansichten.append(["haus_nah",Vector3(p.x+t.x*16.0-nn.x*3.0,h+1.8,p.y+t.y*16.0-nn.y*3.0),Vector3(p.x+t.x*26.0+nn.x*22.0,h+3.5,p.y+t.y*26.0+nn.y*22.0)])
-			ansichten.append(["haus_nah2",Vector3(p.x+t.x*20.0+nn.x*3.0,h+1.8,p.y+t.y*20.0+nn.y*3.0),Vector3(p.x+t.x*30.0-nn.x*22.0,h+3.5,p.y+t.y*30.0-nn.y*22.0)])
+			var hs=extra.get_children().filter(func(x):return x.has_meta("mh"))
+			hs.sort_custom(func(a,b):return Vector2(a.global_position.x,a.global_position.z).distance_to(p)<Vector2(b.global_position.x,b.global_position.z).distance_to(p))
+			for j in min(2,hs.size()):
+				var hh:Node3D=hs[j];var vor=hh.global_transform.basis*Vector3(0,0,1);var seit=hh.global_transform.basis*Vector3(1,0,0)
+				var z=hh.global_position+Vector3(0,3.5,0)
+				ansichten.append(["haus_nah%d"%(j+1),hh.global_position+vor*17.0+seit*7.0+Vector3(0,1.8,0),z])
 			var a0:Vector3=autos[0].global_position
 			ansichten.append(["autos",a0+Vector3(-nn.x*6.0-t.x*5.0,1.6,-nn.y*6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
 		else:
@@ -454,11 +479,11 @@ func _stilprobe2():
 		for a in ansichten:
 			cam.look_at_from_position(a[1],a[2]);cam.current=true
 			await _foto("S2_%s_1"%a[0])
-		if ort==0:extra=_haeuser_tauschen(p,140.0)
-		if ort==0:
-			# Gullydeckel mittig auf der Straße
-			var r=S.roads[_hang_strasse(Vector2(1752,-7559),600.0)]
-			for k in range(1,r.P.size()-1,4):MH.gully(extra,Vector3(r.P[k].x+r.T[k].y*1.6,float(r.h[k])+0.01,r.P[k].y-r.T[k].x*1.6))
+		if extra:
+			# Vorher-Bilder sind gemacht: alte Häuser weg, Musterhäuser sichtbar
+			extra.visible=true
+			for m in extra.get_meta("versteckt",[]):
+				m[0].multimesh.set_instance_transform(m[1],Transform3D(Basis().scaled(Vector3(0.0001,0.0001,0.0001)),m[2].origin))
 		var n=STIL.anwenden(spiel.welt);print("STIL2 Materialien ",n," matt ",STIL.matt(get_tree().root))
 		var kon=STIL.kontur_knoten();get_tree().root.add_child(kon)
 		STIL.licht(spiel.env,sonne);STIL.schatten(sonne,"weich")
