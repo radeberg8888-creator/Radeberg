@@ -17,6 +17,8 @@ env:
 jobs:
   bilder:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +66,16 @@ jobs:
           cp build/galerie.log build/bake.log $GALERIE_OUT/ || true
           ls $GALERIE_OUT | wc -l
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: testbilder
-          path: build/testbilder/
-          retention-days: 7
+      - name: Ergebnis in den Zweig "testbilder-ergebnis" legen (als JPG)
+        run: |
+          cd build/testbilder
+          for f in *.png; do [ -f "$f" ] && convert "$f" -quality 82 "${f%.png}.jpg" && rm "$f"; done
+          ls | head -80
+          cd ../..
+          git config user.name "testbilder-bot"; git config user.email "actions@github.com"
+          mkdir -p /tmp/erg && cp -r build/testbilder/* /tmp/erg/
+          git checkout --orphan testbilder-ergebnis
+          git rm -rq --cached . ; find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/erg/* .
+          echo "Lauf ${{ github.run_number }} – ${{ github.sha }}" > LAUF.txt
+          git add -A && git commit -qm "Testbilder Lauf ${{ github.run_number }}" && git push -f origin testbilder-ergebnis
