@@ -10,6 +10,7 @@ static var _shader:Shader
 static var _cache:={}       # StandardMaterial3D -> ShaderMaterial
 static var _rueck:=[]       # [mesh, surface, original]
 static var _terr_alt:={}    # Knoten -> altes material_override
+static var _ov_alt:={}      # Knoten -> altes material_override (StandardMaterial3D am Knoten)
 
 static func _tex(n:String)->Texture2D:
 	if not _texturen.has(n):_texturen[n]=load("res://assets/stil/%s.png"%n)
@@ -86,7 +87,7 @@ static func _mat(m:StandardMaterial3D)->Material:
 static func _geeignet(m)->bool:
 	if not (m is StandardMaterial3D):return false
 	var s:StandardMaterial3D=m
-	if s.albedo_texture!=null:return false
+	if s.albedo_texture!=null and not (s.albedo_texture is NoiseTexture2D):return false
 	if s.transparency!=BaseMaterial3D.TRANSPARENCY_DISABLED:return false
 	if s.shading_mode==BaseMaterial3D.SHADING_MODE_UNSHADED:return false   # Tusche-Hüllen, Lichter
 	if s.cull_mode==BaseMaterial3D.CULL_FRONT:return false
@@ -108,15 +109,19 @@ static func anwenden(wurzel:Node):
 		if g is MeshInstance3D and g.mesh!=null:
 			if g.material_override is ShaderMaterial and g.material_override.get_shader_parameter("rausch")!=null:
 				_terrain(g)
+			elif _geeignet(g.material_override):
+				_ov_alt[g]=g.material_override;g.material_override=_mat(g.material_override)
 			else:meshes[g.mesh]=true
-		elif g is MultiMeshInstance3D and g.multimesh!=null and g.multimesh.mesh!=null:meshes[g.multimesh.mesh]=true
+		elif g is MultiMeshInstance3D and g.multimesh!=null and g.multimesh.mesh!=null:
+			if _geeignet(g.material_override):_ov_alt[g]=g.material_override;g.material_override=_mat(g.material_override)
+			else:meshes[g.multimesh.mesh]=true
 	var n=0;var arten={}
 	for me in meshes:
 		for i in me.get_surface_count():
 			var m=me.surface_get_material(i);var k=m.get_class() if m else "null"
 			if m is StandardMaterial3D and m.vertex_color_use_as_albedo:k+="_vc"
 			arten[k]=arten.get(k,0)+1
-	print("STIL Materialarten ",arten," Meshes ",meshes.size())
+	print("STIL Materialarten ",arten," Meshes ",meshes.size()," Knoten-Overrides ",_ov_alt.size())
 	for me in meshes:
 		for i in me.get_surface_count():
 			var m=me.surface_get_material(i)
@@ -136,6 +141,9 @@ static func _terrain(g:MeshInstance3D):
 static func zuruecksetzen():
 	for e in _rueck:e[0].surface_set_material(e[1],e[2])
 	_rueck.clear()
+	for g in _ov_alt:
+		if is_instance_valid(g):g.material_override=_ov_alt[g]
+	_ov_alt.clear()
 	for g in _terr_alt:
 		if is_instance_valid(g):g.material_override=_terr_alt[g]
 	_terr_alt.clear()

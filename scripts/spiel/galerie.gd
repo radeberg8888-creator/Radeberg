@@ -336,6 +336,7 @@ func _stilprobe():
 			ansichten.append(["hang_strasse",Vector3(p.x-t.x*7.0,h+2.6,p.y-t.y*7.0),Vector3(p.x+t.x*40.0,h+5.0,p.y+t.y*40.0)])
 			var a0:Vector3=autos[0].global_position
 			ansichten.append(["autos_nah",a0+Vector3(-nn.x*6.0-t.x*5.0,1.8,-nn.y*6.0-t.y*5.0),a0+Vector3(t.x*6.0,0.6,t.y*6.0)])
+			ansichten.append(["haeuser_nah",Vector3(p.x+t.x*12.0-nn.x*2.0,h+1.9,p.y+t.y*12.0-nn.y*2.0),Vector3(p.x+t.x*22.0+nn.x*20.0,h+3.0,p.y+t.y*22.0+nn.y*20.0)])
 			ansichten.append(["ort_schraeg",Vector3(p.x-t.x*60.0+nn.x*40.0,h+30.0,p.y-t.y*60.0+nn.y*40.0),Vector3(p.x+t.x*30.0,h,p.y+t.y*30.0)])
 		else:
 			var q=Vector2(250,-350);var best=null;var bd=1e9
@@ -371,7 +372,7 @@ func _stilprobe():
 		for c in autos:c.queue_free()
 func _laden(p:Vector2):
 	spiel.spieler.global_position=Vector3(p.x,spiel.welt.G.h_at(p.x,p.y)+40.0,p.y)
-	for rund in 3:
+	for rund in 6:
 		spiel.welt.viertel_jetzt(p)
 		for f in 20:await get_tree().process_frame
 		await get_tree().create_timer(1.5).timeout
