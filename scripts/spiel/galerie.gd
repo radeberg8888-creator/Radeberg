@@ -288,6 +288,7 @@ func _nordstaedte():
 				for f in 40:await get_tree().physics_frame
 			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
 			await _foto("Nord_%02d_%d_strasse"%[nr,k])
+			if nr==2 and k==2:await _villa_fotos(Vector3(p.x,h,p.y))
 			if ta.size()==2 and nr<=2:
 				var a0:Vector3=ta[0].global_position;var a1:Vector3=ta[1].global_position
 				cam.look_at_from_position((a0+a1)*0.5+Vector3(t.y*9.0,3.0,-t.x*9.0)-Vector3(t.x,0,t.y)*6.0,(a0+a1)*0.5);cam.current=true
@@ -556,3 +557,22 @@ func _schwebe_suche(mitte:Vector2,radius:float,nr:int):
 				funde[pre][0]+=1
 				if dh>funde[pre][1]:funde[pre][1]=dh;funde[pre][2]=c
 	print("SCHWEBT Ort ",nr," ",funde)
+
+# Nächste Villa zur Kamera: von vorne (Straße) und von hinten (Garten) fotografieren
+func _villa_fotos(nah:Vector3):
+	var best=null;var bd=1e9
+	for m in get_tree().root.find_children("nd_villa*","MultiMeshInstance3D",true,false):
+		if String(m.name).ends_with("ink"):continue
+		for i in m.multimesh.instance_count:
+			var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
+			if gx.basis.get_scale().x<0.01:continue
+			var d=gx.origin.distance_to(nah)
+			if d<bd:bd=d;best=gx
+	if best==null:print("VILLA keine gefunden");return
+	var b:Basis=best.basis.orthonormalized();var o:Vector3=best.origin
+	var mitte=o-b.z*16.0+Vector3(0,3.0,0)
+	print("VILLA bei ",o," Abstand ",bd)
+	cam.look_at_from_position(o+b.z*14.0+b.x*6.0+Vector3(0,3.5,0),mitte);cam.current=true
+	await _foto("Villa_1_vorne")
+	cam.look_at_from_position(o-b.z*46.0-b.x*8.0+Vector3(0,5.0,0),mitte);cam.current=true
+	await _foto("Villa_2_hinten")
