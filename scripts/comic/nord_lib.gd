@@ -401,7 +401,7 @@ func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	# Grundstück an einer Straße: Vorderkante bündig mit der Fahrbahn (sonst schwebt die Einfahrt oder
 	# die Straße liegt im Hang) – wie in der Stadt
 	var sy=strasse_y(F)
-	if sy[2]>=0 and sy[0]<ROADS[sy[2]].w+ROADS[sy[2]].sw+8.0:h=sy[1]+0.1
+	if sy[2]>=0 and sy[0]<ROADS[sy[2]].w+ROADS[sy[2]].sw+(14.0 if k.d>=28.0 else 8.0):h=sy[1]+0.1
 	var aussen=Vector3(-n.x,0,-n.y);var rechts=Vector3.UP.cross(aussen)
 	var xf=Transform3D(Basis(rechts,Vector3.UP,aussen),Vector3(F.x,h-0.14,F.y))
 	PLATZ.append([kit,xf])
@@ -490,7 +490,7 @@ func _k_platz(i:int):
 	for k in 4:L._baum(c+Vector3([-8,8,-8,8][k],0,[-8,-8,8,8][k]))
 	L._bank(c+Vector3(-4,0,6),Vector3(0,0,-1));L._bank(c+Vector3(4,0,-6),Vector3(0,0,1))
 func _k_villa(i:int):
-	L.box(L.M.gras,_P(0,-0.07,16),Vector3(30,0.16,32),Basis(),0.0)
+	_boden(30,32,Color(0.42,0.6,0.28))
 	var weiss=T([Color(0.96,0.95,0.92),Color(0.92,0.88,0.8),Color(0.85,0.85,0.88),Color(0.95,0.9,0.85),Color(0.9,0.93,0.95)][i])
 	var c=_P(-2,0,18)
 	L.box(weiss,c+Vector3(0,1.8,0),Vector3(16,3.6,11),Basis(),0.05)
@@ -508,8 +508,9 @@ func _k_villa(i:int):
 	L.box(weiss,_P(10,1.6,22),Vector3(7,3.2,8),Basis(),0.04);L.koll_box(_P(10,1.6,22),Vector3(7,3.2,8))
 	L.box(T(Color(0.4,0.4,0.42)),_P(10,1.3,17.98),Vector3(5,2.6,0.08),Basis(),0.0)
 	for sx in [-1,1]:
-		L.box(weiss,_P(sx*(15-0.15),1.1,16),Vector3(0.3,2.2,32),Basis(),0.02);L.koll_box(_P(sx*(15-0.15),1.1,16),Vector3(0.3,2.2,32))
-	L.box(weiss,_P(-5,1.1,0.2),Vector3(20,2.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
+		# Mauern bis in den Sockel hinunter (am Hang darf unter ihnen keine Luft sein)
+		L.box(weiss,_P(sx*(15-0.15),-0.4,16),Vector3(0.3,5.2,32),Basis(),0.02);L.koll_box(_P(sx*(15-0.15),1.1,16),Vector3(0.3,2.2,32))
+	L.box(weiss,_P(-5,-0.4,0.2),Vector3(20,5.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
 	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
 # Grundstücke im Norden liegen am Hang: unter der Rasenplatte ein 4 m tiefer Sockel (Erde/Mauer),
@@ -518,7 +519,14 @@ func _boden(w:float,d:float,farbe:Color):
 	super._boden(w,d,farbe)
 	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
 	L.box(T(farbe),_P(0,-0.5,d*0.5),Vector3(w-0.02,0.8,d-0.02),Basis(),0.0)
-	L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.55,d*0.5),Vector3(w-0.04,3.4,d-0.04),Basis(),0.0)
+# JEDER Bausatz im Norden (Villa, Laden, Reihenhaus, Trailer …) bekommt den Sockel unter seine ganze Fläche –
+# nicht nur die mit Rasenplatte. Sonst hängen Mauern/Häuser über tiefer liegenden Nachbargrundstücken.
+func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
+	var mit=func():
+		f.call()
+		if not name.begins_with("nt_"):
+			L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.75,d*0.5),Vector3(w-0.04,5.0,d-0.04),Basis(),0.0)
+	super._kit(stil_,typ,name,w,d,mit)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
 func _mb(c:Color,pos:Vector3,gr:Vector3,rot:=Basis(),k:=0.03):L.box(T(c),pos,gr,rot,k)
