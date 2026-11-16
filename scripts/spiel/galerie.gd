@@ -287,6 +287,13 @@ func _nordstaedte():
 			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
 			await _foto("Nord_%02d_%d_strasse"%[nr,k])
 			for c in ta:spiel.geparkt.erase(c);c.queue_free()
+		if not SCHWEBE_LISTE.is_empty():
+			SCHWEBE_LISTE.sort_custom(func(a,b):return a[0]>b[0])
+			var w:Vector3=SCHWEBE_LISTE[0][2];print("SCHWEBT schlimmste ",SCHWEBE_LISTE.slice(0,6))
+			await _laden(Vector2(w.x,w.z))
+			cam.look_at_from_position(w+Vector3(-9,4,9),w);cam.current=true
+			await _foto("Nord_%02d_6_schwebt"%nr)
+			SCHWEBE_LISTE.clear()
 		var hm=G.h_at(mitte.x,mitte.y)
 		cam.look_at_from_position(Vector3(mitte.x-70,hm+28.0,mitte.y+70),Vector3(mitte.x,hm,mitte.y))
 		await _foto("Nord_%02d_4_schraeg"%nr)
@@ -517,6 +524,7 @@ func _stilprobe2():
 
 # Schwebende Teile suchen: jede MultiMesh-Kopie (Natur, Deko, Häuser) im Umkreis – liegt ihre Unterkante
 # mehr als 0,8 m über dem Boden darunter (Strahl auf Gelände/Kollision), wird sie gemeldet
+var SCHWEBE_LISTE:=[]
 func _schwebe_suche(mitte:Vector2,radius:float,nr:int):
 	var ss=spiel.get_world_3d().direct_space_state;var funde={}
 	for m in get_tree().root.find_children("*","MultiMeshInstance3D",true,false):
@@ -535,7 +543,8 @@ func _schwebe_suche(mitte:Vector2,radius:float,nr:int):
 			var r=ss.intersect_ray(q)
 			var boden=r.position.y if not r.is_empty() else spiel.welt.G.h_at(c.x,c.z)
 			var dh=unten-boden
-			if dh>0.8:
+			if dh>0.8 and not nm.begins_with("NF_") and not nm.begins_with("nt_fern"):
+				SCHWEBE_LISTE.append([dh,nm,c])
 				var pre=nm.substr(0,nm.rfind("_")) if nm.rfind("_")>0 else nm
 				if not funde.has(pre):funde[pre]=[0,0.0,Vector3()]
 				funde[pre][0]+=1
