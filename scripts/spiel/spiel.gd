@@ -1190,7 +1190,6 @@ func einstellungen_menue():
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
 	var gq=OptionButton.new();for t in ["Grafik: Mittel (Akku schonen)","Grafik: Hoch","Grafik: Ultra"]:gq.add_item(t)
 	gq.selected=int(st.e.get("grafik",1));w.add_child(gq);gq.item_selected.connect(func(i):st.e.grafik=i;einstellungen_anwenden())
-	var sh=CheckButton.new();sh.text="Schatten";sh.button_pressed=st.e.schatten;w.add_child(sh);sh.toggled.connect(func(b):st.e.schatten=b;einstellungen_anwenden())
 	var gr=CheckButton.new();gr.text="Dichtes Gras";gr.button_pressed=st.e.get("gras",true);w.add_child(gr);gr.toggled.connect(func(b):st.e.gras=b)
 	var fp=CheckButton.new();fp.text="FPS anzeigen";fp.button_pressed=st.e.fps;w.add_child(fp);fp.toggled.connect(func(b):st.e.fps=b)
 	var lc=Label.new();lc.text="Controller: "+("verbunden ✔" if st.controller else "keiner – Xbox-Controller per Bluetooth koppeln");lc.add_theme_font_size_override("font_size",20);lc.autowrap_mode=TextServer.AUTOWRAP_WORD;w.add_child(lc)
@@ -1201,8 +1200,12 @@ func _slider(v:Control,t:String,key:String,a:float,b:float):
 	var s=HSlider.new();s.min_value=a;s.max_value=b;s.step=0.05;s.value=st.e[key];s.custom_minimum_size=Vector2(420,44);v.add_child(s)
 	s.value_changed.connect(func(x):st.e[key]=x)
 
+var _kontur:Node=null
 func einstellungen_anwenden():
-	sun.shadow_enabled=st.e.schatten
+	# Comic-Stil 2: keine Echtzeit-Schatten (Fahrzeuge/Figuren haben Bodenflecken), Tusche-Konturen, wärmeres Licht
+	sun.shadow_enabled=false
+	if _kontur==null and "comic" in welt:
+		var STIL=load("res://scripts/stil.gd");_kontur=STIL.kontur_knoten();add_child(_kontur);STIL.licht(env,sun)
 	# Grafikstufe: Umgebungsverdeckung, indirektes Licht, Spiegelungen, Lichtnebel, Schattenreichweite, Auflösungs-Skalierung (FSR 2)
 	# Handy-Renderer (Mobile): Glow und Nebel, Schatten je nach Stufe, Auflösung per FSR hochskaliert, max. 60 FPS
 	var q=int(st.e.get("grafik",1))

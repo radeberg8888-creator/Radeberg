@@ -76,14 +76,17 @@ void fragment(){
 }
 """
 
+static var spiel_modus:=false   # im Spiel: Materialien nach Farbe teilen, nichts zum Zurückstellen merken
 static func _mat(m:StandardMaterial3D)->Material:
-	if _cache.has(m):return _cache[m]
+	var key=m
+	if spiel_modus:key=m.albedo_color.to_html()+("v" if m.vertex_color_use_as_albedo else "")
+	if _cache.has(key):return _cache[key]
 	if _shader==null:_shader=Shader.new();_shader.code=CODE
 	var s=ShaderMaterial.new();s.shader=_shader
 	s.set_shader_parameter("farbe",m.albedo_color)
 	s.set_shader_parameter("vfarbe",m.vertex_color_use_as_albedo)
 	for t in TEX:s.set_shader_parameter("t_"+t,_tex(t))
-	_cache[m]=s
+	_cache[key]=s
 	return s
 
 static func _geeignet(m)->bool:
@@ -115,27 +118,40 @@ static func anwenden(wurzel:Node):
 			if g.material_override is ShaderMaterial and g.material_override.get_shader_parameter("rausch")!=null:
 				_terrain(g)
 			elif _geeignet(g.material_override):
-				_ov_alt[g]=g.material_override;g.material_override=_mat(g.material_override)
+				if not spiel_modus:_ov_alt[g]=g.material_override
+				g.material_override=_mat(g.material_override)
 			else:meshes[g.mesh]=true
 		elif g is MultiMeshInstance3D and g.multimesh!=null and g.multimesh.mesh!=null:
-			if _geeignet(g.material_override):_ov_alt[g]=g.material_override;g.material_override=_mat(g.material_override)
+			if _geeignet(g.material_override):
+				if not spiel_modus:_ov_alt[g]=g.material_override
+				g.material_override=_mat(g.material_override)
 			else:meshes[g.multimesh.mesh]=true
 	var n=0;var arten={}
-	for me in meshes:
+	for me in (meshes if not spiel_modus else {}):
 		for i in me.get_surface_count():
 			var m=me.surface_get_material(i);var k=m.get_class() if m else "null"
 			if m is StandardMaterial3D and m.vertex_color_use_as_albedo:k+="_vc"
 			arten[k]=arten.get(k,0)+1
-	print("STIL Materialarten ",arten," Meshes ",meshes.size()," Knoten-Overrides ",_ov_alt.size())
+	if not spiel_modus:print("STIL Materialarten ",arten," Meshes ",meshes.size()," Knoten-Overrides ",_ov_alt.size())
 	for me in meshes:
 		for i in me.get_surface_count():
 			var m=me.surface_get_material(i)
 			if _geeignet(m):
-				_rueck.append([me,i,m]);me.surface_set_material(i,_mat(m));n+=1
+				if not spiel_modus:_rueck.append([me,i,m])
+				me.surface_set_material(i,_mat(m));n+=1
 	return n
 
+static var _terr_mat:={}
 static func _terrain(g:MeshInstance3D):
 	if _terr_alt.has(g):return
+	if spiel_modus:
+		var alt0:ShaderMaterial=g.material_override;var r=alt0.get_shader_parameter("rausch")
+		if not _terr_mat.has(r):
+			if _terr_shader==null:_terr_shader=Shader.new();_terr_shader.code=TERR
+			var s0=ShaderMaterial.new();s0.shader=_terr_shader
+			s0.set_shader_parameter("rausch",r);s0.set_shader_parameter("t_gras",_tex("gras"));s0.set_shader_parameter("t_putz",_tex("putz"))
+			_terr_mat[r]=s0
+		g.material_override=_terr_mat[r];return
 	if _terr_shader==null:_terr_shader=Shader.new();_terr_shader.code=TERR
 	var alt:ShaderMaterial=g.material_override
 	var s=ShaderMaterial.new();s.shader=_terr_shader
@@ -235,3 +251,27 @@ static func schatten(sonne:DirectionalLight3D,modus:String):
 	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH)
 	sonne.shadow_blur=2.0;sonne.directional_shadow_max_distance=70.0
 	sonne.shadow_opacity=0.75
+
+# ---------- im Spiel ----------
+static var _matt_mats:={}
+static func matt_schnell(wurzel:Node):
+	# wie matt(), aber jedes Material nur einmal anfassen (Fahrzeuge teilen ihre Materialien)
+	for g in wurzel.find_children("*","GeometryInstance3D",true,false):
+		var ms=[g.material_override]
+		var me=g.mesh if g is MeshInstance3D else null
+		if me:
+			for i in me.get_surface_count():ms.append(me.surface_get_material(i))
+		for m in ms:
+			if m is StandardMaterial3D and not _matt_mats.has(m):
+				_matt_mats[m]=true
+				if m.roughness<0.6 or m.metallic>0.1 or m.metallic_specular>0.4:m.roughness=0.9;m.metallic=0.0;m.metallic_specular=0.15
+static var _fleck_mat:ShaderMaterial
+static func fleck(groesse:Vector2)->MeshInstance3D:
+	# weicher dunkler Fleck unter Fahrzeugen (statt Echtzeit-Schatten)
+	if _fleck_mat==null:
+		_fleck_mat=ShaderMaterial.new();_fleck_mat.shader=Shader.new()
+		_fleck_mat.shader.code="shader_type spatial;render_mode unshaded,depth_draw_never,cull_disabled,shadows_disabled,fog_disabled;void fragment(){vec2 q=abs(UV-vec2(0.5))*2.0;float d=length(max(q-vec2(0.55),vec2(0.0)))/0.45;ALBEDO=vec3(0.0);ALPHA=(1.0-smoothstep(0.0,1.0,d))*0.5;}"
+	var mi=MeshInstance3D.new();mi.name="Fleck";var q=QuadMesh.new();q.size=groesse;q.orientation=PlaneMesh.FACE_Y;mi.mesh=q
+	mi.material_override=_fleck_mat;mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;mi.sorting_offset=-1.0
+	mi.visibility_range_end=120.0
+	return mi

@@ -39,8 +39,14 @@ class CB:
 class CA:
 	var shops:=[];var icons:=[];var villen:=[]
 
+# Comic-Stil 2 (gemalte Oberflächen) auf nachgeladene Viertel anwenden
+const STIL=preload("res://scripts/stil.gd")
+static var stil_an:=true
+func stil(n:Node):
+	if not stil_an:return
+	STIL.spiel_modus=true;STIL.anwenden(n)
 func aus_cache():
-	puffer_setzen(self)
+	puffer_setzen(self);stil(self)
 	# Schilder/Beschriftungen nur aus der Nähe zeichnen (jedes ist ein Zeichenaufruf)
 	for l in find_children("*","Label3D",true,false):
 		if l.visibility_range_end<=0.0 or l.visibility_range_end>90.0:l.visibility_range_end=90.0
@@ -96,7 +102,7 @@ func _eingesetzt(v,n:Node):
 	v.baut=false
 	if v.node!=null or v.get("weg_jetzt",false):
 		v.weg_jetzt=false;n.queue_free();return
-	puffer_setzen(n)
+	puffer_setzen(n);stil(n)
 	v.node=n;add_child(n)
 # Sofort laden (Spielstart/Teleport), blockierend
 func viertel_jetzt(p:Vector2):
@@ -106,7 +112,7 @@ func viertel_jetzt(p:Vector2):
 			if v.laed:
 				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()
-			puffer_setzen(v.node)
+			puffer_setzen(v.node);stil(v.node)
 			add_child(v.node)
 # Ist der Boden an dieser Stelle schon da? (Verkehr/Parker nur dann aufstellen)
 var _vgitter:={}   # 300-m-Zelle -> Viertel (schnelle Abfrage)

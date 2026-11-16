@@ -342,9 +342,9 @@ func _typ(st:String,ecke:bool,r)->String:
 			if haupt and x<0.4:return "block"
 			if x<0.45:return "reihe"
 			if x<0.62:return "block"
-			if x<0.8:return "holz_lang"
+			if x<0.8:return "einfam_lang"
 			if x<0.86:return "tanke" if haupt else "laden"
-			return "holz_kurz"
+			return "einfam_kurz"
 		"villa":return "villa" if x<0.85 else "busch"
 		"redneck":
 			if x<0.55:return "trailer"
@@ -355,11 +355,11 @@ func _typ(st:String,ecke:bool,r)->String:
 		"farm":
 			if x<0.35:return "feld"
 			if x<0.55:return "scheune"
-			if x<0.75:return "holz_lang"
+			if x<0.75:return "einfam_lang"
 			return "feld"
 		"dorf":
-			if x<0.45:return "holz_lang"
-			if x<0.6:return "holz_kurz"
+			if x<0.45:return "einfam_lang"
+			if x<0.6:return "einfam_kurz"
 			if x<0.72:return "reihe"
 			if x<0.8:return "laden"
 			if x<0.84:return "tanke"
@@ -368,8 +368,8 @@ func _typ(st:String,ecke:bool,r)->String:
 	return super._typ(st,ecke,r)
 func _kette(st:String,typ:String)->Array:
 	if typ=="nichts":return []
-	var rest={"hoch":["buero","laden","busch"],"wohn":["reihe","holz_kurz","laden","busch"],"villa":["busch"],"redneck":["trailer","brache","busch"],
-		"farm":["holz_kurz","busch"],"dorf":["holz_kurz","busch"]}
+	var rest={"hoch":["buero","laden","busch"],"wohn":["reihe","einfam_kurz","laden","busch"],"villa":["busch"],"redneck":["trailer","brache","busch"],
+		"farm":["einfam_kurz","busch"],"dorf":["einfam_kurz","busch"]}
 	if not rest.has(st):return super._kette(st,typ)
 	var k=[typ]
 	for r in rest[st]:
@@ -419,6 +419,9 @@ func kits_bauen():
 	for i in 3:_kit("nord","platz","nd_platz_%d"%i,24.0,24.0,func():_k_platz(i))
 	for i in 5:_kit("nord","villa","nd_villa_%d"%i,30.0,32.0,func():_k_villa(i))
 	for i in 6:_kit("nord","trailer","nd_trailer_%d"%i,12.0,16.0,func():_k_trailer(i))
+	# Einfamilienhäuser im Stil der Vorlagebilder (Holzverschalung, Schindeldach, Läden, Veranda)
+	for i in 8:_kit("nord","einfam_lang","nd_einfam_L%d"%i,12.0,24.0,func():_k_einfam(i,true))
+	for i in 8:_kit("nord","einfam_kurz","nd_einfam_K%d"%i,12.0,16.0,func():_k_einfam(i,false))
 	for i in 2:_kit("nord","bar","nd_bar_%d"%i,16.0,16.0,func():_k_bar(i))
 	_kit("nord","tanke","nd_tanke",26.0,22.0,func():_k_tanke())
 	for i in 2:_kit("nord","scheune","nd_scheune_%d"%i,24.0,28.0,func():_k_scheune(i))
@@ -509,6 +512,83 @@ func _k_villa(i:int):
 	L.box(weiss,_P(-5,1.1,0.2),Vector3(20,2.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
 	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
+const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
+const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
+func _mb(c:Color,pos:Vector3,gr:Vector3,rot:=Basis(),k:=0.03):L.box(T(c),pos,gr,rot,k)
+func _ef_fenster(pos:Vector3,yaw:float,laden:Color,b:=1.1,h:=1.5):
+	var r=Basis(Vector3.UP,yaw);var vor=r*Vector3(0,0,1);var weiss=Color(0.95,0.94,0.9)
+	_mb(weiss,pos+vor*0.06,Vector3(b+0.2,h+0.2,0.1),r,0.0)
+	_mb(Color(0.14,0.2,0.28),pos+vor*0.1,Vector3(b,h,0.04),r,0.0)
+	_mb(weiss,pos+vor*0.13,Vector3(0.07,h,0.04),r,0.0);_mb(weiss,pos+vor*0.13,Vector3(b,0.07,0.04),r,0.0)
+	_mb(weiss,pos+vor*0.12+Vector3(0,-h*0.5-0.1,0),Vector3(b+0.4,0.08,0.22),r,0.0)
+	for sx in [-1.0,1.0]:_mb(laden,pos+vor*0.08+r*Vector3(sx*(b*0.5+0.33),0,0),Vector3(0.42,h+0.1,0.05),r,0.015)
+func _k_einfam(i:int,lang:bool):
+	var d=24.0 if lang else 16.0
+	var gras=[Color(0.42,0.6,0.28),Color(0.46,0.62,0.3),Color(0.4,0.56,0.27)][i%3]
+	_boden(12,d,gras)
+	var wand=EF_WAND[i];var laden=EF_LADEN[i];var dach=[Color(0.42,0.36,0.33),Color(0.35,0.36,0.4),Color(0.45,0.3,0.26)][i%3]
+	var zwei=i%3!=2
+	var weiss=Color(0.95,0.94,0.9);var stein=Color(0.55,0.54,0.52)
+	var B:=9.0;var TT:=9.0;var H:=6.2 if zwei else 3.4;var DH:=3.2
+	var c=_P(-0.6,0,4.6+TT*0.5)   # Hausmitte am Boden, Vorderseite (+z) zur Straße
+	# Sockel, Wände, Giebel
+	_mb(stein,c+Vector3(0,0.35,0),Vector3(B+0.2,0.7,TT+0.2))
+	_mb(wand,c+Vector3(0,0.7+H*0.5,0),Vector3(B,H,TT),Basis(),0.05)
+	K.haupt(c+Vector3(0,0.7+H*0.5,0),Vector3(B,H,TT),Basis(),wand,dach,0,false)
+	for sx in [-1.0,1.0]:
+		var x=sx*B*0.5;var y0=0.7+H
+		var a=c+Vector3(x,y0,-TT*0.5);var b=c+Vector3(x,y0,TT*0.5);var t=c+Vector3(x,y0+DH,0)
+		var st=L._st(T(wand));L._tri(st,a,b,t,Vector3(sx,0,0))
+	for sx in [-1.0,1.0]:
+		for sz in [-1.0,1.0]:_mb(weiss,c+Vector3(sx*B*0.5,0.7+H*0.5,sz*TT*0.5),Vector3(0.22,H,0.22),Basis(),0.0)
+	if zwei:_mb(weiss,c+Vector3(0,0.7+3.1,TT*0.5+0.02),Vector3(B,0.18,0.06),Basis(),0.0)
+	# Satteldach mit Überstand, weiße Blenden, First
+	var w=atan2(DH,TT*0.5);var lg=sqrt(DH*DH+TT*TT*0.25)+0.7
+	for sz in [-1.0,1.0]:
+		var r=Basis(Vector3.RIGHT,sz*w)
+		_mb(dach,c+Vector3(0,0.7+H+DH*0.5+0.12,sz*(TT*0.25+0.12)),Vector3(B+1.0,0.22,lg),r,0.04)
+		_mb(weiss,c+Vector3(0,0.7+H-0.1,sz*(TT*0.5+0.55)),Vector3(B+1.0,0.25,0.1),Basis(),0.0)
+		for sx in [-1.0,1.0]:_mb(weiss,c+Vector3(sx*(B*0.5+0.5),0.7+H+DH*0.5,sz*TT*0.25),Vector3(0.12,0.3,lg),r,0.0)
+	_mb(dach.darkened(0.2),c+Vector3(0,0.7+H+DH+0.18,0),Vector3(B+1.0,0.2,0.4),Basis(),0.0)
+	# Schornstein
+	_mb(Color(0.62,0.3,0.24),c+Vector3(B*0.3,0.7+H+DH*0.6,-TT*0.15),Vector3(1.0,DH+1.6,1.0))
+	_mb(stein,c+Vector3(B*0.3,0.7+H+DH*1.1+0.85,-TT*0.15),Vector3(1.2,0.15,1.2),Basis(),0.0)
+	# Fenster
+	for x in [-2.6,2.6]:_ef_fenster(c+Vector3(x,2.2,TT*0.5),0.0,laden)
+	if zwei:
+		for x in [-2.6,0.0,2.6]:_ef_fenster(c+Vector3(x,5.2,TT*0.5),0.0,laden)
+	for sz in [-2.3,2.3]:
+		for sx in [-1.0,1.0]:
+			_ef_fenster(c+Vector3(sx*B*0.5,2.2,sz),sx*PI*0.5,laden)
+			if zwei:_ef_fenster(c+Vector3(sx*B*0.5,5.2,sz),sx*PI*0.5,laden)
+	# Haustür
+	_mb(weiss,c+Vector3(0,1.85,TT*0.5+0.05),Vector3(1.3,2.4,0.1),Basis(),0.0)
+	_mb(Color(0.38,0.24,0.16),c+Vector3(0,1.8,TT*0.5+0.1),Vector3(1.0,2.2,0.06),Basis(),0.0)
+	# Veranda: Boden, Pfosten, Geländer, Dach, Treppe
+	var vz=TT*0.5+1.4
+	_mb(Color(0.55,0.4,0.28),c+Vector3(0,0.65,vz),Vector3(B-0.6,0.18,2.8))
+	L.koll_box(c+Vector3(0,0.37,vz),Vector3(B-0.6,0.74,2.8))
+	for x in [-B*0.5+0.5,-1.0,1.0,B*0.5-0.5]:_mb(weiss,c+Vector3(x,0.7+1.4,vz+1.25),Vector3(0.18,2.8,0.18))
+	_mb(dach,c+Vector3(0,3.75,vz+0.2),Vector3(B-0.2,0.15,3.4),Basis(Vector3.RIGHT,0.18))
+	_mb(weiss,c+Vector3(0,3.5,vz+1.7),Vector3(B-0.2,0.25,0.08),Basis(),0.0)
+	for sx in [-1.0,1.0]:
+		var lb=B*0.5-2.2;var x0=sx*(B*0.25+0.6)
+		_mb(weiss,c+Vector3(x0,1.65,vz+1.25),Vector3(lb,0.08,0.08),Basis(),0.0)
+		_mb(weiss,c+Vector3(x0,0.85,vz+1.25),Vector3(lb,0.06,0.06),Basis(),0.0)
+		for k in int(lb/0.4):_mb(weiss,c+Vector3(x0-lb*0.5+0.2+k*0.4,1.25,vz+1.25),Vector3(0.05,0.8,0.05),Basis(),0.0)
+	for k in 3:_mb(Color(0.6,0.45,0.32),c+Vector3(0,0.5-k*0.2,vz+1.6+k*0.32),Vector3(2.0,0.2,0.34))
+	# Gartenweg, Einfahrt, Briefkasten, Zaun
+	_mb(Color(0.68,0.66,0.62),_P(-0.6,0.01,2.0),Vector3(1.3,0.04,3.6),Basis(),0.0)
+	var ex=4.9
+	_mb(Color(0.42,0.41,0.39),_P(ex,0.01,d*0.5),Vector3(2.4,0.04,d),Basis(),0.0)
+	_mb(Color(0.35,0.26,0.18),_P(1.2,0.55,0.6),Vector3(0.1,1.1,0.1),Basis(),0.0)
+	_mb(Color(0.25,0.3,0.42),_P(1.2,1.2,0.6),Vector3(0.3,0.3,0.55))
+	if i%2==0:
+		for k in 14:_mb(weiss,_P(-5.8+k*0.36,0.45,0.25),Vector3(0.1,0.9,0.05),Basis(),0.0)
+		_mb(weiss,_P(-3.45,0.7,0.25),Vector3(4.8,0.08,0.06),Basis(),0.0)
+	if lang:
+		if i%2==1:GL.garage(_P(ex,0,20.5),0.0)
+		else:GL.huette(_P(-3.0,0,20.5),3.4,4.0,2.3,0.0,wand.darkened(0.15))
 func _k_trailer(i:int):
 	_boden(12,16,Color(0.62,0.52,0.36))
 	var c=_P(-1.0,0,8.0);var al=T([Color(0.82,0.82,0.8),Color(0.85,0.8,0.65),Color(0.7,0.78,0.8),Color(0.8,0.7,0.6),Color(0.78,0.84,0.76),Color(0.9,0.88,0.84)][i])

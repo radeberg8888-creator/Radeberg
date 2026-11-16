@@ -291,6 +291,9 @@ func setup(k:String):
 	var h=ab.size.y*0.62
 	bx.size=Vector3(ab.size.x*0.92,h,ab.size.z*0.94);cs.shape=bx;add_child(cs)
 	cs.position=Vector3(ab.get_center().x,0.38+h*0.5,ab.get_center().z)
+	# Stil: keine Spiegelungen, weicher Fleck statt Schatten
+	var STIL=load("res://scripts/stil.gd");STIL.matt_schnell(visual)
+	var fl=STIL.fleck(Vector2(ab.size.x*1.15,ab.size.z*1.08));fl.position=Vector3(ab.get_center().x,ab.position.y+0.05,ab.get_center().z);add_child(fl)
 	radius=0.5 if big else 0.34
 	var wx=ab.size.x*0.5-0.24;var wz=ab.size.z*0.5-(1.6 if big else 0.82)
 	var rd:Array=t.get_meta("raeder",[])
