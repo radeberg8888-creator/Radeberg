@@ -552,7 +552,7 @@ func _umgebung():
 	var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-48,-35,0);sun.light_color=Color(1.0,0.95,0.86);sun.light_energy=1.15
 	RenderingServer.directional_shadow_atlas_set_size(8192,true)
 	sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.shadow_enabled=true;sun.directional_shadow_max_distance=90.0;sun.shadow_bias=0.04;sun.shadow_normal_bias=1.0;sun.shadow_blur=0.5
+	sun.shadow_enabled=false;sun.directional_shadow_max_distance=90.0;sun.shadow_bias=0.04;sun.shadow_normal_bias=1.0;sun.shadow_blur=0.5
 	welt.add_child(sun)
 	# Wolken: dicke Comic-Wolken aus Kugeln
 	for i in 9:

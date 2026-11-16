@@ -147,7 +147,7 @@ func _ready():
 	var k=gl("interiors/kitchen");var kw=Node3D.new();add_child(kw);kw.add_child(k);k.scale=Vector3.ONE*0.01;kw.position=Vector3(600,0,0)
 	var kab=F.aabb(kw);k.position=-kab.position
 	for p in [Vector3(1.2,2.1,1.6),Vector3(2.4,2.1,3.2)]:
-		var l=OmniLight3D.new();add_child(l);l.position=Vector3(600,0,0)+p;l.omni_range=6;l.light_energy=1.2;l.light_color=Color(1,0.9,0.78);l.shadow_enabled=true
+		var l=OmniLight3D.new();add_child(l);l.position=Vector3(600,0,0)+p;l.omni_range=6;l.light_energy=1.2;l.light_color=Color(1,0.9,0.78);l.shadow_enabled=false
 	var cam=Camera3D.new();cam.near=0.05;cam.far=900;add_child(cam)
 	if not "--play" in args:
 		var sh=load("res://scripts/shots.gd").new();add_child(sh)

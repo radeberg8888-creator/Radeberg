@@ -17,7 +17,7 @@ func _ready():
 		for y in range(0,60):hs.append(Transform3D(Basis(Vector3(1,0,0),PI*0.5),Vector3(-1.5+x*0.1,-0.8+y*0.1,-0.054)))
 	mm.instance_count=hs.size();for i in hs.size():mm.set_instance_transform(i,hs[i])
 	holes.multimesh=mm;var hmat=StandardMaterial3D.new();hmat.albedo_color=Color(0.15,0.13,0.11);holes.material_override=hmat;add_child(holes)
-	var l=DirectionalLight3D.new();add_child(l);l.rotation_degrees=Vector3(-35,25,0);l.light_energy=1.4;l.shadow_enabled=true
+	var l=DirectionalLight3D.new();add_child(l);l.rotation_degrees=Vector3(-35,25,0);l.light_energy=1.4;l.shadow_enabled=false
 	var l2=OmniLight3D.new();add_child(l2);l2.position=Vector3(5,3.5,3);l2.omni_range=12;l2.light_energy=1.2
 	var cats=["Nahkampf","Pistole","Schrotflinte","Maschinenpistole","Sturmgewehr","Gewehr","Scharfschützengewehr"]
 	var rows={};for id in WP.LIST:

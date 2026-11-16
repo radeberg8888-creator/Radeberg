@@ -81,8 +81,8 @@ func _hall():
 		for z in [-6,-1,4]:
 			var t=MeshInstance3D.new();t.mesh=BoxMesh.new();t.mesh.size=Vector3(0.12,0.06,1.8);add_child(t);t.position=Vector3(x,6.3,z);t.material_override=tube
 	for p in [Vector3(-3,5.5,-3),Vector3(3,5.5,-3),Vector3(-3,5.5,3),Vector3(3,5.5,3)]:
-		var l=OmniLight3D.new();add_child(l);l.position=p;l.omni_range=12;l.light_energy=1.3;l.light_color=Color(0.95,0.97,1);l.shadow_enabled=(p.x<0 and p.z<0)
-	var key=SpotLight3D.new();add_child(key);key.position=Vector3(0,6.2,0);key.rotation_degrees=Vector3(-90,0,0);key.spot_range=9;key.spot_angle=45;key.light_energy=3.5;key.shadow_enabled=true
+		var l=OmniLight3D.new();add_child(l);l.position=p;l.omni_range=12;l.light_energy=1.3;l.light_color=Color(0.95,0.97,1);l.shadow_enabled=false
+	var key=SpotLight3D.new();add_child(key);key.position=Vector3(0,6.2,0);key.rotation_degrees=Vector3(-90,0,0);key.spot_range=9;key.spot_angle=45;key.light_energy=3.5;key.shadow_enabled=false
 	for s in [-1,1]:
 		var rim=SpotLight3D.new();add_child(rim);rim.position=Vector3(s*5,2.5,-4);rim.look_at_from_position(rim.position,Vector3(0,0.6,0));rim.spot_range=12;rim.spot_angle=35;rim.light_energy=2.0;rim.light_color=Color(1,0.85,0.7)
 	# Schriftzug

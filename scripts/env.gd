@@ -23,7 +23,7 @@ static func make(root:Node3D,mode:="day")->DirectionalLight3D:
 	env.fog_enabled=true;env.fog_light_color=Color(0.7,0.76,0.84);env.fog_density=0.0018;env.fog_aerial_perspective=0.5;env.fog_sky_affect=0.0
 	env.adjustment_enabled=true;env.adjustment_contrast=1.08;env.adjustment_saturation=1.1
 	we.environment=env;root.add_child(we)
-	var l=DirectionalLight3D.new();l.shadow_enabled=true;l.directional_shadow_max_distance=140.0;l.shadow_blur=1.2;l.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	var l=DirectionalLight3D.new();l.shadow_enabled=false;l.directional_shadow_max_distance=140.0;l.shadow_blur=1.2;l.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	if mode=="sunset":
 		l.light_color=Color(1.0,0.72,0.45);l.light_energy=2.4;l.rotation_degrees=Vector3(-11,-118,0)
 		env.fog_light_color=Color(0.95,0.7,0.5);env.adjustment_saturation=1.18;env.tonemap_exposure=1.15

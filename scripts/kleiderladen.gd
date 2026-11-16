@@ -59,7 +59,7 @@ func room():
 	b.commit(self)
 	for x in [-4.0,0.0,4.0]:
 		var l=OmniLight3D.new();add_child(l);l.position=Vector3(x,3.8,-1.5);l.omni_range=9;l.light_energy=1.4;l.light_color=Color(1,0.95,0.88)
-	var spot=SpotLight3D.new();add_child(spot);spot.position=Vector3(-0.9,4.0,1.5);spot.look_at(Vector3(-0.9,1,0));spot.light_energy=4;spot.spot_angle=28;spot.shadow_enabled=true
+	var spot=SpotLight3D.new();add_child(spot);spot.position=Vector3(-0.9,4.0,1.5);spot.look_at(Vector3(-0.9,1,0));spot.light_energy=4;spot.spot_angle=28;spot.shadow_enabled=false
 	var sign=Label3D.new();sign.text="STOFFWECHSEL";sign.font_size=160;sign.pixel_size=0.0032;sign.modulate=Color(0.15,0.15,0.17);sign.outline_size=0;add_child(sign);sign.position=Vector3(-3.0,3.4,-5.9)
 
 func make_player():
