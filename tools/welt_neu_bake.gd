@@ -1136,13 +1136,21 @@ func _norden()->Dictionary:
 		if not is_nan(thn):HN[j]=thn
 	_grundstuecke_ebnen(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
 	_strassen_korridor(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
-	var n_nat=0
+	var n_nat=0;var dbg={}
 	for p in NL.PLATZ:
-		if not String(p[0]).begins_with("nt_"):continue
+		var kn:String=p[0];var kk=K.KITS[kn]
+		var klein=kn.begins_with("nt_") or (kk.w<=8.0 and kk.d<=8.0 and not kn.begins_with("kn_"))
 		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
 		if STADT.has_point(w):continue
 		var hy=G0._bilin(HN,w.x,w.y)-NL.H0-0.1
-		if abs(hy-xf.origin.y)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
+		var dh=xf.origin.y-hy
+		if abs(dh)>1.0:
+			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn
+			if not dbg.has(pre):dbg[pre]=[0,0.0,w]
+			dbg[pre][0]+=1
+			if abs(dh)>abs(dbg[pre][1]):dbg[pre][1]=dh;dbg[pre][2]=w
+		if klein and abs(dh)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
+	print("HOEHE abweichend (vor Korrektur) ",dbg)
 	for i in NATUR_FERN.size():
 		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)
 		if STADT.has_point(w):continue

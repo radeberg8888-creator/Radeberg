@@ -245,6 +245,7 @@ func _nordstaedte():
 					var w=p+nn*r.w*q;var g=G.h_at(w.x,w.y)-float(r.h[i])
 					if g>ueber:ueber=g;wo_u=w
 					if -g>unter:unter=-g;wo_d=w
+		await _laden(mitte);_schwebe_suche(mitte,350.0,nr)
 		print("MESS Ort %d bei (%d,%d): Strassen %d  Gelaende ueber Fahrbahn max %.2f m bei %s  Fahrbahn ueber Gelaende max %.2f m bei %s"%[nr,mitte.x,mitte.y,ro.size(),ueber,str(wo_u.round()),unter,str(wo_d.round())])
 		# 3 Straßenbilder (Mitte, zwei Enden), schräg von oben, Luftbild
 		var ausw=[]
@@ -504,3 +505,30 @@ func _stilprobe2():
 		if sonne:
 			sonne.shadow_enabled=true;sonne.light_color=sonne_alt[0];sonne.light_energy=sonne_alt[1];sonne.shadow_blur=sonne_alt[2];sonne.directional_shadow_max_distance=sonne_alt[3]
 		for c in autos:c.queue_free()
+
+# Schwebende Teile suchen: jede MultiMesh-Kopie (Natur, Deko, Häuser) im Umkreis – liegt ihre Unterkante
+# mehr als 0,8 m über dem Boden darunter (Strahl auf Gelände/Kollision), wird sie gemeldet
+func _schwebe_suche(mitte:Vector2,radius:float,nr:int):
+	var ss=spiel.get_world_3d().direct_space_state;var funde={}
+	for m in get_tree().root.find_children("*","MultiMeshInstance3D",true,false):
+		var nm:String=m.name
+		if nm.ends_with("_ink") or m.multimesh==null or m.multimesh.mesh==null:continue
+		var ab:AABB=m.multimesh.mesh.get_aabb()
+		if ab.size.y<0.15:continue
+		var mm=m.multimesh
+		for i in mm.instance_count:
+			var gx:Transform3D=m.global_transform*mm.get_instance_transform(i)
+			if gx.basis.get_scale().x<0.01:continue
+			var c=gx*ab.get_center()
+			if Vector2(c.x,c.z).distance_to(mitte)>radius:continue
+			var unten=(gx*ab).position.y
+			var q=PhysicsRayQueryParameters3D.create(Vector3(c.x,unten+0.3,c.z),Vector3(c.x,unten-30.0,c.z))
+			var r=ss.intersect_ray(q)
+			var boden=r.position.y if not r.is_empty() else spiel.welt.G.h_at(c.x,c.z)
+			var dh=unten-boden
+			if dh>0.8:
+				var pre=nm.substr(0,nm.rfind("_")) if nm.rfind("_")>0 else nm
+				if not funde.has(pre):funde[pre]=[0,0.0,Vector3()]
+				funde[pre][0]+=1
+				if dh>funde[pre][1]:funde[pre][1]=dh;funde[pre][2]=c
+	print("SCHWEBT Ort ",nr," ",funde)
