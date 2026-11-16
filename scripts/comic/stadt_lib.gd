@@ -164,10 +164,9 @@ const ASPHALT:=KOPF+"""
 uniform vec3 farbe:source_color=vec3(0.3,0.31,0.33);
 void fragment(){
 	vec2 p=wp.xz;
+	// gleichmäßiger Belag: feines Korn, kaum großflächige Flecken
 	float k=vn(p*6.0); float g=vn(p*0.8);
-	vec3 c=farbe*(0.94+0.1*k)*(0.96+0.06*g);
-	// Flickstellen
-	if(vn(p/4.0)>0.78) c*=0.9;
+	vec3 c=farbe*(0.95+0.07*k)*(0.985+0.03*g);
 	ALBEDO=c; ROUGHNESS=0.95;
 }
 """

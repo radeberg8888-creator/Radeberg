@@ -42,6 +42,7 @@ class CA:
 # Comic-Stil 2 (gemalte Oberflächen) auf nachgeladene Viertel anwenden
 const STIL=preload("res://scripts/stil.gd")
 static var stil_an:=true
+var _stil_mx:=Mutex.new()
 func stil(n:Node):
 	if not stil_an:return
 	STIL.spiel_modus=true;STIL.anwenden(n)
@@ -76,6 +77,8 @@ func _process(dt:float):
 				var ps:PackedScene=ResourceLoader.load_threaded_get(v.datei);v.laed=false;v.baut=true
 				WorkerThreadPool.add_task(func():
 					var n=ps.instantiate()
+					_stil_mx.lock();stil(n);_stil_mx.unlock()   # Materialumstellung im Hintergrund, nicht im Bild-Takt
+					n.set_meta("stil",true)
 					_eingesetzt.call_deferred(v,n))
 				break
 			elif st!=ResourceLoader.THREAD_LOAD_IN_PROGRESS:v.laed=false
@@ -102,7 +105,8 @@ func _eingesetzt(v,n:Node):
 	v.baut=false
 	if v.node!=null or v.get("weg_jetzt",false):
 		v.weg_jetzt=false;n.queue_free();return
-	puffer_setzen(n);stil(n)
+	puffer_setzen(n)
+	if not n.has_meta("stil"):stil(n)
 	v.node=n;add_child(n)
 # Sofort laden (Spielstart/Teleport), blockierend
 func viertel_jetzt(p:Vector2):

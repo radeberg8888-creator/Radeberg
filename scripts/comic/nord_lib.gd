@@ -1122,7 +1122,7 @@ func belag_mat(art:String)->Material:
 	return m
 func fahrbahnen():
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
-	var bank=T(Color(0.47,0.6,0.33));L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
+	var bank=T(Color(0.47,0.6,0.33));var bank_sand=T(Color(0.72,0.62,0.45));L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
 	for ri in ROADS.size():
 		var r=ROADS[ri];var belag=r.get("belag","asphalt")
@@ -1145,7 +1145,9 @@ func fahrbahnen():
 			L._tri(so,Ls[i],Ls[i+1],Rs[i+1],Vector3.UP);L._tri(so,Ls[i],Rs[i+1],Rs[i],Vector3.UP)
 		# Bankett: schräg vom Fahrbahnrand 2,6 m nach außen ins Gelände (statt senkrechter Kante)
 		if not r.stadt:
-			var sb=L._st(bank,true)
+			# Bankett in der Farbe der Umgebung (Wüste: Sand/Schotter statt grünem Streifen)
+			var ba=_boden_art(r.P[n/2]+C)
+			var sb=L._st(bank_sand if ba[2]+ba[4]>0.5 else bank,true)
 			for i in n-1:
 				for sd in [1,-1]:
 					var a=Ls[i] if sd>0 else Rs[i];var b=Ls[i+1] if sd>0 else Rs[i+1]
@@ -1192,9 +1194,7 @@ func fahrbahnen():
 						L.box(L.M.metall,Vector3(q.x,y+0.3,q.y),Vector3(0.1,0.6,0.1),bas,0.0)
 			elif r.typ!="gasse" and fmod(s,9.0)<3.0 and not nah_kreuzung(p,2.0):
 				L.box(L.M.markierung if r.stadt else gelb,Vector3(p.x,y,p.y),Vector3(0.14,0.012,2.6),bas,0.0)
-			if r.stadt and rng.randf()<0.08:
-				var q=p+nn*rng.randf_range(-r.w+0.8,r.w-0.8)
-				L.box(flick,Vector3(q.x,y-0.005,q.y),Vector3(rng.randf_range(0.8,2.6),0.01,rng.randf_range(0.6,1.8)),Basis(Vector3.UP,rng.randf()*TAU),0.0)
+			pass
 			s+=3.0
 	# Rollbahnen
 	var so2=L._st(L.M.asphalt,true)

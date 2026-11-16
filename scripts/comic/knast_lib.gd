@@ -52,11 +52,10 @@ func _mauer():
 	L.box(BETON2,Vector3(0,KB+7.1,0),Vector3(40.2,0.25,1.1),Basis(),0.03)
 	for x in range(-18,20,4):L.box(BETON2,Vector3(x,KB+3.5,-0.38),Vector3(0.5,7.0,0.12),Basis(),0.0)
 	# Drahtrolle: Ringe entlang der Mauer
-	for k in 40:
-		var x=-19.5+k
-		L.zyl(DRAHT,Vector3(x,KB+7.3,-0.35),Vector3(x+0.6,KB+7.95,0.35),0.03,1.0)
-		L.zyl(DRAHT,Vector3(x,KB+7.95,-0.35),Vector3(x+0.6,KB+7.3,0.35),0.03,1.0)
-	L.zyl(DRAHT,Vector3(-20,KB+7.65,0),Vector3(20,KB+7.65,0),0.02,1.0)
+	L.zyl(DRAHT,Vector3(-20,KB+7.6,0),Vector3(20,KB+7.6,0),0.34,1.0)
+	for k in 10:
+		var x=-18.0+k*4.0
+		L.zyl(T(Color(0.62,0.64,0.66)),Vector3(x-0.06,KB+7.6,0),Vector3(x+0.06,KB+7.6,0),0.37,1.0)
 	for x in [-10.0,10.0]:
 		L.zyl(GITTER,Vector3(x,KB+7.2,0.3),Vector3(x,KB+8.4,1.4),0.06,1.1)
 		L.box(T(Color(1.0,0.96,0.75)),Vector3(x,KB+8.4,1.5),Vector3(0.7,0.3,0.4),Basis(Vector3.RIGHT,0.5),0.02)
@@ -68,7 +67,7 @@ func _zaun():
 		L.zyl(GITTER,Vector3(x,KB+4.5,0),Vector3(x,KB+5.2,-0.6),0.04,1.1)
 	for k in 5:L.box(DRAHT,Vector3(0,KB+0.5+k*1.0,0),Vector3(10.0,0.03,0.02),Basis(),0.0)
 	for k in 26:L.box(DRAHT,Vector3(-5.0+k*0.4,KB+2.25,0),Vector3(0.02,4.4,0.02),Basis(),0.0)
-	for k in 3:L.zyl(DRAHT,Vector3(-5,KB+4.6+k*0.22,-0.15-k*0.2),Vector3(5,KB+4.6+k*0.22,-0.15-k*0.2),0.02,1.0)
+	L.zyl(DRAHT,Vector3(-5,KB+4.85,-0.4),Vector3(5,KB+4.85,-0.4),0.22,1.0)
 	L.koll_box(Vector3(0,KB+2.3,0),Vector3(10.0,4.6,0.25))
 func _turm():
 	# Wachturm 15 m: Betonschaft, verglaste Kanzel mit Umgang, Flachdach, Suchscheinwerfer, Leiter

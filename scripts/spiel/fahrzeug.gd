@@ -46,7 +46,25 @@ var _v_alt:=Vector3.ZERO
 var _crash_t:=0.0
 var _eigen:=false
 var _splitter:=false
+# Bodenfleck (statt Schatten): liegt immer auf dem Boden darunter, kippt nicht mit dem Auto, wird beim Springen kleiner
+var _fleck:MeshInstance3D
+func _fleck_schritt():
+	if _fleck==null:return
+	var gb=global_transform.basis.orthonormalized()
+	var mitte=global_transform*Vector3(ab.get_center().x,ab.position.y,ab.get_center().z)
+	if modus=="ki" or sleeping or (freeze and modus!="spieler"):
+		# fährt/steht auf der Straße: Fleck liegt flach unter dem Auto
+		_fleck.visible=true;_fleck.global_transform=Transform3D(gb,mitte+gb.y*0.05);return
+	var q=PhysicsRayQueryParameters3D.create(mitte+gb.y*0.8,mitte+Vector3.DOWN*12.0);q.exclude=[get_rid()]
+	var r=get_world_3d().direct_space_state.intersect_ray(q)
+	if r.is_empty():_fleck.visible=false;return
+	var n:Vector3=r.normal;var z:Vector3=gb.z-n*gb.z.dot(n)
+	if z.length()<0.05:z=Vector3.BACK
+	z=z.normalized();var x=n.cross(z).normalized()
+	var hoch=max(0.0,mitte.y-r.position.y);var sk=clamp(1.0-hoch*0.08,0.45,1.0)
+	_fleck.visible=true;_fleck.global_transform=Transform3D(Basis(x,n,z).scaled(Vector3(sk,1.0,sk)),r.position+n*0.05)
 func _physics_process(dt):
+	_fleck_schritt()
 	if freeze or modus=="ki":_v_alt=Vector3.ZERO;_staub_aus();return
 	_staub_schritt(dt)
 	_crash_t=max(0.0,_crash_t-dt)
@@ -293,7 +311,7 @@ func setup(k:String):
 	cs.position=Vector3(ab.get_center().x,0.38+h*0.5,ab.get_center().z)
 	# Stil: keine Spiegelungen, weicher Fleck statt Schatten
 	var STIL=load("res://scripts/stil.gd");STIL.matt_schnell(visual)
-	var fl=STIL.fleck(Vector2(ab.size.x*1.15,ab.size.z*1.08));fl.position=Vector3(ab.get_center().x,ab.position.y+0.05,ab.get_center().z);add_child(fl)
+	_fleck=STIL.fleck(Vector2(ab.size.x*1.15,ab.size.z*1.08));_fleck.top_level=true;add_child(_fleck)
 	radius=0.5 if big else 0.34
 	var wx=ab.size.x*0.5-0.24;var wz=ab.size.z*0.5-(1.6 if big else 0.82)
 	var rd:Array=t.get_meta("raeder",[])

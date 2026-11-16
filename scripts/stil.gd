@@ -7,6 +7,7 @@ extends RefCounted
 const TEX:=["holz","schindel","backstein","asphalt","platten","gras","putz"]
 static var _texturen:={}
 static var _shader:Shader
+static var _shader_b:Shader
 static var _cache:={}       # StandardMaterial3D -> ShaderMaterial
 static var _rueck:=[]       # [mesh, surface, original]
 static var _terr_alt:={}    # Knoten -> altes material_override
@@ -79,10 +80,12 @@ void fragment(){
 static var spiel_modus:=false   # im Spiel: Materialien nach Farbe teilen, nichts zum Zurückstellen merken
 static func _mat(m:StandardMaterial3D)->Material:
 	var key=m
-	if spiel_modus:key=m.albedo_color.to_html()+("v" if m.vertex_color_use_as_albedo else "")
+	var beid=m.cull_mode==BaseMaterial3D.CULL_DISABLED
+	if spiel_modus:key=m.albedo_color.to_html()+("v" if m.vertex_color_use_as_albedo else "")+("b" if beid else "")
 	if _cache.has(key):return _cache[key]
 	if _shader==null:_shader=Shader.new();_shader.code=CODE
-	var s=ShaderMaterial.new();s.shader=_shader
+	if _shader_b==null:_shader_b=Shader.new();_shader_b.code=CODE.replace("render_mode diffuse_toon,","render_mode cull_disabled,diffuse_toon,")
+	var s=ShaderMaterial.new();s.shader=_shader_b if beid else _shader
 	s.set_shader_parameter("farbe",m.albedo_color)
 	s.set_shader_parameter("vfarbe",m.vertex_color_use_as_albedo)
 	for t in TEX:s.set_shader_parameter("t_"+t,_tex(t))
@@ -197,7 +200,7 @@ void fragment(){
 	// einfacher Differenz -> schräge Flächen (Straße, Hang) bekommen keine Linien
 	float k=abs(zl+zr-2.0*z)+abs(zu+zo-2.0*z);
 	float e=smoothstep(0.035,0.09,k/max(z,0.5));
-	e*=1.0-smoothstep(260.0,600.0,z);
+	e*=(1.0-smoothstep(90.0,320.0,z))*mix(1.0,0.55,smoothstep(25.0,140.0,z));
 	vec3 c=texture(bild,uv).rgb;
 	vec3 cl=texture(bild,uv-vec2(px.x,0.0)).rgb;vec3 cu=texture(bild,uv-vec2(0.0,px.y)).rgb;
 	float fk=length(c-cl)+length(c-cu);

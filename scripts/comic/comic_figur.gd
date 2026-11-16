@@ -32,7 +32,11 @@ static func anziehen(p:Node3D,o:Dictionary):
 	var sk:Skeleton3D=U.find_skel(p)
 	if sk==null:return
 	for m in p.find_children("*","MeshInstance3D",true,false):
-		m.get_parent().remove_child(m);m.free()
+		# erst die Materialien lösen, dann freigeben (sonst meldet der Renderer "material is null")
+		m.material_override=null
+		for i in m.get_surface_override_material_count():m.set_surface_override_material(i,null)
+		m.mesh=null
+		m.get_parent().remove_child(m);m.queue_free()
 	_koerper(p,sk,o)
 	p.set_meta("comic",o)
 

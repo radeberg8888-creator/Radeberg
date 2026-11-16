@@ -1128,6 +1128,26 @@ func _norden()->Dictionary:
 		kachel.call(key).add_child(c)
 	print("NORD Geometrie in der Stadt verworfen ",weg)
 	flach.free();L.welt=alt_w
+	# Natur wurde vor dem Ebnen der Grundstücke und dem Straßenband gesetzt -> auf die endgültige Höhe legen
+	# (sonst schweben Felsen/Blumenbeete über geebneten Flächen oder stecken im Damm)
+	var HN=PackedFloat32Array(G0._nh);var gnx=G0.rx;var gnz=G0.rz
+	for j in gnx*gnz:
+		var thn=NL.TH[j]
+		if not is_nan(thn):HN[j]=thn
+	_grundstuecke_ebnen(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
+	_strassen_korridor(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
+	var n_nat=0
+	for p in NL.PLATZ:
+		if not String(p[0]).begins_with("nt_"):continue
+		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
+		if STADT.has_point(w):continue
+		var hy=G0._bilin(HN,w.x,w.y)-NL.H0-0.1
+		if abs(hy-xf.origin.y)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
+	for i in NATUR_FERN.size():
+		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)
+		if STADT.has_point(w):continue
+		xf.origin.y=G0._bilin(HN,w.x,w.y)-0.1;NATUR_FERN[i][1]=xf
+	print("NATUR auf Endgelaende gesetzt ",n_nat)
 	var PL={}
 	for p in NL.PLATZ:
 		var key=schl.call(p[1].origin)
@@ -1404,6 +1424,7 @@ const C_TROCKEN:=Color(0.76,0.66,0.38)
 const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
 var HG:PackedFloat32Array
+var GARTEN:=PackedFloat32Array()
 func _farbe(i:int,k:int,h:float)->Color:
 	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP
 	var i0=max(i-1,0);var i1=min(i+1,nx-1);var k0=max(k-1,0);var k1=min(k+1,G0.rz-1)
@@ -1412,7 +1433,13 @@ func _farbe(i:int,k:int,h:float)->Color:
 	if STADT.has_point(w):
 		c=N.farbe(x,z,h,min(stg,0.3),G0.kuesten_abstand(x,z),0.0)
 		if h>2.5:c=c.lerp(Color(0.4,0.52,0.28),0.3)
-	else:c=N.farbe(x,z,h,stg,G0.kuesten_abstand(x,z),_trocken(w))
+	else:
+		c=N.farbe(x,z,h,stg,G0.kuesten_abstand(x,z),_trocken(w))
+		# Gärten: um Häuser/Grundstücke gepflegter Rasen, weich ins Umland (auch in der Wüste)
+		var j=k*nx+i
+		if GARTEN.size()>j and GARTEN[j]>0.0:
+			var rasen=Color(0.38,0.57,0.25).lerp(Color(0.44,0.6,0.27),fmod(abs(x*0.013+z*0.007),1.0))
+			c=c.lerp(rasen,smoothstep(0.0,1.0,GARTEN[j])*0.9)
 	# im Spiel hellen Licht + Dunst die Farben auf -> Gelände etwas dunkler und satter
 	var g=c.v;c.v=g*0.82;c.s=min(c.s*1.12,1.0)
 	return c
@@ -1539,6 +1566,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 		n+=1
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
+	GARTEN=gew   # Rasen um die Grundstücke (weicher 12-m-Übergang), siehe _farbe
 	print("GRUNDSTUECKE geebnet ",n)
 
 func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float):

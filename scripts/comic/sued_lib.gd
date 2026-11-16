@@ -1030,7 +1030,7 @@ func fahrbahnen():
 			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1]
 			if r.typ!="gasse" and fmod(s,9.0)<3.0 and not nah_kreuzung(p,2.0) and rng.randf()<0.85:
 				L.box(L.M.markierung,Vector3(p.x,0.045,p.y),Vector3(0.14,0.012,2.6),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
-			if rng.randf()<0.12 and stil(p) in ["ghetto","sued","docks","industrie"]:
+			if rng.randf()<0.03 and stil(p) in ["ghetto","docks"]:
 				var q=p+Vector2(-t.y,t.x)*rng.randf_range(-r.w+0.8,r.w-0.8)
 				L.box(flick,Vector3(q.x,0.04,q.y),Vector3(rng.randf_range(0.8,2.6),0.01,rng.randf_range(0.6,1.8)),Basis(Vector3.UP,rng.randf()*TAU),0.0)
 			s+=3.0
