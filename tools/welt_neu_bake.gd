@@ -1554,12 +1554,14 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 		var poly=PackedVector2Array()
 		for e in t[0]:poly.append(e+NO.C)
 		var h:float=t[1]-0.22
-		var gross=Geometry2D.offset_polygon(poly,3.0)
+		# 8 m Rand: jeder Rasterpunkt (10 m) einer Zelle, die das Grundstück berührt, liegt voll auf Grundstückshöhe –
+		# sonst hängt das Gelände zwischen den Punkten durch und Büsche/Beete/Häuserkanten schweben am Hang
+		var gross=Geometry2D.offset_polygon(poly,8.0)
 		if gross.is_empty():continue
 		var pg:PackedVector2Array=gross[0]
 		var bb=Rect2(pg[0],Vector2.ZERO)
 		for q in pg:bb=bb.expand(q)
-		bb=bb.grow(12.0)
+		bb=bb.grow(16.0)
 		for k in range(max(int((bb.position.y-Z0)/ST),0),min(int((bb.end.y-Z0)/ST)+2,nz)):
 			for i in range(max(int((bb.position.x-X0)/ST),0),min(int((bb.end.x-X0)/ST)+2,nx)):
 				var w=Vector2(X0+i*ST,Z0+k*ST);var j=k*nx+i
@@ -1569,7 +1571,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 				else:
 					var d=1e9
 					for a in pg.size():d=min(d,Geometry2D.get_closest_point_to_segment(w,pg[a],pg[(a+1)%pg.size()]).distance_to(w))
-					g=1.0-smoothstep(0.0,12.0,d)
+					g=1.0-smoothstep(0.0,16.0,d)
 				if g>gew[j]:gew[j]=g;ziel[j]=h
 		n+=1
 	for j in nx*nz:

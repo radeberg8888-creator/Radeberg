@@ -276,8 +276,17 @@ func _nordstaedte():
 				for f in 15:await get_tree().process_frame
 				await get_tree().create_timer(1.5).timeout
 			var h=float(r.h[i])
+			# Bodenfleck-Test: ein Auto steht, eins "springt" (2 m hoch, schräg) – der Fleck muss flach am Boden bleiben
+			var ta=[]
+			if k==1:
+				ta=_autos_parken(r,min(i+2,r.P.size()-3),["c_trabant_blau","c_jdm_blau"])
+				if ta.size()==2:
+					var sp=ta[1];sp.modus="spieler";sp.freeze=true
+					sp.global_transform=Transform3D(Basis(Vector3.UP,atan2(t.x,t.y)+PI)*Basis(Vector3.RIGHT,0.35),sp.global_position+Vector3(0,2.0,0))
+				for f in 40:await get_tree().physics_frame
 			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
 			await _foto("Nord_%02d_%d_strasse"%[nr,k])
+			for c in ta:spiel.geparkt.erase(c);c.queue_free()
 		var hm=G.h_at(mitte.x,mitte.y)
 		cam.look_at_from_position(Vector3(mitte.x-70,hm+28.0,mitte.y+70),Vector3(mitte.x,hm,mitte.y))
 		await _foto("Nord_%02d_4_schraeg"%nr)
