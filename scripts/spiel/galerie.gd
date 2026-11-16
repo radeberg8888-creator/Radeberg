@@ -271,6 +271,8 @@ func _nordstaedte():
 			k+=1
 			var r=S.roads[ri];var i=r.P.size()/2;var p:Vector2=r.P[i];var t:Vector2=r.T[i]
 			spiel.spieler.global_position=Vector3(p.x,float(r.h[i])+60.0,p.y)
+			# Kamera schon hierhin, sonst entlädt die Welt die frisch geladenen Viertel wieder (Kamera noch am alten Ort)
+			cam.global_position=Vector3(p.x,float(r.h[i])+3.0,p.y);cam.current=true
 			for rund in 3:
 				spiel.welt.viertel_jetzt(p)
 				for f in 15:await get_tree().process_frame
@@ -286,12 +288,16 @@ func _nordstaedte():
 				for f in 40:await get_tree().physics_frame
 			cam.look_at_from_position(Vector3(p.x-t.x*9.0,h+3.2,p.y-t.y*9.0),Vector3(p.x+t.x*30.0,h+1.0,p.y+t.y*30.0));cam.current=true
 			await _foto("Nord_%02d_%d_strasse"%[nr,k])
+			if ta.size()==2 and nr<=2:
+				var a0:Vector3=ta[0].global_position;var a1:Vector3=ta[1].global_position
+				cam.look_at_from_position((a0+a1)*0.5+Vector3(t.y*9.0,3.0,-t.x*9.0)-Vector3(t.x,0,t.y)*6.0,(a0+a1)*0.5);cam.current=true
+				await _foto("Nord_%02d_7_autofleck"%nr)
 			for c in ta:spiel.geparkt.erase(c);c.queue_free()
 		if not SCHWEBE_LISTE.is_empty():
 			SCHWEBE_LISTE.sort_custom(func(a,b):return a[0]>b[0])
 			var w:Vector3=SCHWEBE_LISTE[0][2];print("SCHWEBT schlimmste ",SCHWEBE_LISTE.slice(0,6))
-			await _laden(Vector2(w.x,w.z))
-			cam.look_at_from_position(w+Vector3(-9,4,9),w);cam.current=true
+			cam.global_position=w+Vector3(-14,6,14);await _laden(Vector2(w.x,w.z))
+			cam.look_at_from_position(w+Vector3(-14,6,14),w);cam.current=true
 			await _foto("Nord_%02d_6_schwebt"%nr)
 			SCHWEBE_LISTE.clear()
 		var hm=G.h_at(mitte.x,mitte.y)

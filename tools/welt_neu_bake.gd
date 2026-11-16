@@ -1550,29 +1550,30 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	# über/unter der Bodenplatte liegen (Figur sank durch die Terrasse).
 	var n=0;var gew=PackedFloat32Array();gew.resize(nx*nz);gew.fill(0.0)
 	var ziel=PackedFloat32Array();ziel.resize(nx*nz)
+	var dmin=PackedFloat32Array();dmin.resize(nx*nz);dmin.fill(1e9)
 	for t in NO.TERR:
 		var poly=PackedVector2Array()
 		for e in t[0]:poly.append(e+NO.C)
 		var h:float=t[1]-0.22
-		# 8 m Rand: jeder Rasterpunkt (10 m) einer Zelle, die das Grundstück berührt, liegt voll auf Grundstückshöhe –
-		# sonst hängt das Gelände zwischen den Punkten durch und Büsche/Beete/Häuserkanten schweben am Hang
-		var gross=Geometry2D.offset_polygon(poly,8.0)
+		# 6 m Rand voll auf Grundstückshöhe (das 10-m-Raster hängt sonst zwischen den Punkten durch), 14 m weich.
+		# Grenzen sich zwei Grundstücke auf verschiedener Höhe, gewinnt je Rasterpunkt das nähere (nicht das erste)
+		var gross=Geometry2D.offset_polygon(poly,6.0)
 		if gross.is_empty():continue
 		var pg:PackedVector2Array=gross[0]
 		var bb=Rect2(pg[0],Vector2.ZERO)
 		for q in pg:bb=bb.expand(q)
-		bb=bb.grow(16.0)
+		bb=bb.grow(14.0)
 		for k in range(max(int((bb.position.y-Z0)/ST),0),min(int((bb.end.y-Z0)/ST)+2,nz)):
 			for i in range(max(int((bb.position.x-X0)/ST),0),min(int((bb.end.x-X0)/ST)+2,nx)):
 				var w=Vector2(X0+i*ST,Z0+k*ST);var j=k*nx+i
 				if STADT.has_point(w):continue
-				var g:float
-				if Geometry2D.is_point_in_polygon(w,pg):g=1.0
-				else:
-					var d=1e9
-					for a in pg.size():d=min(d,Geometry2D.get_closest_point_to_segment(w,pg[a],pg[(a+1)%pg.size()]).distance_to(w))
-					g=1.0-smoothstep(0.0,16.0,d)
-				if g>gew[j]:gew[j]=g;ziel[j]=h
+				var d0=0.0
+				if not Geometry2D.is_point_in_polygon(w,poly):
+					d0=1e9
+					for a in poly.size():d0=min(d0,Geometry2D.get_closest_point_to_segment(w,poly[a],poly[(a+1)%poly.size()]).distance_to(w))
+				var g=1.0-smoothstep(6.0,20.0,d0)
+				if g<=0.0:continue
+				if d0<dmin[j]:dmin[j]=d0;gew[j]=g;ziel[j]=h
 		n+=1
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
@@ -1604,7 +1605,6 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 						# Grundstücke (Häuser, Gärten) behalten ihre Höhe, außer direkt am Fahrbahn-/Gehwegrand –
 						# sonst schneidet das Band einer Straße hinter dem Haus das Gelände unter dem Garten weg
 						var kern_j=kern
-						if NO.LOT[j]!=0:kern_j=min(kern,wk+3.0)
 						if not best.has(j):best[j]=[d,y,kern_j,R,(y if d<=kern_j else INF)]
 						else:
 							var e=best[j]
