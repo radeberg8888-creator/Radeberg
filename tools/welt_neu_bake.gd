@@ -1148,7 +1148,7 @@ func _norden()->Dictionary:
 			var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
 			var pts=[Vector3(-hw,0,0),Vector3(hw,0,0),Vector3(-hw,0,-dd),Vector3(hw,0,-dd),Vector3(0,0,-dd*0.5)]
 			if kn.begins_with("nt_"):
-				var rr=clamp(kk.w*0.35,0.8,2.5)
+				var rr=clamp(kk.w*0.5,1.2,3.5)
 				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
 			for q in pts:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C

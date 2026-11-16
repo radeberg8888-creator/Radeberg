@@ -516,7 +516,9 @@ func _k_villa(i:int):
 # damit nichts in der Luft hängt, wenn das Gelände neben dem Grundstück abfällt
 func _boden(w:float,d:float,farbe:Color):
 	super._boden(w,d,farbe)
-	L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.17,d*0.5),Vector3(w-0.02,4.0,d-0.02),Basis(),0.0)
+	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
+	L.box(T(farbe),_P(0,-0.5,d*0.5),Vector3(w-0.02,0.8,d-0.02),Basis(),0.0)
+	L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.55,d*0.5),Vector3(w-0.04,3.4,d-0.04),Basis(),0.0)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
 func _mb(c:Color,pos:Vector3,gr:Vector3,rot:=Basis(),k:=0.03):L.box(T(c),pos,gr,rot,k)
@@ -591,9 +593,8 @@ func _k_einfam(i:int,lang:bool):
 	if i%2==0:
 		for k in 14:_mb(weiss,_P(-5.8+k*0.36,0.45,0.25),Vector3(0.1,0.9,0.05),Basis(),0.0)
 		_mb(weiss,_P(-3.45,0.7,0.25),Vector3(4.8,0.08,0.06),Basis(),0.0)
-	if lang:
-		if i%2==1:GL.garage(_P(ex,0,20.5),0.0)
-		else:GL.huette(_P(-3.0,0,20.5),3.4,4.0,2.3,0.0,wand.darkened(0.15))
+	# (Schuppen/Garage hinten im Garten entfernt: am Hang ragten sie aus dem Nachbargrundstück; echte Garagen
+	# mit Einfahrt kommen mit Schritt 2)
 func _k_trailer(i:int):
 	_boden(12,16,Color(0.62,0.52,0.36))
 	var c=_P(-1.0,0,8.0);var al=T([Color(0.82,0.82,0.8),Color(0.85,0.8,0.65),Color(0.7,0.78,0.8),Color(0.8,0.7,0.6),Color(0.78,0.84,0.76),Color(0.9,0.88,0.84)][i])
