@@ -203,6 +203,11 @@ void fragment(){
 	float ax=abs(zl-z),bx=abs(zr-z),ay=abs(zu-z),by=abs(zo-z);
 	float k=max(max(ax,bx)-3.0*min(ax,bx),0.0)+max(max(ay,by)-3.0*min(ay,by),0.0);
 	float e=smoothstep(0.03,0.08,k/max(z,0.5));
+	// Umriss nur, wo sich auch die Farbe ändert: Kuppen und Böschungen (Boden vor gleichem Boden) bleiben ohne Linie
+	vec3 c0=texture(bild,uv).rgb;
+	float fd=max(max(length(c0-texture(bild,uv-vec2(px.x,0.0)).rgb),length(c0-texture(bild,uv+vec2(px.x,0.0)).rgb)),
+		max(length(c0-texture(bild,uv-vec2(0.0,px.y)).rgb),length(c0-texture(bild,uv+vec2(0.0,px.y)).rgb)));
+	e*=smoothstep(0.035,0.12,fd);
 	e*=(1.0-smoothstep(90.0,320.0,z))*mix(1.0,0.55,smoothstep(25.0,140.0,z));
 	vec3 c=texture(bild,uv).rgb;
 	vec3 cl=texture(bild,uv-vec2(px.x,0.0)).rgb;vec3 cu=texture(bild,uv-vec2(0.0,px.y)).rgb;

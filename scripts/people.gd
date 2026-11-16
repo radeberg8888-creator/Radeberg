@@ -252,7 +252,7 @@ static func _arme_laufen(a:Animation,sk:Skeleton3D,ch:Node3D,amp:float,ellbogen:
 		var g=[];g.resize(n)
 		for i in n:
 			var r:Transform3D=sk.get_bone_rest(i);var q:Quaternion=r.basis.orthonormalized().get_rotation_quaternion()
-			if spur.has(i):q=a.rotation_track_interpolate(spur[i],zeit)
+			if spur.has(i) and a.track_get_key_count(spur[i])>0:q=a.rotation_track_interpolate(spur[i],zeit)
 			var lok=Transform3D(Basis(q),r.origin);var p=sk.get_bone_parent(i)
 			g[i]=lok if p<0 else g[p]*lok
 		return g

@@ -1444,6 +1444,7 @@ const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
 var HG:PackedFloat32Array
 var GARTEN:=PackedFloat32Array()
+var LOTZIEL:=PackedFloat32Array()
 func _farbe(i:int,k:int,h:float)->Color:
 	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP
 	var i0=max(i-1,0);var i1=min(i+1,nx-1);var k0=max(k-1,0);var k1=min(k+1,G0.rz-1)
@@ -1588,6 +1589,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 		n+=1
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
+	LOTZIEL=ziel
 	GARTEN=gew   # Rasen um die Grundstücke (weicher 12-m-Übergang), siehe _farbe
 	print("GRUNDSTUECKE geebnet ",n)
 
@@ -1616,6 +1618,9 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 						# Grundstücke (Häuser, Gärten) behalten ihre Höhe, außer direkt am Fahrbahn-/Gehwegrand –
 						# sonst schneidet das Band einer Straße hinter dem Haus das Gelände unter dem Garten weg
 						var kern_j=kern
+						# Grundstück liegt tiefer als diese Straße (Straße am Hang darüber): Band nur bis knapp hinter den
+						# Gehweg, sonst schüttet es Garten und Schuppen des unteren Grundstücks zu (tiefer kann nicht durchstechen)
+						if NO.LOT[j]!=0 and GARTEN.size()>j and GARTEN[j]>0.99 and LOTZIEL[j]<y-0.3:kern_j=min(kern,wk+4.0)
 						if not best.has(j):best[j]=[d,y,kern_j,R,(y if d<=kern_j else INF)]
 						else:
 							var e=best[j]
