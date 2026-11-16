@@ -1143,6 +1143,17 @@ func _norden()->Dictionary:
 		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
 		if STADT.has_point(w):continue
 		var hy=G0._bilin(HN,w.x,w.y)-NL.H0-0.1
+		if klein:
+			# am Hang auf den tiefsten Punkt der Grundfläche setzen (sonst hängt die Talseite in der Luft)
+			var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
+			var pts=[Vector3(-hw,0,0),Vector3(hw,0,0),Vector3(-hw,0,-dd),Vector3(hw,0,-dd),Vector3(0,0,-dd*0.5)]
+			if kn.begins_with("nt_"):
+				var rr=clamp(kk.w*0.35,0.8,2.5)
+				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
+			for q in pts:
+				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
+				hy=min(hy,G0._bilin(HN,qq.x,qq.y)-NL.H0-0.1)
+			if kn.begins_with("nt_"):hy-=0.15
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
 			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn

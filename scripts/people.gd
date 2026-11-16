@@ -272,7 +272,13 @@ static func _arme_laufen(a:Animation,sk:Skeleton3D,ch:Node3D,amp:float,ellbogen:
 		var bn=sk.get_bone_name(idx[name]);var tr=-1
 		for t in a.get_track_count():
 			if a.track_get_type(t)==Animation.TYPE_ROTATION_3D and str(a.track_get_path(t)).get_slice(":",1)==bn:tr=t
-		if tr<0:tr=a.add_track(Animation.TYPE_ROTATION_3D);a.track_set_path(tr,str(ch.get_path_to(sk))+":"+bn)
+		if tr<0:
+			# Pfad wie bei den vorhandenen Spuren (sonst "Rotation Track … unavailable" und die Arme bleiben starr)
+			var knoten=str(ch.get_path_to(sk))
+			for t in a.get_track_count():
+				var tp=str(a.track_get_path(t))
+				if a.track_get_type(t)==Animation.TYPE_ROTATION_3D and tp.contains(":"):knoten=tp.get_slice(":",0);break
+			tr=a.add_track(Animation.TYPE_ROTATION_3D);a.track_set_path(tr,knoten+":"+bn)
 		while a.track_get_key_count(tr)>0:a.track_remove_key(tr,0)
 		tracks[name]=tr
 	var schritte=int(ceil(a.length*30.0))

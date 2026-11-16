@@ -198,8 +198,11 @@ void fragment(){
 	float zu=lin(uv-vec2(0.0,px.y),INV_PROJECTION_MATRIX);float zo=lin(uv+vec2(0.0,px.y),INV_PROJECTION_MATRIX);
 	// Kante, wo die Tiefe springt (relativ, damit nahe und ferne Kanten gleich wirken); Krümmung statt
 	// einfacher Differenz -> schräge Flächen (Straße, Hang) bekommen keine Linien
-	float k=abs(zl+zr-2.0*z)+abs(zu+zo-2.0*z);
-	float e=smoothstep(0.035,0.09,k/max(z,0.5));
+	// Nur echte Tiefensprünge (Umrisse) – Knicke im Boden (Böschung, Kuppe, Kreuzung) haben links und rechts
+	// ähnliche Steigung und bekommen keine Linie mehr
+	float ax=abs(zl-z),bx=abs(zr-z),ay=abs(zu-z),by=abs(zo-z);
+	float k=max(max(ax,bx)-3.0*min(ax,bx),0.0)+max(max(ay,by)-3.0*min(ay,by),0.0);
+	float e=smoothstep(0.03,0.08,k/max(z,0.5));
 	e*=(1.0-smoothstep(90.0,320.0,z))*mix(1.0,0.55,smoothstep(25.0,140.0,z));
 	vec3 c=texture(bild,uv).rgb;
 	vec3 cl=texture(bild,uv-vec2(px.x,0.0)).rgb;vec3 cu=texture(bild,uv-vec2(0.0,px.y)).rgb;

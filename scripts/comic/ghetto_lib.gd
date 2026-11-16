@@ -360,9 +360,8 @@ func ecke_bau(P:Callable,lw:float,ld:float,aussen:Vector3,yaw:float):
 	var schild=T([Color(0.85,0.15,0.12),Color(0.15,0.3,0.6),Color(0.95,0.75,0.1),Color(0.1,0.1,0.12)][rng.randi()%4])
 	L.box(schild,f+Vector3(0,3.5,0)+aussen*0.15,Vector3(lw-1.2,0.9,0.2),b,0.03)
 	label(namen[rng.randi()%namen.size()],f+Vector3(0,3.5,0)+aussen*0.27,b,0.0085,Color(1,1,0.92),Color(0.05,0.05,0.05))
-	var seite=b*Vector3(1,0,0)
-	graffiti(c+seite*((lw-0.6)*0.5+0.06)+Vector3(0,2.0,0),seite,1.0)
-	muellsack(c+seite*((lw-0.6)*0.5+0.8)+aussen*2.0)
+	# (kein Graffiti/Müllsack an der Seitenwand: der Laden steht auch in den Vororten, dort sah es wie ein
+	# schwebender lila Fleck mit schwarzem Klumpen aus)
 
 # ---------- Bausteine ----------
 # Fahrbahn als Viereckstreifen entlang der Linie (wenige Dreiecke, mit Kollision)

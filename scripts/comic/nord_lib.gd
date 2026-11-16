@@ -512,6 +512,11 @@ func _k_villa(i:int):
 	L.box(weiss,_P(-5,1.1,0.2),Vector3(20,2.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
 	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
+# Grundstücke im Norden liegen am Hang: unter der Rasenplatte ein 4 m tiefer Sockel (Erde/Mauer),
+# damit nichts in der Luft hängt, wenn das Gelände neben dem Grundstück abfällt
+func _boden(w:float,d:float,farbe:Color):
+	super._boden(w,d,farbe)
+	L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.17,d*0.5),Vector3(w-0.02,4.0,d-0.02),Basis(),0.0)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
 func _mb(c:Color,pos:Vector3,gr:Vector3,rot:=Basis(),k:=0.03):L.box(T(c),pos,gr,rot,k)
@@ -1289,25 +1294,30 @@ func _gehweg_ecken(so)->int:
 			else:
 				var K=Geometry2D.line_intersects_line(c+n1*w1,d1,c+n2*w2,d2)
 				var O=Geometry2D.line_intersects_line(c+n1*(w1+s1),d1,c+n2*(w2+s2),d2)
-				if K==null or O==null or K.distance_to(c)>R*2.5 or O.distance_to(c)>R*2.5:continue
+				if K==null or O==null or K.distance_to(c)>R*1.3 or O.distance_to(c)>R*1.5:continue
+				# Spitze nicht auf die Fahrbahn ragen lassen (schräge/gebogene Einmündungen)
+				for st in 11:
+					var Kt:Vector2=K.lerp(O,st*0.1)
+					if not auf_fahrbahn(Kt,-1,-0.15):K=Kt;break
 				poly=[A1k,K,A2k,A2o,O,A1o]
 			var mid=Vector2.ZERO
 			for q in poly:mid+=q
 			mid/=poly.size()
 			if auf_fahrbahn(mid,-1,0.2):continue
+			var ym=(ya1+ya2)*0.5
 			var hs=[]
 			for q in poly:
-				var h=yc
+				var h=ym
 				if q==A1k or q==A1o:h=ya1
 				elif q==A2k or q==A2o:h=ya2
 				hs.append(h)
 			# Asphalt-Zwickel zwischen den Bordsteinkanten (schräge Einmündungen ließen dort Wiese durchscheinen)
-			if poly.size()==6:
+			if poly.size()==6 and abs(ya1-ya2)<0.12 and abs(yc-ym)<0.12:
 				var sa=L._st(L.M.asphalt,true)
 				var ca=Vector3(c.x,yc-0.05,c.y)
 				L._tri(sa,ca,Vector3(A1k.x,ya1-0.05,A1k.y),Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3.UP)
 				L._tri(sa,ca,Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3(A2k.x,ya2-0.05,A2k.y),Vector3.UP)
-			var m3=Vector3(mid.x,yc,mid.y)
+			var m3=Vector3(mid.x,ym,mid.y)
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
 				L._tri(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),Vector3.UP)
