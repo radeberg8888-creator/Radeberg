@@ -1230,6 +1230,7 @@ func platten():
 				L._tri(so,Vector3(a0.x,ya,a0.y),Vector3(c1.x,yc,c1.y),Vector3(a1.x,ya,a1.y),Vector3.UP)
 				n_ok+=1
 			s=s2
+	n_ok+=_gehweg_ecken(so)
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)
 	if not KNAST_WAND.is_empty():
@@ -1243,6 +1244,70 @@ func platten():
 			L.box(grau,Vector3(m.x,y+3.0,m.y),Vector3(0.8,6.0,t.length()+0.3),b,0.04);L.koll_box(Vector3(m.x,y+3.0,m.y),Vector3(0.8,6.0,t.length()+0.3),b)
 			L.zyl(L.M.metall,Vector3(m.x,y+6.0,m.y),Vector3(m.x,y+6.6,m.y),0.35,1.1)
 	print("NORD Gehwegstücke ",n_ok)
+# Gehweg-Ecken an Kreuzungen: die Streifen enden vor jeder Kreuzung (sonst lägen sie auf dem Asphalt).
+# Die Ecke zwischen zwei Straßenarmen wird hier geschlossen: Fläche zwischen den Bordsteinkanten und den
+# Außenkanten beider Arme bis zu ihrem Schnittpunkt; gegenüber einer Einmündung ein gerades Stück.
+func _gehweg_ecken(so)->int:
+	var n=0
+	for j in JUNC:
+		var c:Vector2=j.p;var arme=[]
+		for ri in [j.a,j.b]:
+			var r=ROADS[ri]
+			if not r.stadt or r.sw<=0.0:continue
+			var P:PackedVector2Array=r.P;var bi=0;var bd=1e9
+			for i in P.size():
+				var d=P[i].distance_to(c)
+				if d<bd:bd=d;bi=i
+			var sj:float=r.S[bi];var Lg:float=r.S[-1]
+			var t:Vector2=bei(r,sj)[1]
+			if sj<Lg-j.r-4.0:arme.append({"d":t,"r":r,"s":sj,"sg":1.0})
+			if sj>j.r+4.0:arme.append({"d":-t,"r":r,"s":sj,"sg":-1.0})
+		if arme.size()<2:continue
+		arme.sort_custom(func(x,y):return x.d.angle()<y.d.angle())
+		var yc=y_bei(arme[0].r,arme[0].s)+0.11
+		var R=float(j.r)+4.0
+		for k in arme.size():
+			var a1=arme[k];var a2=arme[(k+1)%arme.size()]
+			if a1.r==a2.r and a1.d.dot(a2.d)>0.9:continue
+			var wink=fposmod(a2.d.angle()-a1.d.angle(),TAU)
+			if arme.size()==2 and wink>PI+0.2:continue   # nur die Innenseite einer Kurve/Ecke
+			if wink<0.15:continue
+			var m=a1.d.rotated(wink*0.5)
+			var d1:Vector2=a1.d;var d2:Vector2=a2.d
+			var n1=Vector2(-d1.y,d1.x)
+			if n1.dot(m)<0:n1=-n1
+			var n2=Vector2(-d2.y,d2.x)
+			if n2.dot(m)<0:n2=-n2
+			var w1:float=a1.r.w;var w2:float=a2.r.w;var s1:float=a1.r.sw;var s2:float=a2.r.sw
+			var A1k=c+n1*w1+d1*R;var A1o=c+n1*(w1+s1)+d1*R
+			var A2k=c+n2*w2+d2*R;var A2o=c+n2*(w2+s2)+d2*R
+			var ya1=y_bei(a1.r,clamp(a1.s+a1.sg*R,0.0,a1.r.S[-1]))+0.11
+			var ya2=y_bei(a2.r,clamp(a2.s+a2.sg*R,0.0,a2.r.S[-1]))+0.11
+			var poly:Array
+			if wink>PI-0.35 and wink<PI+0.35:
+				poly=[A1k,A2k,A2o,A1o]   # gerades Stück gegenüber einer Einmündung
+			else:
+				var K=Geometry2D.line_intersects_line(c+n1*w1,d1,c+n2*w2,d2)
+				var O=Geometry2D.line_intersects_line(c+n1*(w1+s1),d1,c+n2*(w2+s2),d2)
+				if K==null or O==null or K.distance_to(c)>R*2.5 or O.distance_to(c)>R*2.5:continue
+				poly=[A1k,K,A2k,A2o,O,A1o]
+			var mid=Vector2.ZERO
+			for q in poly:mid+=q
+			mid/=poly.size()
+			if auf_fahrbahn(mid,-1,0.2):continue
+			var hs=[]
+			for q in poly:
+				var h=yc
+				if q==A1k or q==A1o:h=ya1
+				elif q==A2k or q==A2o:h=ya2
+				hs.append(h)
+			var m3=Vector3(mid.x,yc,mid.y)
+			for i in poly.size():
+				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
+				L._tri(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),Vector3.UP)
+			n+=1
+	print("NORD Gehweg-Ecken ",n)
+	return n
 func wege():
 	var dreck=L._toon(Color(0.4,0.34,0.25))
 	for w in WEGE:
