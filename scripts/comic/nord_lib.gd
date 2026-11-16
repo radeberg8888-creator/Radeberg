@@ -1301,6 +1301,12 @@ func _gehweg_ecken(so)->int:
 				if q==A1k or q==A1o:h=ya1
 				elif q==A2k or q==A2o:h=ya2
 				hs.append(h)
+			# Asphalt-Zwickel zwischen den Bordsteinkanten (schräge Einmündungen ließen dort Wiese durchscheinen)
+			if poly.size()==6:
+				var sa=L._st(L.M.asphalt,true)
+				var ca=Vector3(c.x,yc-0.05,c.y)
+				L._tri(sa,ca,Vector3(A1k.x,ya1-0.05,A1k.y),Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3.UP)
+				L._tri(sa,ca,Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3(A2k.x,ya2-0.05,A2k.y),Vector3.UP)
 			var m3=Vector3(mid.x,yc,mid.y)
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
