@@ -620,10 +620,11 @@ func _schwebe_lauf():
 				for a in 12:
 					var dir=Vector3(cos(a*PI/6.0),0,sin(a*PI/6.0))
 					var kand=w+dir*6.0+Vector3(0,1.2,0)
+					# Kamera über dem Boden an dieser Stelle (am Hang nicht im Berg)
+					var bod=_strahl(kand+Vector3(0,60,0),kand+Vector3(0,-60,0))
+					if not bod.is_empty():kand.y=max(kand.y,bod.position.y+1.3)
 					var frei=_strahl(w+Vector3(0,0.4,0),kand,true).is_empty()
-					var boden=_strahl(kand+Vector3(0,0.1,0),kand+Vector3(0,-3,0))
-					var oben=_strahl(kand,kand+Vector3(0,30,0),true)
-					if frei and oben.is_empty():cp=kand;break
+					if frei:cp=kand;break
 				cam.look_at_from_position(cp,w+Vector3(0,0.2,0));cam.current=true
 				for fr in 3:await get_tree().process_frame
 				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])
@@ -665,7 +666,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
 				if not r.is_empty():
 					var luft=w.y-r.position.y
-					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.name)])
+					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.5:
@@ -684,6 +685,7 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				var rs=_strahl(Vector3(ai.x,h0+1.5,ai.y),Vector3(ai.x,h0-1.0,ai.y))
 				if rs.is_empty():continue
 				var ys=rs.position.y
+				if ys<h0-0.08:FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)])
 				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
 				if rg.is_empty():continue
 				var yg=rg.position.y
