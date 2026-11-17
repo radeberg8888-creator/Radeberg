@@ -599,6 +599,7 @@ func _schwebe_lauf():
 		spiel.spieler.global_position=Vector3(mitte.x,G_h(mitte)+200.0,mitte.y)
 		await _laden(mitte)
 		FUNDE.clear()
+		_diag_gelaende(mitte,name)
 		_pruef_kopien(mitte,260.0)
 		_pruef_gehwege(mitte,260.0)
 		gesamt+=FUNDE.size()
@@ -666,7 +667,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
 				if not r.is_empty():
 					var luft=w.y-r.position.y
-					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)])
+					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.5:
@@ -696,3 +697,28 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 					var aus=Vector3(n.x*sd,0,n.y*sd)
 					var rh=_strahl(Vector3(ai.x,ys-0.25,ai.y),Vector3(ai.x,ys-0.25,ai.y)+aus*1.2,true)
 					if rh.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])
+
+# Diagnose: liegt die Gelände-Kollision dort, wo das sichtbare Gelände ist (Dreiecke wie im Netz)?
+func _tri_hg(x:float,z:float)->float:
+	var G=spiel.welt.G;var fx=(x-G.X0)/G.STEP;var fz=(z-G.Z0)/G.STEP
+	var i=clampi(int(fx),0,G.nx-2);var k=clampi(int(fz),0,G.nz-2);var u=fx-i;var v=fz-k
+	var H=G.heights;var j=k*G.nx+i
+	var h00=H[j];var h10=H[j+1];var h01=H[j+G.nx];var h11=H[j+G.nx+1]
+	if u>=v:return h00+u*(h10-h00)+v*(h11-h10)
+	return h00+v*(h01-h00)+u*(h11-h01)
+func _diag_gelaende(mitte:Vector2,name:String):
+	var gk=_gelaende_koerper();var mt=0.0;var mb=0.0;var n=0;var wo=Vector3()
+	for a in 20:
+		for b in 20:
+			var x=mitte.x-200.0+a*20.0+3.7;var z=mitte.y-200.0+b*20.0+6.1
+			var q=PhysicsRayQueryParameters3D.create(Vector3(x,900,z),Vector3(x,-200,z))
+			var ex:Array[RID]=[]
+			var r=spiel.get_world_3d().direct_space_state.intersect_ray(q)
+			var tries=0
+			while not r.is_empty() and r.collider!=gk and tries<8:
+				ex.append(r.rid);q.exclude=ex;r=spiel.get_world_3d().direct_space_state.intersect_ray(q);tries+=1
+			if r.is_empty():continue
+			var dt=abs(r.position.y-_tri_hg(x,z));var db=abs(r.position.y-spiel.welt.G.h_at(x,z))
+			if dt>mt:mt=dt;wo=r.position
+			mb=max(mb,db);n+=1
+	print("DIAG ",name," Kollision vs Netz(Dreieck) max ",snapped(mt,0.01)," bei ",wo," | vs bilinear max ",snapped(mb,0.01)," | Punkte ",n)
