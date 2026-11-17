@@ -19,6 +19,7 @@ func start(sp):
 	var nur=spiel._arg("--nur")
 	if nur=="figur":await _figur();get_tree().quit();return
 	if nur=="nord":await _nordstaedte();get_tree().quit();return
+	if nur=="schweben":await _schwebe_lauf();get_tree().quit();return
 	if nur=="stil":await _stilprobe();get_tree().quit();return
 	if nur=="stil2":await _stilprobe2();get_tree().quit();return
 	if nur=="punkt":
@@ -576,3 +577,103 @@ func _villa_fotos(nah:Vector3):
 	await _foto("Villa_1_vorne")
 	cam.look_at_from_position(o-b.z*46.0-b.x*8.0+Vector3(0,5.0,0),mitte);cam.current=true
 	await _foto("Villa_2_hinten")
+
+# ================= Schwebe-Prüfung (feste Regel für jeden Build) =================
+# Alle Viertel. Je Bausatz-Kopie (Häuser, Villen, Mauern, Sockel, Zäune, Laternen, Natur …) 4 Ecken + Mitte
+# der Grundfläche: Strahl nach unten. Meldet > 0,15 m Luft oder > 1,5 m im Boden versunken.
+# Gehwege: Außenkante gegen Gelände (Spalt ohne Böschungsmauer, oder Gelände über dem Gehweg).
+const PRUEF_ORTE:=[["Innenstadt",Vector2(250,-350)],["Altstadt",Vector2(-150,-650)],["Nordstadt",Vector2(496,-168)],["Oststadt",Vector2(2550,850)],
+	["Suedstadt",Vector2(250,1560)],["Ghetto",Vector2(-262,1040)],["Strand",Vector2(-2300,700)],["Industrie",Vector2(900,640)],
+	["Hafen",Vector2(500,2090)],["Wohnviertel_West",Vector2(-1083,-504)],["Sonnenhuegel",Vector2(-150,-1450)],["Ostvorort",Vector2(2900,-300)],
+	["Wueste_Staubwinkel",Vector2(945,-5847)],["JVA",Vector2(1828,-4937)],["Nord_Kueste",Vector2(-2504,-8463)],["Nord_Villen",Vector2(-1609,-9248)],
+	["Nord_Feuerwache",Vector2(1752,-7559)],["Nordbucht",Vector2(-119,-9032)],["Berg",Vector2(-600,-7000)]]
+var FUNDE:=[]
+func _strahl(von:Vector3,bis:Vector3,rueck:=false)->Dictionary:
+	var q=PhysicsRayQueryParameters3D.create(von,bis);q.hit_back_faces=rueck
+	return spiel.get_world_3d().direct_space_state.intersect_ray(q)
+func _schwebe_lauf():
+	var gesamt=0
+	for o in PRUEF_ORTE:
+		var mitte:Vector2=o[1];var name:String=o[0]
+		cam.global_position=Vector3(mitte.x,G_h(mitte)+30.0,mitte.y);cam.current=true
+		spiel.spieler.global_position=Vector3(mitte.x,G_h(mitte)+200.0,mitte.y)
+		await _laden(mitte)
+		FUNDE.clear()
+		_pruef_kopien(mitte,260.0)
+		_pruef_gehwege(mitte,260.0)
+		gesamt+=FUNDE.size()
+		var arten={}
+		for f in FUNDE:
+			var k=f[0]+" "+f[1]
+			if not arten.has(k):arten[k]=[0,f]
+			arten[k][0]+=1
+			if abs(f[2])>abs(arten[k][1][2]):arten[k][1]=f
+		print("SCHWEBT ",name," Funde ",FUNDE.size()," Arten ",arten.size())
+		var nr=0
+		for k in arten:
+			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3])
+			if nr<4:
+				var w:Vector3=f[3]
+				# Nahbild von unten seitlich
+				cam.look_at_from_position(w+Vector3(5.5,0.9,5.5),w+Vector3(0,0.3,0));cam.current=true
+				for fr in 3:await get_tree().process_frame
+				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])
+				nr+=1
+	print("SCHWEBT GESAMT ",gesamt)
+	# Prototyp Villa-Mauern
+	var vp=Vector2(-1634,-8994);cam.global_position=Vector3(vp.x,G_h(vp)+20,vp.y);await _laden(vp)
+	await _villa_fotos(Vector3(vp.x,G_h(vp),vp.y))
+func G_h(p:Vector2)->float:return spiel.welt.G.h_at(p.x,p.y)
+func _pruef_kopien(mitte:Vector2,radius:float):
+	for m in get_tree().root.find_children("*","MultiMeshInstance3D",true,false):
+		var nm:String=m.name
+		if nm.ends_with("ink") or nm.begins_with("NF_") or m.multimesh==null or m.multimesh.mesh==null:continue
+		if not m.is_visible_in_tree():continue
+		var ab:AABB=m.multimesh.mesh.get_aabb()
+		if ab.size.y<0.1 and ab.size.x<0.5:continue
+		var natur=nm.begins_with("nt_") or nm.contains("baum") or nm.contains("busch") or nm.contains("palme") or nm.contains("kaktus")
+		var sockel=nm.begins_with("nd_")   # Nord-Bausätze stehen auf 5-m-Sockel
+		var mm=m.multimesh
+		for i in mm.instance_count:
+			var gx:Transform3D=m.global_transform*mm.get_instance_transform(i)
+			if gx.basis.get_scale().x<0.01:continue
+			var cw=gx*ab.get_center()
+			if Vector2(cw.x,cw.z).distance_to(mitte)>radius:continue
+			var yb=0.0 if ab.position.y<0.6 else ab.position.y
+			var ex=ab.size.x*0.5;var ez=ab.size.z*0.5;var cx=ab.get_center().x;var cz=ab.get_center().z
+			if natur:ex=min(ex,0.25);ez=min(ez,0.25)   # Stamm/Wurzel, nicht die Krone
+			else:ex=max(ex-0.15,0.0);ez=max(ez-0.15,0.0)
+			for q in [Vector3(cx,yb,cz),Vector3(cx-ex,yb,cz-ez),Vector3(cx+ex,yb,cz-ez),Vector3(cx-ex,yb,cz+ez),Vector3(cx+ex,yb,cz+ez)]:
+				var w=gx*q
+				var kn=nm.substr(0,nm.rfind("_")) if nm.rfind("_")>2 else nm
+				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
+				if not r.is_empty():
+					var luft=w.y-r.position.y
+					if luft>(5.0 if sockel else 0.15):FUNDE.append([kn,"schwebt",luft,w])
+				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
+				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
+				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.5:
+					FUNDE.append([kn,"versunken",-(ru.position.y-w.y),w])
+func _pruef_gehwege(mitte:Vector2,radius:float):
+	for r in spiel.welt.S.roads:
+		var sw:float=float(r.get("sw",0.0))
+		if sw<=0.0:continue
+		var P:PackedVector2Array=r.P;var T=r.T;var Hh=r.h;var w:float=r.w
+		for i in range(0,P.size(),2):
+			if P[i].distance_to(mitte)>radius:continue
+			var t:Vector2=T[i];var n=Vector2(-t.y,t.x)
+			for sd in [1.0,-1.0]:
+				var ai=P[i]+n*sd*(w+sw-0.25);var ao=P[i]+n*sd*(w+sw+0.4)
+				var h0=float(Hh[i])
+				var rs=_strahl(Vector3(ai.x,h0+1.5,ai.y),Vector3(ai.x,h0-1.0,ai.y))
+				if rs.is_empty():continue
+				var ys=rs.position.y
+				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
+				if rg.is_empty():continue
+				var yg=rg.position.y
+				var wo=Vector3(ao.x,ys,ao.y)
+				if yg-ys>0.3:FUNDE.append(["Gehweg","Gelaende_drueber",yg-ys,wo])
+				elif ys-yg>0.15:
+					var aus=Vector3(n.x*sd,0,n.y*sd)
+					var rh=_strahl(Vector3(ai.x,ys-0.25,ai.y),Vector3(ai.x,ys-0.25,ai.y)+aus*1.2,true)
+					if rh.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])

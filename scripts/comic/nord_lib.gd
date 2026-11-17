@@ -507,10 +507,25 @@ func _k_villa(i:int):
 	palme(_P(7,0,7),8.0);palme(_P(-11,0,10),9.0)
 	L.box(weiss,_P(10,1.6,22),Vector3(7,3.2,8),Basis(),0.04);L.koll_box(_P(10,1.6,22),Vector3(7,3.2,8))
 	L.box(T(Color(0.4,0.4,0.42)),_P(10,1.3,17.98),Vector3(5,2.6,0.08),Basis(),0.0)
+	# Gartenmauern: warmer Putz statt Weiß, Pfeiler alle 4 m, Abdeckplatte oben, Sockelstreifen unten,
+	# Pflanzen am Fuß (zur Straße). Mauern reichen in den Sockel hinunter (am Hang keine Luft darunter).
+	var putz=T([Color(0.86,0.8,0.7),Color(0.82,0.76,0.66),Color(0.88,0.84,0.76),Color(0.8,0.74,0.64),Color(0.85,0.82,0.74)][i])
+	var stein=T(Color(0.62,0.6,0.56));var deck=T(Color(0.5,0.48,0.45))
 	for sx in [-1,1]:
-		# Mauern bis in den Sockel hinunter (am Hang darf unter ihnen keine Luft sein)
-		L.box(weiss,_P(sx*(15-0.15),-0.4,16),Vector3(0.3,5.2,32),Basis(),0.02);L.koll_box(_P(sx*(15-0.15),1.1,16),Vector3(0.3,2.2,32))
-	L.box(weiss,_P(-5,-0.4,0.2),Vector3(20,5.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
+		var x=sx*(15-0.15)
+		L.box(putz,_P(x,-0.4,16),Vector3(0.3,5.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
+		L.box(deck,_P(x,2.26,16),Vector3(0.46,0.12,32.1),Basis(),0.0)
+		L.box(stein,_P(x,0.2,16),Vector3(0.34,0.4,32.02),Basis(),0.0)
+		for k in 9:L.box(stein,_P(x,1.1,0.3+k*3.9),Vector3(0.5,2.3,0.5),Basis(),0.0)
+	L.box(putz,_P(-5,-0.4,0.2),Vector3(20,5.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
+	L.box(deck,_P(-5,2.26,0.2),Vector3(20.1,0.12,0.46),Basis(),0.0)
+	L.box(stein,_P(-5,0.2,0.2),Vector3(20.02,0.4,0.34),Basis(),0.0)
+	for k in 6:L.box(stein,_P(-14.8+k*4.0,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
+	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6))
+	for k in 8:
+		var q=_P(-13.5+k*2.4,0.35,-0.55)
+		L.kugel(laub,q,Vector3(0.7,0.55,0.55),1.05)
+		if k%2==0:L.kugel(bluete,q+Vector3(0.2,0.35,-0.15),Vector3(0.22,0.18,0.22),1.0)
 	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
 # Grundstücke im Norden liegen am Hang: unter der Rasenplatte ein 4 m tiefer Sockel (Erde/Mauer),
@@ -525,7 +540,7 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 	var mit=func():
 		f.call()
 		if not name.begins_with("nt_"):
-			L.box(T(Color(0.56,0.5,0.43)),_P(0,-2.75,d*0.5),Vector3(w-0.04,5.0,d-0.04),Basis(),0.0)
+			L.box(T(Color(0.6,0.57,0.52)),_P(0,-2.75,d*0.5),Vector3(w-0.04,5.0,d-0.04),Basis(),0.0)
 	super._kit(stil_,typ,name,w,d,mit)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
@@ -1182,8 +1197,10 @@ func fahrbahnen():
 		var ss=L._st(sch,true)
 		for i in n-1:
 			var d:Vector2=(P[i+1]-P[i]).normalized();var nn=Vector2(-d.y,d.x)
+			var ta=_vt(P,i);var tb=_vt(P,i+1)
+			var na=Vector2(-ta.y,ta.x);var nb=Vector2(-tb.y,tb.x)
 			for sd in [1,-1]:
-				var a=P[i]+nn*aus*sd;var b=P[i+1]+nn*aus*sd
+				var a=P[i]+na*aus*sd;var b=P[i+1]+nb*aus*sd
 				var mid=(a+b)*0.5
 				if auf_fahrbahn(mid,ri,0.8) or nah_kreuzung(mid,r.w+r.sw+2.0):continue
 				var ya=Y[i]+oben;var yb=Y[i+1]+oben
@@ -1223,6 +1240,10 @@ func fahrbahnen():
 			var B1=Vector3(b.x+nn.x*sd.w,yb,b.y+nn.y*sd.w);var B2=Vector3(b.x-nn.x*sd.w,yb,b.y-nn.y*sd.w)
 			L._tri(so3,A1,B1,B2,Vector3.UP);L._tri(so3,A1,B2,A2,Vector3.UP)
 			if sd.typ=="runway" and i%3==0 and not mat_sand:L.box(L.M.markierung,Vector3(a.x,ya+0.01,a.y),Vector3(0.6,0.01,6.0),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
+# Richtung an einem Straßenpunkt (Mittel aus beiden Nachbarsegmenten) – gemeinsame Kanten ohne Knick
+func _vt(P:PackedVector2Array,i:int)->Vector2:
+	var a=P[max(i-1,0)];var b=P[min(i+1,P.size()-1)]
+	return (b-a).normalized()
 func platten():
 	# keine Platten: Gelände ist der Boden; Gehwege als Streifen entlang der Stadtstraßen
 	var alt=L.koll_an;L.koll_an=true
@@ -1230,20 +1251,19 @@ func platten():
 	for ri in ROADS.size():
 		var r=ROADS[ri]
 		if not r.stadt or r.sw<=0.0:continue
-		var s=0.0;var Lg:float=r.S[-1]
-		while s<Lg:
-			var s2=min(s+3.0,Lg)
-			var b1=bei(r,s);var b2=bei(r,s2)
+		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
+		for i in P.size()-1:
+			var t1:Vector2=_vt(P,i);var t2:Vector2=_vt(P,i+1)
 			for sd in [1,-1]:
-				var n1=Vector2(-b1[1].y,b1[1].x)*sd;var n2=Vector2(-b2[1].y,b2[1].x)*sd
-				var a0:Vector2=b1[0]+n1*r.w;var a1:Vector2=b1[0]+n1*(r.w+r.sw);var c0:Vector2=b2[0]+n2*r.w;var c1:Vector2=b2[0]+n2*(r.w+r.sw)
+				# Normalen aus der gemittelten Richtung an jedem Punkt: keine Sägezähne in Kurven und am Hang
+				var n1=Vector2(-t1.y,t1.x)*sd;var n2=Vector2(-t2.y,t2.x)*sd
+				var a0:Vector2=P[i]+n1*r.w;var a1:Vector2=P[i]+n1*(r.w+r.sw);var c0:Vector2=P[i+1]+n2*r.w;var c1:Vector2=P[i+1]+n2*(r.w+r.sw)
 				var mid=(a0+a1+c0+c1)*0.25
 				if auf_fahrbahn(mid,ri,0.3) or nah_kreuzung(mid,1.0):continue
-				var ya=y_bei(r,s)+0.11;var yc=y_bei(r,s2)+0.11
+				var ya=Y[i]+0.11;var yc=Y[i+1]+0.11
 				L._tri(so,Vector3(a0.x,ya,a0.y),Vector3(c0.x,yc,c0.y),Vector3(c1.x,yc,c1.y),Vector3.UP)
 				L._tri(so,Vector3(a0.x,ya,a0.y),Vector3(c1.x,yc,c1.y),Vector3(a1.x,ya,a1.y),Vector3.UP)
 				n_ok+=1
-			s=s2
 	n_ok+=_gehweg_ecken(so)
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)

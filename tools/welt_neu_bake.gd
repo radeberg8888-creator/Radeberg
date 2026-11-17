@@ -1566,7 +1566,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	for t in NO.TERR:
 		var poly=PackedVector2Array()
 		for e in t[0]:poly.append(e+NO.C)
-		var h:float=t[1]-0.22
+		var h:float=t[1]-0.06
 		# 6 m Rand voll auf Grundstückshöhe (das 10-m-Raster hängt sonst zwischen den Punkten durch), 14 m weich.
 		# Grenzen sich zwei Grundstücke auf verschiedener Höhe, gewinnt je Rasterpunkt das nähere (nicht das erste)
 		var gross=Geometry2D.offset_polygon(poly,6.0)
@@ -1621,16 +1621,18 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 						# Grundstück liegt tiefer als diese Straße (Straße am Hang darüber): Band nur bis knapp hinter den
 						# Gehweg, sonst schüttet es Garten und Schuppen des unteren Grundstücks zu (tiefer kann nicht durchstechen)
 						if NO.LOT[j]!=0 and GARTEN.size()>j and GARTEN[j]>0.99 and LOTZIEL[j]<y-0.3:kern_j=min(kern,wk+4.0)
-						if not best.has(j):best[j]=[d,y,kern_j,R,(y if d<=kern_j else INF)]
+						if not best.has(j):best[j]=[d,y,kern_j,R,(y if d<=kern_j else INF),wk]
 						else:
 							var e=best[j]
 							if d<=kern_j:e[4]=min(e[4],y)   # im Kern: niedrigste Fahrbahn aller nahen Straßen
-							if e[0]>d:e[0]=d;e[1]=y;e[2]=kern_j;e[3]=R
+							if e[0]>d:e[0]=d;e[1]=y;e[2]=kern_j;e[3]=R;e[5]=wk
 	var n=0
 	for j in best:
 		var e=best[j];var d:float=e[0];var y:float=e[1]-0.15
 		if NO.WASSER[j]==1 and H[j]<0.0 and d>e[2]-ST:continue   # Brücken: kein Damm im Wasser
-		if d<=e[2]:H[j]=min(y,e[4]-0.15)
+		# Fahrbahn/Gehweg: Gelände knapp unter dem Belag. Hinter dem Gehweg: Gelände fast bündig mit der
+		# Gehweg-Oberkante (+0,11) statt 26 cm tiefer – sonst sieht man überall eine Erdkante als Naht
+		if d<=e[2]:H[j]=min(y,e[4]-0.15) if d<=e[5]+1.0 else min(e[1],e[4])+0.04
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)
