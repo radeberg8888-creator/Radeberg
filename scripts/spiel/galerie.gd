@@ -612,7 +612,7 @@ func _schwebe_lauf():
 		var nr=0
 		var ks=arten.keys();ks.sort_custom(func(a,b):return abs(arten[a][1][2])>abs(arten[b][1][2]))
 		for k in ks:
-			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3])
+			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3]," | Boden: ",f[4] if f.size()>4 else "-")
 			if nr<4:
 				var w:Vector3=f[3]
 				# Nahbild von seitlich unten: freie Position im Kreis suchen (nicht in Hang oder Haus)
