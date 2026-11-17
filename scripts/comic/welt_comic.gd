@@ -28,8 +28,11 @@ class CG:
 	func h_at(x:float,z:float)->float:
 		var fx=(x-X0)/STEP;var fz=(z-Z0)/STEP
 		var i=clampi(int(fx),0,nx-2);var k=clampi(int(fz),0,nz-2);var tx=clamp(fx-i,0.0,1.0);var tz=clamp(fz-k,0.0,1.0)
+		# wie Gelände-Netz und Kollision: Dreiecke mit Diagonale (i+1,k)-(i,k+1)
 		var j=k*nx+i
-		return lerp(lerp(heights[j],heights[j+1],tx),lerp(heights[j+nx],heights[j+nx+1],tx),tz)
+		var h00=heights[j];var h10=heights[j+1];var h01=heights[j+nx];var h11=heights[j+nx+1]
+		if tx+tz<=1.0:return h00+tx*(h10-h00)+tz*(h01-h00)
+		return h11+(1.0-tx)*(h01-h11)+(1.0-tz)*(h10-h11)
 	func soil(_x,_z,_h,_s)->Color:return Color(1,0,0,0)
 class CB:
 	var placed:=[];var ohne_dach:=false;var rect:Rect2

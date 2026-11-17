@@ -704,8 +704,8 @@ func _tri_hg(x:float,z:float)->float:
 	var i=clampi(int(fx),0,G.nx-2);var k=clampi(int(fz),0,G.nz-2);var u=fx-i;var v=fz-k
 	var H=G.heights;var j=k*G.nx+i
 	var h00=H[j];var h10=H[j+1];var h01=H[j+G.nx];var h11=H[j+G.nx+1]
-	if u>=v:return h00+u*(h10-h00)+v*(h11-h10)
-	return h00+v*(h01-h00)+u*(h11-h01)
+	if u+v<=1.0:return h00+u*(h10-h00)+v*(h01-h00)
+	return h11+(1.0-u)*(h01-h11)+(1.0-v)*(h10-h11)
 func _diag_gelaende(mitte:Vector2,name:String):
 	var gk=_gelaende_koerper();var mt=0.0;var mb=0.0;var n=0;var wo=Vector3()
 	for a in 20:

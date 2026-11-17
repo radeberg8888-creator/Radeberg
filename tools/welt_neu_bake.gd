@@ -1444,14 +1444,14 @@ const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
 var HG:PackedFloat32Array
 var GARTEN:=PackedFloat32Array()
-# Höhe genau wie das sichtbare Gelände-Netz (Dreiecke mit Diagonale (i,k)-(i+1,k+1)), nicht bilinear –
+# Höhe genau wie das sichtbare Gelände-Netz und die Kollision (Diagonale (i+1,k)-(i,k+1)), nicht bilinear –
 # am Steilhang weicht bilinear mehrere Meter ab (Bäume/Büsche schwebten)
 func _tri_h(H:PackedFloat32Array,x:float,z:float)->float:
 	var nx=G0.rx;var fx=clamp((x-G0.X0)/G0.STEP,0.0,nx-1.001);var fz=clamp((z-G0.Z0)/G0.STEP,0.0,G0.rz-1.001)
 	var i=int(fx);var k=int(fz);var u=fx-i;var v=fz-k
 	var h00=H[k*nx+i];var h10=H[k*nx+i+1];var h01=H[(k+1)*nx+i];var h11=H[(k+1)*nx+i+1]
-	if u>=v:return h00+u*(h10-h00)+v*(h11-h10)
-	return h00+v*(h01-h00)+u*(h11-h01)
+	if u+v<=1.0:return h00+u*(h10-h00)+v*(h01-h00)
+	return h11+(1.0-u)*(h01-h11)+(1.0-v)*(h10-h11)
 var LOTZIEL:=PackedFloat32Array()
 func _farbe(i:int,k:int,h:float)->Color:
 	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP
@@ -1504,9 +1504,11 @@ void fragment(){
 						var P=[[i,k],[ii,k],[ii,kk],[i,kk]]
 						var V=[]
 						for q in P:V.append(Vector3(X0+q[0]*ST,H[q[1]*nx+q[0]],Z0+q[1]*ST))
-						var n1=(V[2]-V[0]).cross(V[1]-V[0]).normalized()
-						if n1.y<0:n1=-n1
-						for t in [[0,1,2],[0,2,3]]:
+						# Diagonale (ii,k)-(i,kk) wie die Gelände-Kollision (HeightMapShape3D) – mit der anderen Diagonale
+						# lag die Kollision an Steilhängen bis 35 m neben dem sichtbaren Gelände (Bäume "schwebten")
+						for t in [[0,1,3],[1,2,3]]:
+							var n1=(V[t[2]]-V[t[0]]).cross(V[t[1]]-V[t[0]]).normalized()
+							if n1.y<0:n1=-n1
 							for q in t:
 								stt.set_color(_farbe(P[q][0],P[q][1],V[q].y));stt.set_normal(n1);stt.add_vertex(V[q])
 						i=ii

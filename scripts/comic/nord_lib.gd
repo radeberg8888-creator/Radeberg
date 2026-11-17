@@ -537,6 +537,10 @@ func _k_villa(i:int):
 	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6))
 	L.box(stein,_P(-5,-0.75,-0.45),Vector3(20,1.9,0.62),Basis(),0.02)
 	L.box(deck,_P(-5,0.22,-0.45),Vector3(20.04,0.06,0.66),Basis(),0.0)
+	# Trog nicht als glatte Fläche: Steinfugen alle 1 m und ein dunklerer Sockelstreifen unten
+	var fuge=T(Color(0.46,0.44,0.41))
+	for k in 21:L.box(fuge,_P(-15.0+k*1.0,-0.75,-0.77),Vector3(0.05,1.9,0.02),Basis(),0.0)
+	for k in 3:L.box(fuge,_P(-5,-1.4+k*0.55,-0.77),Vector3(20.0,0.04,0.02),Basis(),0.0)
 	for k in 10:
 		var hh=0.55+0.12*sin(float(k)*1.7+float(i))
 		L.box(laub,_P(-14.0+k*2.0,0.25+hh*0.5,-0.45),Vector3(2.02,hh,0.5),Basis(),0.03)
