@@ -647,13 +647,14 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 		if ab.size.y<0.1 and ab.size.x<0.5:continue
 		var natur=nm.begins_with("nt_") or nm.contains("baum") or nm.contains("busch") or nm.contains("palme") or nm.contains("kaktus")
 		# Nord (z < -3500): jeder Bausatz steht auf einem 10-m-Sockel, der bis ins Gelände reicht
-		var sockel=(nm.begins_with("nd_") or m.global_position.z<-3500.0 or (m.global_transform*mm.get_instance_transform(0)).origin.z<-3500.0) and not natur
 		var mm=m.multimesh
+		var sockel=false
 		for i in mm.instance_count:
 			var gx:Transform3D=m.global_transform*mm.get_instance_transform(i)
 			if gx.basis.get_scale().x<0.01:continue
 			var cw=gx*ab.get_center()
 			if Vector2(cw.x,cw.z).distance_to(mitte)>radius:continue
+			sockel=(nm.begins_with("nd_") or cw.z<-3500.0) and not natur
 			var yb=0.0 if ab.position.y<0.6 else ab.position.y
 			var ex=ab.size.x*0.5;var ez=ab.size.z*0.5;var cx=ab.get_center().x;var cz=ab.get_center().z
 			if natur:ex=min(ex,0.25);ez=min(ez,0.25)   # Stamm/Wurzel, nicht die Krone
