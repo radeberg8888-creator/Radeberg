@@ -1142,7 +1142,7 @@ func _norden()->Dictionary:
 		var klein=kn.begins_with("nt_") or (kk.w<=8.0 and kk.d<=8.0 and not kn.begins_with("kn_"))
 		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
 		if STADT.has_point(w):continue
-		var hy=G0._bilin(HN,w.x,w.y)-NL.H0-0.1
+		var hy=_tri_h(HN,w.x,w.y)-NL.H0-0.1
 		if klein:
 			# am Hang auf den tiefsten Punkt der Grundfläche setzen (sonst hängt die Talseite in der Luft)
 			var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
@@ -1152,7 +1152,7 @@ func _norden()->Dictionary:
 				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
 			for q in pts:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
-				hy=min(hy,G0._bilin(HN,qq.x,qq.y)-NL.H0-0.1)
+				hy=min(hy,_tri_h(HN,qq.x,qq.y)-NL.H0-0.1)
 			if kn.begins_with("nt_"):hy-=0.15
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
@@ -1165,7 +1165,7 @@ func _norden()->Dictionary:
 	for i in NATUR_FERN.size():
 		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)
 		if STADT.has_point(w):continue
-		xf.origin.y=G0._bilin(HN,w.x,w.y)-0.1;NATUR_FERN[i][1]=xf
+		xf.origin.y=_tri_h(HN,w.x,w.y)-0.25;NATUR_FERN[i][1]=xf
 	print("NATUR auf Endgelaende gesetzt ",n_nat)
 	var PL={}
 	for p in NL.PLATZ:
@@ -1444,6 +1444,14 @@ const C_STRAND:=Color(0.92,0.82,0.58)
 const C_SCHNEE:=Color(0.95,0.96,0.98)
 var HG:PackedFloat32Array
 var GARTEN:=PackedFloat32Array()
+# Höhe genau wie das sichtbare Gelände-Netz (Dreiecke mit Diagonale (i,k)-(i+1,k+1)), nicht bilinear –
+# am Steilhang weicht bilinear mehrere Meter ab (Bäume/Büsche schwebten)
+func _tri_h(H:PackedFloat32Array,x:float,z:float)->float:
+	var nx=G0.rx;var fx=clamp((x-G0.X0)/G0.STEP,0.0,nx-1.001);var fz=clamp((z-G0.Z0)/G0.STEP,0.0,G0.rz-1.001)
+	var i=int(fx);var k=int(fz);var u=fx-i;var v=fz-k
+	var h00=H[k*nx+i];var h10=H[k*nx+i+1];var h01=H[(k+1)*nx+i];var h11=H[(k+1)*nx+i+1]
+	if u>=v:return h00+u*(h10-h00)+v*(h11-h10)
+	return h00+v*(h01-h00)+u*(h11-h01)
 var LOTZIEL:=PackedFloat32Array()
 func _farbe(i:int,k:int,h:float)->Color:
 	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP

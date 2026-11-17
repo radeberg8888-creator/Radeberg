@@ -610,7 +610,8 @@ func _schwebe_lauf():
 			if abs(f[2])>abs(arten[k][1][2]):arten[k][1]=f
 		print("SCHWEBT ",name," Funde ",FUNDE.size()," Arten ",arten.size())
 		var nr=0
-		for k in arten:
+		var ks=arten.keys();ks.sort_custom(func(a,b):return abs(arten[a][1][2])>abs(arten[b][1][2]))
+		for k in ks:
 			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3])
 			if nr<4:
 				var w:Vector3=f[3]
@@ -623,11 +624,16 @@ func _schwebe_lauf():
 	# Prototyp Villa-Mauern
 	var vp=Vector2(-1634,-8994);cam.global_position=Vector3(vp.x,G_h(vp)+20,vp.y);await _laden(vp)
 	await _villa_fotos(Vector3(vp.x,G_h(vp),vp.y))
+var _gk=null
+func _gelaende_koerper():
+	if _gk==null:_gk=spiel.welt.get_node_or_null("Kollision")
+	return _gk
 func G_h(p:Vector2)->float:return spiel.welt.G.h_at(p.x,p.y)
 func _pruef_kopien(mitte:Vector2,radius:float):
 	for m in get_tree().root.find_children("*","MultiMeshInstance3D",true,false):
 		var nm:String=m.name
-		if nm.ends_with("ink") or nm.begins_with("NF_") or m.multimesh==null or m.multimesh.mesh==null:continue
+		# K_B-…: Fassaden-Bauteile (Fenster, Gesimse) an Hauswänden – Teil des Hauses, kein eigenes Objekt
+		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or m.multimesh==null or m.multimesh.mesh==null:continue
 		if not m.is_visible_in_tree():continue
 		var ab:AABB=m.multimesh.mesh.get_aabb()
 		if ab.size.y<0.1 and ab.size.x<0.5:continue
@@ -672,7 +678,8 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				if rg.is_empty():continue
 				var yg=rg.position.y
 				var wo=Vector3(ao.x,ys,ao.y)
-				if yg-ys>0.3:FUNDE.append(["Gehweg","Gelaende_drueber",yg-ys,wo])
+				# nur echtes Gelände zählt (Mauern/Zäune direkt am Gehweg sind gewollt)
+				if yg-ys>0.3 and rg.collider==_gelaende_koerper():FUNDE.append(["Gehweg","Gelaende_drueber",yg-ys,wo])
 				elif ys-yg>0.15:
 					var aus=Vector3(n.x*sd,0,n.y*sd)
 					var rh=_strahl(Vector3(ai.x,ys-0.25,ai.y),Vector3(ai.x,ys-0.25,ai.y)+aus*1.2,true)

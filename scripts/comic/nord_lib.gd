@@ -405,6 +405,8 @@ func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	var aussen=Vector3(-n.x,0,-n.y);var rechts=Vector3.UP.cross(aussen)
 	var xf=Transform3D(Basis(rechts,Vector3.UP,aussen),Vector3(F.x,h-0.14,F.y))
 	PLATZ.append([kit,xf])
+	var sk="nd_sockel_%d_%d"%[int(k.w),int(k.d)]
+	if not kit.begins_with("nd_") and K.KITS.has(sk):PLATZ.append([sk,xf])
 	for pk in k.park:PARK.append([pk[0],xf*pk[1]])
 	var tt=Vector2(-n.y,n.x)
 	TERR.append([[F-tt*(k.w*0.5+1),F+tt*(k.w*0.5+1),F+tt*(k.w*0.5+1)+n*(k.d+1),F-tt*(k.w*0.5+1)+n*(k.d+1)],h+H0])
@@ -456,6 +458,15 @@ func kits_bauen():
 	_kit("land","camp","ld_camp",14.0,12.0,func():_k_camp())
 	_kit("land","holz","ld_holz",6.0,4.0,func():_k_holzstapel())
 	GL.ohne_tags=false
+	# Sockel-Bausätze für die aus Süd/Ghetto geliehenen Bausätze (Läden, Reihenhäuser, Holzhäuser …):
+	# sie werden im Norden zusätzlich darunter gesetzt (siehe _setzen)
+	var groessen={}
+	for kn in K.KITS:
+		if kn.begins_with("nd_") or kn.begins_with("nt_"):continue
+		var kk=K.KITS[kn];groessen["nd_sockel_%d_%d"%[int(kk.w),int(kk.d)]]=[kk.w,kk.d]
+	for sn in groessen:
+		var g=groessen[sn]
+		_kit("nord","sockel",sn,g[0],g[1],func():pass)
 	print("NORD Bausätze ",K.KITS.size())
 
 func _k_hochhaus(i:int):
@@ -539,8 +550,8 @@ func _boden(w:float,d:float,farbe:Color):
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 	var mit=func():
 		f.call()
-		if not name.begins_with("nt_"):
-			L.box(T(Color(0.6,0.57,0.52)),_P(0,-2.75,d*0.5),Vector3(w-0.04,5.0,d-0.04),Basis(),0.0)
+		if not (name.begins_with("nt_") or name.contains("kaktus") or name.contains("fels") or name.contains("jet")):
+			L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,d*0.5),Vector3(w-0.04,10.0,d-0.04),Basis(),0.0)
 	super._kit(stil_,typ,name,w,d,mit)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
@@ -1346,6 +1357,15 @@ func _gehweg_ecken(so)->int:
 				var ca=Vector3(c.x,yc-0.05,c.y)
 				L._tri(sa,ca,Vector3(A1k.x,ya1-0.05,A1k.y),Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3.UP)
 				L._tri(sa,ca,Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3(A2k.x,ya2-0.05,A2k.y),Vector3.UP)
+			# Böschungsmauer unter der Außenkante der Ecke (sonst Spalt, wo das Gelände tiefer liegt)
+			var ss=L._st(T(Color(0.5,0.46,0.4)),true)
+			var aussen_k=[[3,4],[4,5]] if poly.size()==6 else [[2,3]]
+			for e in aussen_k:
+				var pa:Vector2=poly[e[0]];var pb:Vector2=poly[e[1]]
+				var A=Vector3(pa.x,hs[e[0]],pa.y);var B=Vector3(pb.x,hs[e[1]],pb.y)
+				var A2=A-Vector3(0,6,0);var B2=B-Vector3(0,6,0)
+				var nm2=(pa+pb)*0.5-mid;var nr=Vector3(nm2.x,0,nm2.y).normalized()
+				L._tri(ss,A,A2,B2,nr);L._tri(ss,A,B2,B,nr)
 			var m3=Vector3(mid.x,ym,mid.y)
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
