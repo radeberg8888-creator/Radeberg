@@ -2299,8 +2299,11 @@ func _aussen_gehweg(pc:PackedVector2Array):
 		if abs(nr[1]-r.w)>1.6:continue
 		var a=p;var b=q;var c=q+inn*SWB;var d=p+inn*SWB
 		var s=_st(M.pflaster,true)
+		# mit Kollision (vorher ohne: Figuren liefen 0,6 m darunter, Laternen standen scheinbar in der Luft)
+		var ak=koll_an;koll_an=true
 		_tri(s,Vector3(a.x,KB+0.004,a.y),Vector3(b.x,KB+0.004,b.y),Vector3(c.x,KB+0.004,c.y),Vector3.UP)
 		_tri(s,Vector3(a.x,KB+0.004,a.y),Vector3(c.x,KB+0.004,c.y),Vector3(d.x,KB+0.004,d.y),Vector3.UP)
+		koll_an=ak
 
 func _spitze_ecke_merken(pc:PackedVector2Array):
 	if abs(_flaeche2(pc))<400:return
