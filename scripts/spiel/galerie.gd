@@ -643,7 +643,8 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 	for m in get_tree().root.find_children("*","MultiMeshInstance3D",true,false):
 		var nm:String=m.name
 		# K_B-…: Fassaden-Bauteile (Fenster, Gesimse) an Hauswänden – Teil des Hauses, kein eigenes Objekt
-		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or m.multimesh==null or m.multimesh.mesh==null:continue
+		# nt_fern/ld_fern: Fern-Stellvertreter (erst ab 120 m sichtbar, nah steht das echte Modell)
+		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or nm.begins_with("nt_fern") or nm.begins_with("ld_fern") or m.multimesh==null or m.multimesh.mesh==null:continue
 		if not m.is_visible_in_tree():continue
 		var ab:AABB=m.multimesh.mesh.get_aabb()
 		if ab.size.y<0.1 and ab.size.x<0.5:continue
