@@ -615,8 +615,16 @@ func _schwebe_lauf():
 			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3])
 			if nr<4:
 				var w:Vector3=f[3]
-				# Nahbild von unten seitlich
-				cam.look_at_from_position(w+Vector3(5.5,0.9,5.5),w+Vector3(0,0.3,0));cam.current=true
+				# Nahbild von seitlich unten: freie Position im Kreis suchen (nicht in Hang oder Haus)
+				var cp=w+Vector3(5.5,0.9,5.5)
+				for a in 12:
+					var dir=Vector3(cos(a*PI/6.0),0,sin(a*PI/6.0))
+					var kand=w+dir*6.0+Vector3(0,1.2,0)
+					var frei=_strahl(w+Vector3(0,0.4,0),kand,true).is_empty()
+					var boden=_strahl(kand+Vector3(0,0.1,0),kand+Vector3(0,-3,0))
+					var oben=_strahl(kand,kand+Vector3(0,30,0),true)
+					if frei and oben.is_empty():cp=kand;break
+				cam.look_at_from_position(cp,w+Vector3(0,0.2,0));cam.current=true
 				for fr in 3:await get_tree().process_frame
 				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])
 				nr+=1
@@ -638,7 +646,8 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 		var ab:AABB=m.multimesh.mesh.get_aabb()
 		if ab.size.y<0.1 and ab.size.x<0.5:continue
 		var natur=nm.begins_with("nt_") or nm.contains("baum") or nm.contains("busch") or nm.contains("palme") or nm.contains("kaktus")
-		var sockel=nm.begins_with("nd_")   # Nord-Bausätze stehen auf 5-m-Sockel
+		# Nord (z < -3500): jeder Bausatz steht auf einem 10-m-Sockel, der bis ins Gelände reicht
+		var sockel=(nm.begins_with("nd_") or m.global_position.z<-3500.0 or (m.global_transform*mm.get_instance_transform(0)).origin.z<-3500.0) and not natur
 		var mm=m.multimesh
 		for i in mm.instance_count:
 			var gx:Transform3D=m.global_transform*mm.get_instance_transform(i)
@@ -655,7 +664,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
 				if not r.is_empty():
 					var luft=w.y-r.position.y
-					if luft>(5.0 if sockel else 0.15):FUNDE.append([kn,"schwebt",luft,w])
+					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.name)])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.5:

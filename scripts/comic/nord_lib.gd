@@ -532,11 +532,15 @@ func _k_villa(i:int):
 	L.box(deck,_P(-5,2.26,0.2),Vector3(20.1,0.12,0.46),Basis(),0.0)
 	L.box(stein,_P(-5,0.2,0.2),Vector3(20.02,0.4,0.34),Basis(),0.0)
 	for k in 6:L.box(stein,_P(-14.8+k*4.0,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
+	# Pflanzbeet vor der Mauer: Steintrog, der bis 1,5 m unter Grundstückshöhe reicht (steht damit auch auf
+	# tiefer liegendem Gehweg auf), darin eine gestutzte Hecke als Band mit leicht unregelmäßiger Oberkante
 	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6))
-	for k in 8:
-		var q=_P(-13.5+k*2.4,0.35,-0.55)
-		L.kugel(laub,q,Vector3(0.7,0.55,0.55),1.05)
-		if k%2==0:L.kugel(bluete,q+Vector3(0.2,0.35,-0.15),Vector3(0.22,0.18,0.22),1.0)
+	L.box(stein,_P(-5,-0.75,-0.45),Vector3(20,1.9,0.62),Basis(),0.02)
+	L.box(deck,_P(-5,0.22,-0.45),Vector3(20.04,0.06,0.66),Basis(),0.0)
+	for k in 10:
+		var hh=0.55+0.12*sin(float(k)*1.7+float(i))
+		L.box(laub,_P(-14.0+k*2.0,0.25+hh*0.5,-0.45),Vector3(2.02,hh,0.5),Basis(),0.03)
+		if k%3==0:L.kugel(bluete,_P(-14.0+k*2.0,0.3+hh,-0.45),Vector3(0.22,0.14,0.22),1.0)
 	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
 # Grundstücke im Norden liegen am Hang: unter der Rasenplatte ein 4 m tiefer Sockel (Erde/Mauer),
@@ -1213,7 +1217,7 @@ func fahrbahnen():
 			for sd in [1,-1]:
 				var a=P[i]+na*aus*sd;var b=P[i+1]+nb*aus*sd
 				var mid=(a+b)*0.5
-				if auf_fahrbahn(mid,ri,0.8) or nah_kreuzung(mid,r.w+r.sw+2.0):continue
+				if auf_fahrbahn(mid,ri,0.8) or nah_kreuzung(mid,2.0):continue
 				var ya=Y[i]+oben;var yb=Y[i+1]+oben
 				var A=Vector3(a.x,ya,a.y);var B=Vector3(b.x,yb,b.y);var A2=Vector3(a.x,ya-6.0,a.y);var B2=Vector3(b.x,yb-6.0,b.y)
 				var nrm=Vector3(nn.x*sd,0,nn.y*sd)
@@ -1256,25 +1260,50 @@ func _vt(P:PackedVector2Array,i:int)->Vector2:
 	var a=P[max(i-1,0)];var b=P[min(i+1,P.size()-1)]
 	return (b-a).normalized()
 func platten():
-	# keine Platten: Gelände ist der Boden; Gehwege als Streifen entlang der Stadtstraßen
+	# Gehwege: ein durchgehendes Band je Straßenseite (Punkt-Normalen, keine Sägezähne). An Kreuzungen wird das
+	# Band genau auf dem Kreis R um den Knoten abgeschnitten; die Ecken zwischen den Armen schließen exakt an
+	# diese Schnittkanten an (keine zwei Flächen übereinander, kein Spalt). Außenkante: Böschungsmauer.
 	var alt=L.koll_an;L.koll_an=true
 	var so=L._st(L.M.pflaster,true);var n_ok=0
+	ENDEN={}
+	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
+	for ji in JUNC.size():
+		var j=JUNC[ji];var R=float(j.r)+3.0
+		for ri in [j.a,j.b]:
+			if not jr.has(ri):jr[ri]=[]
+			jr[ri].append([ji,j.p,R])
 	for ri in ROADS.size():
 		var r=ROADS[ri]
 		if not r.stadt or r.sw<=0.0:continue
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
+		var knoten=jr.get(ri,[])
 		for i in P.size()-1:
 			var t1:Vector2=_vt(P,i);var t2:Vector2=_vt(P,i+1)
+			var u0=0.0;var u1=1.0;var kn0=-1;var kn1=-1
+			var weg=false
+			for kk in knoten:
+				var c:Vector2=kk[1];var R:float=kk[2]
+				var in0=P[i].distance_to(c)<R;var in1=P[i+1].distance_to(c)<R
+				if in0 and in1:weg=true;break
+				if in0 or in1:
+					var tt=_kreis_schnitt(P[i],P[i+1],c,R)
+					if in0 and tt>u0:u0=tt;kn0=kk[0]
+					if in1 and tt<u1:u1=tt;kn1=kk[0]
+			if weg or u1-u0<0.02:continue
+			var q0=P[i].lerp(P[i+1],u0);var q1=P[i].lerp(P[i+1],u1)
+			var m0=t1.lerp(t2,u0).normalized();var m1=t1.lerp(t2,u1).normalized()
+			var y0=lerp(Y[i],Y[i+1],u0)+0.11;var y1=lerp(Y[i],Y[i+1],u1)+0.11
 			for sd in [1,-1]:
-				# Normalen aus der gemittelten Richtung an jedem Punkt: keine Sägezähne in Kurven und am Hang
-				var n1=Vector2(-t1.y,t1.x)*sd;var n2=Vector2(-t2.y,t2.x)*sd
-				var a0:Vector2=P[i]+n1*r.w;var a1:Vector2=P[i]+n1*(r.w+r.sw);var c0:Vector2=P[i+1]+n2*r.w;var c1:Vector2=P[i+1]+n2*(r.w+r.sw)
+				var n0=Vector2(-m0.y,m0.x)*sd;var n1=Vector2(-m1.y,m1.x)*sd
+				var a0:Vector2=q0+n0*r.w;var a1:Vector2=q0+n0*(r.w+r.sw);var c0:Vector2=q1+n1*r.w;var c1:Vector2=q1+n1*(r.w+r.sw)
 				var mid=(a0+a1+c0+c1)*0.25
-				if auf_fahrbahn(mid,ri,0.3) or nah_kreuzung(mid,1.0):continue
-				var ya=Y[i]+0.11;var yc=Y[i+1]+0.11
-				L._tri(so,Vector3(a0.x,ya,a0.y),Vector3(c0.x,yc,c0.y),Vector3(c1.x,yc,c1.y),Vector3.UP)
-				L._tri(so,Vector3(a0.x,ya,a0.y),Vector3(c1.x,yc,c1.y),Vector3(a1.x,ya,a1.y),Vector3.UP)
+				if auf_fahrbahn(mid,ri,0.3):continue
+				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),Vector3.UP)
+				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),Vector3.UP)
 				n_ok+=1
+				# Schnittkanten am Knoten merken (Richtung: vom Knoten weg)
+				if kn0>=0:_ende(kn0,ri,Vector3(a0.x,y0,a0.y),Vector3(a1.x,y0,a1.y),m0)
+				if kn1>=0:_ende(kn1,ri,Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),-m1)
 	n_ok+=_gehweg_ecken(so)
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)
@@ -1289,87 +1318,61 @@ func platten():
 			L.box(grau,Vector3(m.x,y+3.0,m.y),Vector3(0.8,6.0,t.length()+0.3),b,0.04);L.koll_box(Vector3(m.x,y+3.0,m.y),Vector3(0.8,6.0,t.length()+0.3),b)
 			L.zyl(L.M.metall,Vector3(m.x,y+6.0,m.y),Vector3(m.x,y+6.6,m.y),0.35,1.1)
 	print("NORD Gehwegstücke ",n_ok)
-# Gehweg-Ecken an Kreuzungen: die Streifen enden vor jeder Kreuzung (sonst lägen sie auf dem Asphalt).
-# Die Ecke zwischen zwei Straßenarmen wird hier geschlossen: Fläche zwischen den Bordsteinkanten und den
-# Außenkanten beider Arme bis zu ihrem Schnittpunkt; gegenüber einer Einmündung ein gerades Stück.
+var ENDEN:={}
+func _kreis_schnitt(a:Vector2,b:Vector2,c:Vector2,R:float)->float:
+	# Parameter t in [0,1] auf a->b mit |p(t)-c|=R (der Übergang innen/außen)
+	var d=b-a;var f=a-c
+	var A=d.dot(d);var B=2.0*f.dot(d);var Cq=f.dot(f)-R*R
+	var disk=B*B-4.0*A*Cq
+	if A<1e-6 or disk<0.0:return 0.5
+	var sq=sqrt(disk);var t1=(-B-sq)/(2.0*A);var t2=(-B+sq)/(2.0*A)
+	if t1>=0.0 and t1<=1.0:return t1
+	return clamp(t2,0.0,1.0)
+func _ende(ji:int,ri:int,innen:Vector3,aussen:Vector3,weg:Vector2):
+	if not ENDEN.has(ji):ENDEN[ji]=[]
+	ENDEN[ji].append({"ri":ri,"i":innen,"o":aussen,"d":weg.normalized()})
 func _gehweg_ecken(so)->int:
-	var n=0
-	for j in JUNC:
-		var c:Vector2=j.p;var arme=[]
-		for ri in [j.a,j.b]:
-			var r=ROADS[ri]
-			if not r.stadt or r.sw<=0.0:continue
-			var P:PackedVector2Array=r.P;var bi=0;var bd=1e9
-			for i in P.size():
-				var d=P[i].distance_to(c)
-				if d<bd:bd=d;bi=i
-			var sj:float=r.S[bi];var Lg:float=r.S[-1]
-			var t:Vector2=bei(r,sj)[1]
-			if sj<Lg-j.r-4.0:arme.append({"d":t,"r":r,"s":sj,"sg":1.0})
-			if sj>j.r+4.0:arme.append({"d":-t,"r":r,"s":sj,"sg":-1.0})
-		if arme.size()<2:continue
-		arme.sort_custom(func(x,y):return x.d.angle()<y.d.angle())
-		var yc=y_bei(arme[0].r,arme[0].s)+0.11
-		var R=float(j.r)+4.0
-		for k in arme.size():
-			var a1=arme[k];var a2=arme[(k+1)%arme.size()]
-			if a1.r==a2.r and a1.d.dot(a2.d)>0.9:continue
-			var wink=fposmod(a2.d.angle()-a1.d.angle(),TAU)
-			if arme.size()==2 and wink>PI+0.2:continue   # nur die Innenseite einer Kurve/Ecke
-			if wink<0.15:continue
-			var m=a1.d.rotated(wink*0.5)
-			var d1:Vector2=a1.d;var d2:Vector2=a2.d
-			var n1=Vector2(-d1.y,d1.x)
-			if n1.dot(m)<0:n1=-n1
-			var n2=Vector2(-d2.y,d2.x)
-			if n2.dot(m)<0:n2=-n2
-			var w1:float=a1.r.w;var w2:float=a2.r.w;var s1:float=a1.r.sw;var s2:float=a2.r.sw
-			var A1k=c+n1*w1+d1*R;var A1o=c+n1*(w1+s1)+d1*R
-			var A2k=c+n2*w2+d2*R;var A2o=c+n2*(w2+s2)+d2*R
-			var ya1=y_bei(a1.r,clamp(a1.s+a1.sg*R,0.0,a1.r.S[-1]))+0.11
-			var ya2=y_bei(a2.r,clamp(a2.s+a2.sg*R,0.0,a2.r.S[-1]))+0.11
-			var poly:Array
-			if wink>PI-0.35 and wink<PI+0.35:
-				poly=[A1k,A2k,A2o,A1o]   # gerades Stück gegenüber einer Einmündung
+	var n=0;var ss=L._st(T(Color(0.5,0.46,0.4)),true)
+	for ji in ENDEN:
+		var c:Vector2=JUNC[ji].p;var E:Array=ENDEN[ji]
+		if E.size()<2:continue
+		E.sort_custom(func(x,y):return (Vector2(x.o.x,x.o.z)-c).angle()<(Vector2(y.o.x,y.o.z)-c).angle())
+		for k in E.size():
+			var e1=E[k];var e2=E[(k+1)%E.size()]
+			var o1=Vector2(e1.o.x,e1.o.z)-c;var o2=Vector2(e2.o.x,e2.o.z)-c
+			var wink=fposmod(o2.angle()-o1.angle(),TAU)
+			if wink>PI*0.95:continue   # dazwischen liegt eine Fahrbahn bzw. keine Ecke
+			# zwei Seiten desselben Arms (Fahrbahn dazwischen): keine Ecke
+			if e1.ri==e2.ri and e1.d.dot(e2.d)>0.8:continue
+			var i1=Vector2(e1.i.x,e1.i.z);var i2=Vector2(e2.i.x,e2.i.z);var a1=Vector2(e1.o.x,e1.o.z);var a2=Vector2(e2.o.x,e2.o.z)
+			var ym=(e1.i.y+e2.i.y)*0.5
+			var poly:Array;var hs:Array
+			if e1.d.dot(e2.d)<-0.95:
+				poly=[i1,i2,a2,a1];hs=[e1.i.y,e2.i.y,e2.o.y,e1.o.y]   # gerade gegenüber einer Einmündung
 			else:
-				var K=Geometry2D.line_intersects_line(c+n1*w1,d1,c+n2*w2,d2)
-				var O=Geometry2D.line_intersects_line(c+n1*(w1+s1),d1,c+n2*(w2+s2),d2)
-				if K==null or O==null or K.distance_to(c)>R*1.3 or O.distance_to(c)>R*1.5:continue
-				# Spitze nicht auf die Fahrbahn ragen lassen (schräge/gebogene Einmündungen)
+				var K=Geometry2D.line_intersects_line(i1,-e1.d,i2,-e2.d)
+				var O=Geometry2D.line_intersects_line(a1,-e1.d,a2,-e2.d)
+				if K==null or O==null:continue
+				if (K-c).length()>(i1-c).length()*1.6 or (O-c).length()>(a1-c).length()*1.8:continue
 				for st in 11:
 					var Kt:Vector2=K.lerp(O,st*0.1)
 					if not auf_fahrbahn(Kt,-1,-0.15):K=Kt;break
-				poly=[A1k,K,A2k,A2o,O,A1o]
+				poly=[i1,K,i2,a2,O,a1];hs=[e1.i.y,ym,e2.i.y,e2.o.y,ym,e1.o.y]
 			var mid=Vector2.ZERO
 			for q in poly:mid+=q
 			mid/=poly.size()
 			if auf_fahrbahn(mid,-1,0.2):continue
-			var ym=(ya1+ya2)*0.5
-			var hs=[]
-			for q in poly:
-				var h=ym
-				if q==A1k or q==A1o:h=ya1
-				elif q==A2k or q==A2o:h=ya2
-				hs.append(h)
-			# Asphalt-Zwickel zwischen den Bordsteinkanten (schräge Einmündungen ließen dort Wiese durchscheinen)
-			if poly.size()==6 and abs(ya1-ya2)<0.12 and abs(yc-ym)<0.12:
-				var sa=L._st(L.M.asphalt,true)
-				var ca=Vector3(c.x,yc-0.05,c.y)
-				L._tri(sa,ca,Vector3(A1k.x,ya1-0.05,A1k.y),Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3.UP)
-				L._tri(sa,ca,Vector3(poly[1].x,yc-0.05,poly[1].y),Vector3(A2k.x,ya2-0.05,A2k.y),Vector3.UP)
-			# Böschungsmauer unter der Außenkante der Ecke (sonst Spalt, wo das Gelände tiefer liegt)
-			var ss=L._st(T(Color(0.5,0.46,0.4)),true)
-			var aussen_k=[[3,4],[4,5]] if poly.size()==6 else [[2,3]]
-			for e in aussen_k:
-				var pa:Vector2=poly[e[0]];var pb:Vector2=poly[e[1]]
-				var A=Vector3(pa.x,hs[e[0]],pa.y);var B=Vector3(pb.x,hs[e[1]],pb.y)
-				var A2=A-Vector3(0,6,0);var B2=B-Vector3(0,6,0)
-				var nm2=(pa+pb)*0.5-mid;var nr=Vector3(nm2.x,0,nm2.y).normalized()
-				L._tri(ss,A,A2,B2,nr);L._tri(ss,A,B2,B,nr)
 			var m3=Vector3(mid.x,ym,mid.y)
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
 				L._tri(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),Vector3.UP)
+			# Böschungsmauer unter der Außenkante
+			var aus=[[3,4],[4,5]] if poly.size()==6 else [[2,3]]
+			for e in aus:
+				var pa:Vector2=poly[e[0]];var pb:Vector2=poly[e[1]]
+				var A=Vector3(pa.x,hs[e[0]],pa.y);var B=Vector3(pb.x,hs[e[1]],pb.y)
+				var nr=Vector3(((pa+pb)*0.5-mid).x,0,((pa+pb)*0.5-mid).y).normalized()
+				L._tri(ss,A,A-Vector3(0,6,0),B-Vector3(0,6,0),nr);L._tri(ss,A,B-Vector3(0,6,0),B,nr)
 			n+=1
 	print("NORD Gehweg-Ecken ",n)
 	return n
