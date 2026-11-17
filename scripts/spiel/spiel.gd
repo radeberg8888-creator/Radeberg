@@ -1184,12 +1184,16 @@ func einstellungen_menue():
 	_slider(w,"Neigungs-Empfindlichkeit","neig_empf",0.4,2.5)
 	var inv=CheckButton.new();inv.text="Neigung umkehren";inv.button_pressed=st.e.neig_umkehren;w.add_child(inv);inv.toggled.connect(func(b):st.e.neig_umkehren=b)
 	_slider(w,"Kamera-Empfindlichkeit","kamera_empf",0.3,2.5)
+	if not st.e.has("totzone"):st.e.totzone=0.15
+	_slider(w,"Totzone (Stick/Neigen)","totzone",0.02,0.35)
 	var iy=CheckButton.new();iy.text="Kamera hoch/runter umkehren";iy.button_pressed=st.e.kamera_invert_y;w.add_child(iy);iy.toggled.connect(func(b):st.e.kamera_invert_y=b)
 	_slider(w,"Größe der Touch-Knöpfe","hud_groesse",0.7,1.4)
 	var sw=OptionButton.new();for t in ["Sichtweite: niedrig (schnell)","Sichtweite: mittel","Sichtweite: hoch"]:sw.add_item(t)
 	sw.selected=int(st.e.sichtweite);w.add_child(sw);sw.item_selected.connect(func(i):st.e.sichtweite=i;einstellungen_anwenden())
-	var gq=OptionButton.new();for t in ["Grafik: Mittel (Akku schonen)","Grafik: Hoch","Grafik: Ultra"]:gq.add_item(t)
-	gq.selected=int(st.e.get("grafik",1));w.add_child(gq);gq.item_selected.connect(func(i):st.e.grafik=i;einstellungen_anwenden())
+	var gq=OptionButton.new();for t in ["Grafik: Akku sparen (weniger Details/Sichtweite)","Grafik: Mittel","Grafik: Hoch","Grafik: Ultra"]:gq.add_item(t)
+	gq.selected=_grafik();w.add_child(gq);gq.item_selected.connect(func(i):st.e.grafik4=i;einstellungen_anwenden())
+	var br=OptionButton.new();for t in ["Bildrate: Akku sparen (30 FPS)","Bildrate: Mittel (40 FPS)","Bildrate: Flüssig (60 FPS)"]:br.add_item(t)
+	br.selected=int(st.e.get("bildrate",2));w.add_child(br);br.item_selected.connect(func(i):st.e.bildrate=i;einstellungen_anwenden())
 	var gr=CheckButton.new();gr.text="Dichtes Gras";gr.button_pressed=st.e.get("gras",true);w.add_child(gr);gr.toggled.connect(func(b):st.e.gras=b)
 	var fp=CheckButton.new();fp.text="FPS anzeigen";fp.button_pressed=st.e.fps;w.add_child(fp);fp.toggled.connect(func(b):st.e.fps=b)
 	var lc=Label.new();lc.text="Controller: "+("verbunden ✔" if st.controller else "keiner – Xbox-Controller per Bluetooth koppeln");lc.add_theme_font_size_override("font_size",20);lc.autowrap_mode=TextServer.AUTOWRAP_WORD;w.add_child(lc)
@@ -1201,6 +1205,10 @@ func _slider(v:Control,t:String,key:String,a:float,b:float):
 	s.value_changed.connect(func(x):st.e[key]=x)
 
 var _kontur:Node=null
+func _grafik()->int:
+	# alte Speicherstände (3 Stufen) auf die neuen 4 Stufen abbilden
+	if st.e.has("grafik4"):return clamp(int(st.e.grafik4),0,3)
+	return clamp(int(st.e.get("grafik",1))+1,0,3)
 func einstellungen_anwenden():
 	# Comic-Stil 2: keine Echtzeit-Schatten (Fahrzeuge/Figuren haben Bodenflecken), Tusche-Konturen, wärmeres Licht
 	sun.shadow_enabled=false
@@ -1208,7 +1216,7 @@ func einstellungen_anwenden():
 		var STIL=load("res://scripts/stil.gd");_kontur=STIL.kontur_knoten();add_child(_kontur);STIL.licht(env,sun)
 	# Grafikstufe: Umgebungsverdeckung, indirektes Licht, Spiegelungen, Lichtnebel, Schattenreichweite, Auflösungs-Skalierung (FSR 2)
 	# Handy-Renderer (Mobile): Glow und Nebel, Schatten je nach Stufe, Auflösung per FSR hochskaliert, max. 60 FPS
-	var q=int(st.e.get("grafik",1))
+	var g4=_grafik();var q=max(g4-1,0)
 	env.ssao_enabled=false;env.ssil_enabled=false;env.ssr_enabled=false;env.volumetric_fog_enabled=false;env.sdfgi_enabled=false
 	env.glow_enabled=q>=1;env.glow_intensity=0.4;env.glow_bloom=0.04
 	sun.directional_shadow_max_distance=[70.0,110.0,180.0][q]
@@ -1216,15 +1224,21 @@ func einstellungen_anwenden():
 	sun.shadow_blur=1.0;sun.light_angular_distance=0.0
 	sun.shadow_normal_bias=1.6;sun.shadow_bias=0.06;sun.directional_shadow_blend_splits=true
 	var vp=get_viewport()
-	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_FSR
-	vp.scaling_3d_scale=[0.67,0.8,1.0][q]
-	vp.mesh_lod_threshold=[2.5,1.5,1.0][q]
-	Engine.max_fps=[40,60,60][q]   # Teiler der Bildwiederholrate (120 Hz), sonst ungleichmäßige Bilder
-	var f=[0.6,1.0,1.6][int(st.e.sichtweite)]
+	# Mobile-Renderer: FSR geht nur mit Forward+ -> einfache bilineare Skalierung (greift im Mobile-Renderer)
+	vp.scaling_3d_mode=Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale=[0.6,0.67,0.8,1.0][g4]
+	vp.mesh_lod_threshold=[4.0,2.5,1.5,1.0][g4]
+	if g4==0:env.glow_enabled=false
+	# Bildrate: Teiler der 120-Hz-Anzeige (30/40/60), sonst ungleichmäßige Bilder
+	Engine.max_fps=[30,40,60][int(st.e.get("bildrate",2))]
+	var sw=int(st.e.sichtweite)
+	if g4==0:sw=0   # Akku sparen: immer kurze Sichtweite
+	if _kontur:_kontur.visible=g4>=1   # Akku sparen: ohne Tusche-Nachbearbeitung (Konturen der Häuser bleiben)
+	var f=[0.6,1.0,1.6][sw]
 	if strom:strom.sicht_f=f;strom.sichtweite_anwenden()
-	var far=[900.0,1600.0,2600.0][int(st.e.sichtweite)]
+	var far=[900.0,1600.0,2600.0][sw]
 	kam.cam.far=far
-	env.fog_density=[0.0016,0.0009,0.0005][int(st.e.sichtweite)]
+	env.fog_density=[0.0016,0.0009,0.0005][sw]
 
 func hilfe():
 	var v=_panel("STEUERUNG")

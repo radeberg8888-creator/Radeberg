@@ -11,6 +11,7 @@ var e:={
 	"neig_empf":1.0,         # Neigungs-Empfindlichkeit
 	"neig_umkehren":false,
 	"kamera_empf":1.0,
+	"totzone":0.15,          # Controller-Stick und Neigen: Bereich ohne Wirkung in der Mitte
 	"kamera_invert_y":false,
 	"sichtweite":1,          # 0 niedrig, 1 mittel, 2 hoch
 	"schatten":true,
@@ -105,8 +106,10 @@ func _process(dt):
 	# Controller-Achsen
 	var ls=Vector2(Input.get_joy_axis(0,JOY_AXIS_LEFT_X),-Input.get_joy_axis(0,JOY_AXIS_LEFT_Y)) if controller else Vector2.ZERO
 	var rs=Vector2(Input.get_joy_axis(0,JOY_AXIS_RIGHT_X),Input.get_joy_axis(0,JOY_AXIS_RIGHT_Y)) if controller else Vector2.ZERO
-	if ls.length()<0.15:ls=Vector2.ZERO
-	if rs.length()<0.15:rs=Vector2.ZERO
+	# Totzone ohne Sprung: hinter der Totzone weich von 0 an hochskaliert
+	var tz=float(e.get("totzone",0.15))
+	ls=Vector2.ZERO if ls.length()<tz else ls.normalized()*inverse_lerp(tz,1.0,min(ls.length(),1.0))
+	rs=Vector2.ZERO if rs.length()<tz else rs.normalized()*inverse_lerp(tz,1.0,min(rs.length(),1.0))
 	var kb=Vector2(Input.get_action_strength("rechts")-Input.get_action_strength("links"),Input.get_action_strength("vor")-Input.get_action_strength("zurueck"))
 	move=t_move+ls+kb
 	if move.length()>1.0:move=move.normalized()
@@ -147,5 +150,6 @@ func _tilt()->float:
 	var d=wrapf(a1-a0,-PI,PI)
 	var s=d/deg_to_rad(28.0)*e.neig_empf
 	if e.neig_umkehren:s=-s
-	if abs(s)<0.04:s=0.0
+	var tzn=float(e.get("totzone",0.15))*0.3
+	s=0.0 if abs(s)<tzn else sign(s)*(abs(s)-tzn)/(1.0-tzn)
 	return clamp(s,-1.0,1.0)

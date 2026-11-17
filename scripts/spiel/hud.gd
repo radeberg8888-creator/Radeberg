@@ -132,7 +132,9 @@ func _draw():
 	if st.e.fps:
 		var dc=int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME));var pr=int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
 		var ms=Performance.get_monitor(Performance.TIME_PROCESS)*1000.0
+		var ram=Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0;var vram=Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)/1048576.0
 		_txt(Vector2(330,40),"%d FPS · %d Aufrufe · %.1f Mio. Dreiecke · Logik %.1f ms"%[Engine.get_frames_per_second(),dc,pr/1e6,ms],22,Color(1,1,0.6),HORIZONTAL_ALIGNMENT_LEFT,true)
+		_txt(Vector2(330,68),"Speicher %d MB · Grafikspeicher %d MB · Laufzeit %d min"%[ram,vram,int(Time.get_ticks_msec()/60000)],20,Color(1,1,0.6),HORIZONTAL_ALIGNMENT_LEFT,true)
 	if job_text!="":_txt(Vector2(s.x*0.5,110),job_text,26,Color(1,0.85,0.3),HORIZONTAL_ALIGNMENT_CENTER,true)
 	if meldung_zeit>0:
 		var a=clamp(meldung_zeit,0.0,1.0)
