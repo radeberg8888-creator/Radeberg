@@ -553,6 +553,12 @@ func _boden(w:float,d:float,farbe:Color):
 	super._boden(w,d,farbe)
 	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
 	L.box(T(farbe),_P(0,-0.5,d*0.5),Vector3(w-0.02,0.8,d-0.02),Basis(),0.0)
+	# flache Rasen-Schräge an Seiten und Rückseite: keine 6-cm-Stufe zum Gelände -> keine gestrichelte Konturlinie
+	var so=L._st(T(farbe),true);var b:=1.2;var o:=0.01;var u:=-0.3
+	var A=_P(-w*0.5,o,0);var B=_P(-w*0.5,o,d);var C2=_P(w*0.5,o,d);var D=_P(w*0.5,o,0)
+	var A2=_P(-w*0.5-b,u,0);var B2=_P(-w*0.5-b,u,d+b);var C3=_P(w*0.5+b,u,d+b);var D2=_P(w*0.5+b,u,0)
+	for q in [[A,A2,B2,B],[B,B2,C3,C2],[C2,C3,D2,D]]:
+		L._tri(so,q[0],q[1],q[2],Vector3.UP);L._tri(so,q[0],q[2],q[3],Vector3.UP)
 # JEDER Bausatz im Norden (Villa, Laden, Reihenhaus, Trailer …) bekommt den Sockel unter seine ganze Fläche –
 # nicht nur die mit Rasenplatte. Sonst hängen Mauern/Häuser über tiefer liegenden Nachbargrundstücken.
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
@@ -560,6 +566,8 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 		f.call()
 		if not (name.begins_with("nt_") or name.contains("kaktus") or name.contains("fels") or name.contains("jet")):
 			L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,d*0.5),Vector3(w-0.04,10.0,d-0.04),Basis(),0.0)
+			# Sockel mit Kollision (Oberkante knapp unter dem Grundstücksboden): man läuft nicht durch ihn hindurch
+			L.koll_box(_P(0,-5.02,d*0.5),Vector3(w-0.04,10.0,d-0.04))
 	super._kit(stil_,typ,name,w,d,mit)
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]

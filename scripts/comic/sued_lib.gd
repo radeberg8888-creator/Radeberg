@@ -350,7 +350,10 @@ func kits_bauen():
 	for sn in gr:
 		if K.KITS.has(sn):continue
 		var g=gr[sn]
-		_kit("dienst","sockel",sn,g[0],g[1],func():L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04),Basis(),0.0))
+		var fb=func():
+			L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04),Basis(),0.0)
+			L.koll_box(_P(0,-5.02,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04))
+		_kit("dienst","sockel",sn,g[0],g[1],fb)
 	GL.ohne_tags=false
 	print("SUED Bausätze ",K.KITS.size()," ",Time.get_ticks_msec()-t0," ms")
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
@@ -766,11 +769,8 @@ func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	PLATZ.append([kit,xf])
 	# am Hang (Höhenunterschied über die Fläche > 0,15 m) Fundament mitsetzen, damit keine Kante in der Luft hängt
 	var kk=K.KITS[kit];var sk="su_sockel_%d_%d"%[int(kk.w),int(kk.d)]
-	if K.KITS.has(sk) and L!=null and L.has_method("FY"):
-		var hs=[]
-		for q in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(-kk.w*0.5,0,-kk.d),Vector3(kk.w*0.5,0,-kk.d)]:
-			var w=xf*q;hs.append(L.FY(w.x,w.z))
-		if hs.max()-hs.min()>0.15 or kit.begins_with("sv_"):PLATZ.append([sk,xf])
+	# immer: Fundament mit Kollision trägt den Grundstücksboden (auch im Flachen keine Luft unter dem Boden)
+	if K.KITS.has(sk):PLATZ.append([sk,xf])
 	for pk in K.KITS[kit].park:PARK.append([pk[0],xf*pk[1]])
 	return xf
 func _wahl(st:String,typ:String)->String:

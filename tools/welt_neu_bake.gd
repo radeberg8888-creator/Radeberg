@@ -1141,8 +1141,8 @@ func _norden()->Dictionary:
 		var kn:String=p[0];var kk=K.KITS[kn]
 		var klein=kn.begins_with("nt_") or (kk.w<=8.0 and kk.d<=8.0 and not kn.begins_with("kn_"))
 		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
-		if STADT.has_point(w):continue
-		var hy=_tri_h(HN,w.x,w.y)-NL.H0-0.1
+		# in der Stadt liegt das Gelände 0,12 m (Block) bzw. 0,45 m (Straße) unter dem Feld -> dieselbe Formel nehmen
+		var hy=_end_h(HN,w)-NL.H0-0.1
 		if klein:
 			# am Hang auf den tiefsten Punkt der Grundfläche setzen (sonst hängt die Talseite in der Luft)
 			var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
@@ -1150,10 +1150,12 @@ func _norden()->Dictionary:
 			if kn.begins_with("nt_"):
 				var rr=clamp(kk.w*0.5,1.2,3.5)
 				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
+			var hm=hy
 			for q in pts:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
-				hy=min(hy,_tri_h(HN,qq.x,qq.y)-NL.H0-0.1)
-			if kn.begins_with("nt_"):hy-=0.15
+				hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
+			# Pflanzen/Steine am Steilhang nicht meterweit eingraben (Stamm misst nur ±0,25 m)
+			if kn.begins_with("nt_"):hy=max(hy,hm-0.7)-0.15
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
 			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn
@@ -1656,6 +1658,9 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 # darunter ist aber eine ebene Platte zwischen seinen Eckpunkten – am gewölbten Hang lag die Deko bis 0,7 m darüber
 # oder darunter. Hier wird jede Kopie auf die tatsächliche Oberfläche gesetzt: höchste begehbare Fläche (Platten,
 # Gehwege) oder das Gelände, je nachdem was direkt darunter liegt.
+func _end_h(HN:PackedFloat32Array,w:Vector2)->float:
+	if STADT.has_point(w):return _stadt_gelaende(w.x,w.y)
+	return _tri_h(HN,w.x,w.y)
 func _stadt_h_raster(j:int)->float:
 	var nx=G0.rx;var x=G0.X0+(j%nx)*G0.STEP;var z=G0.Z0+(j/nx)*G0.STEP
 	if not STADT.has_point(Vector2(x,z)) or NAT0[j]<1.0:return G0._nh[j]
@@ -1712,7 +1717,7 @@ func _deko_auf_boden():
 				if hg<=y+0.25 and hg>=y-1.5 and hg>boden:boden=hg
 				if boden>-INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
 			L.INSTG[key][tk]=buf
-	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt)
+	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt," | Stadtboden geteilt ",L.N_TEIL)
 func _tri_hoehe(a:Vector3,b:Vector3,c:Vector3,x:float,z:float)->float:
 	# Höhe des Dreiecks an (x,z), NAN wenn außerhalb
 	var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)

@@ -62,6 +62,8 @@ var KOLL_F:=PackedVector3Array()   # Kollisionsdreiecke, die noch dem Höhenfeld
 var KOLL_N:=PackedVector3Array()   # Kollisionsdreiecke in Endlage
 var PFOSTEN:=[]          # [Vector3 Fuß, Radius, Höhe] Laternen, Bäume, Ampeln, Pfeiler
 var koll_an:=false
+var boden_teil:=0.0   # >0: waagerechte Dreiecke bis zu dieser Kantenlänge teilen (nur Stadtplatten)
+var N_TEIL:=0
 
 func init_lib(w:Node3D,seed_:=11):
 	rng.seed=seed_
@@ -1055,6 +1057,22 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
 		cr=(b-a).cross(c-a)
 	var fn=-cr.normalized()
+	if boden_teil>0.0 and not fest_modus and abs(fn.y)>0.95:
+		# große waagerechte Fläche in Stücke teilen, damit Sicht und Kollision dem Höhenfeld folgen
+		var lab=Vector2(a.x-b.x,a.z-b.z).length();var lbc=Vector2(b.x-c.x,b.z-c.z).length();var lca=Vector2(c.x-a.x,c.z-a.z).length()
+		var lm=max(lab,max(lbc,lca))
+		if lm>boden_teil:
+			N_TEIL+=1
+			if lm==lab:
+				var m1=(a+b)*0.5
+				_tri(s,a,m1,c,aussen);_tri(s,m1,b,c,aussen)
+			elif lm==lbc:
+				var m2=(b+c)*0.5
+				_tri(s,a,b,m2,aussen);_tri(s,a,m2,c,aussen)
+			else:
+				var m3=(c+a)*0.5
+				_tri(s,a,b,m3,aussen);_tri(s,m3,b,c,aussen)
+			return
 	if koll_an:
 		if fest_modus:KOLL_N.append_array([a,b,c])
 		else:KOLL_F.append_array([a,b,c])
@@ -2076,15 +2094,24 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 	var idx=Geometry2D.triangulate_polygon(poly)
 	if idx.is_empty():return
 	var so=_st(oben,true)
+	var bt0=boden_teil
+	if hoehen_an:boden_teil=8.0
 	for i in range(0,idx.size(),3):
 		_tri(so,Vector3(poly[idx[i]].x,y1,poly[idx[i]].y),Vector3(poly[idx[i+1]].x,y1,poly[idx[i+1]].y),Vector3(poly[idx[i+2]].x,y1,poly[idx[i+2]].y),Vector3.UP)
+	boden_teil=bt0
 	var ss=_st(seite,true);var sg=sign(_flaeche2(poly))
 	# Handy-Fassung: Bordstein für die Physik als schräge Auffahrt (senkrechte Kante stoppt tiefe Autos)
 	var schraeg=leicht and koll_an and y1>0.05 and y1<0.4
 	var a_k=koll_an
 	if schraeg:koll_an=false
+	# Seitenkanten in ≤8-m-Stücke, damit die Oberkante der geteilten Deckfläche folgt (keine Spalten)
+	var P2=PackedVector2Array()
 	for i in poly.size():
-		var p=poly[i];var q=poly[(i+1)%poly.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
+		var p0=poly[i];var q0=poly[(i+1)%poly.size()]
+		var nst=int(ceil(p0.distance_to(q0)/8.0)) if hoehen_an else 1
+		for k in max(nst,1):P2.append(p0.lerp(q0,float(k)/max(nst,1)))
+	for i in P2.size():
+		var p=P2[i];var q=P2[(i+1)%P2.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
 		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
 		if schraeg:
@@ -2300,10 +2327,10 @@ func _aussen_gehweg(pc:PackedVector2Array):
 		var a=p;var b=q;var c=q+inn*SWB;var d=p+inn*SWB
 		var s=_st(M.pflaster,true)
 		# mit Kollision (vorher ohne: Figuren liefen 0,6 m darunter, Laternen standen scheinbar in der Luft)
-		var ak=koll_an;koll_an=true
+		var ak=koll_an;koll_an=true;var bt0=boden_teil;boden_teil=8.0
 		_tri(s,Vector3(a.x,KB+0.004,a.y),Vector3(b.x,KB+0.004,b.y),Vector3(c.x,KB+0.004,c.y),Vector3.UP)
 		_tri(s,Vector3(a.x,KB+0.004,a.y),Vector3(c.x,KB+0.004,c.y),Vector3(d.x,KB+0.004,d.y),Vector3.UP)
-		koll_an=ak
+		koll_an=ak;boden_teil=bt0
 
 func _spitze_ecke_merken(pc:PackedVector2Array):
 	if abs(_flaeche2(pc))<400:return

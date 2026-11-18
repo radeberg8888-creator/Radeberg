@@ -666,12 +666,14 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				var w=gx*q
 				var kn=nm.substr(0,nm.rfind("_")) if nm.rfind("_")>2 else nm
 				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
+				# Punkt liegt unter der Geländeoberfläche (Hangseite) -> der Strahl startet im Boden; das ist kein Schweben
+				if not r.is_empty() and _tri_hg(w.x,w.z)>w.y+0.05:r={}
 				if not r.is_empty():
 					var luft=w.y-r.position.y
 					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
-				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.5:
+				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.0:
 					FUNDE.append([kn,"versunken",-(ru.position.y-w.y),w])
 func _pruef_gehwege(mitte:Vector2,radius:float):
 	for r in spiel.welt.S.roads:
@@ -680,6 +682,11 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 		var P:PackedVector2Array=r.P;var T=r.T;var Hh=r.h;var w:float=r.w
 		for i in range(0,P.size(),2):
 			if P[i].distance_to(mitte)>radius:continue
+			# an Kreuzungen endet der Gehweg gewollt (Fahrbahn der Querstraße bzw. Ecke) -> dort nicht messen
+			var an_kr=false
+			for jn in spiel.welt.S.junctions:
+				if P[i].distance_to(jn.p)<float(jn.r)+sw+w+2.0:an_kr=true;break
+			if an_kr:continue
 			var t:Vector2=T[i];var n=Vector2(-t.y,t.x)
 			for sd in [1.0,-1.0]:
 				var ai=P[i]+n*sd*(w+sw-0.25);var ao=P[i]+n*sd*(w+sw+0.4)
