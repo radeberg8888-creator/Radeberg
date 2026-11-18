@@ -1241,6 +1241,7 @@ func _owner(n:Node,o:Node):
 
 # ================= 7. Stadt-Kacheln, Gelände, Kollision, Daten =================
 func _gelaende_und_daten(ND:Dictionary):
+	_deko_auf_boden()
 	L._fertig(true)
 	# Stadtknoten in 300-m-Kacheln zerlegen (eigene Szenen, im Spiel nach Entfernung geladen)
 	var schl=func(v:Vector3)->Vector2i:return Vector2i(int(floor(v.x/KACHEL)),int(floor(v.z/KACHEL)))
@@ -1649,3 +1650,75 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)
+
+# ================= Stadt-Deko auf den Boden =================
+# Laternen, Bänke, Bäume, Mülleimer, Hydranten … wurden mit der Feldhöhe an ihrem Fußpunkt gesetzt. Der Gehweg
+# darunter ist aber eine ebene Platte zwischen seinen Eckpunkten – am gewölbten Hang lag die Deko bis 0,7 m darüber
+# oder darunter. Hier wird jede Kopie auf die tatsächliche Oberfläche gesetzt: höchste begehbare Fläche (Platten,
+# Gehwege) oder das Gelände, je nachdem was direkt darunter liegt.
+func _stadt_h_raster(j:int)->float:
+	var nx=G0.rx;var x=G0.X0+(j%nx)*G0.STEP;var z=G0.Z0+(j/nx)*G0.STEP
+	if not STADT.has_point(Vector2(x,z)) or NAT0[j]<1.0:return G0._nh[j]
+	var p=Vector2(x,z)-C;var ns=SU.naechst(p)
+	var an_strasse=(ns[2]>=0 and ns[3]<NETZ[ns[2]].w+4.0)
+	return L.FY(p.x,p.y)-(0.45 if an_strasse else (0.12 if _stadtflaeche(p) else 0.0))
+var _sh_cache:={}
+func _stadt_gelaende(wx:float,wz:float)->float:
+	var nx=G0.rx;var fx=clamp((wx-G0.X0)/G0.STEP,0.0,nx-1.001);var fz=clamp((wz-G0.Z0)/G0.STEP,0.0,G0.rz-1.001)
+	var i=int(fx);var k=int(fz);var u=fx-i;var v=fz-k
+	var h=[]
+	for jj in [k*nx+i,k*nx+i+1,(k+1)*nx+i,(k+1)*nx+i+1]:
+		if not _sh_cache.has(jj):_sh_cache[jj]=_stadt_h_raster(jj)
+		h.append(_sh_cache[jj])
+	if u+v<=1.0:return h[0]+u*(h[1]-h[0])+v*(h[2]-h[0])
+	return h[3]+(1.0-u)*(h[2]-h[3])+(1.0-v)*(h[1]-h[3])
+func _deko_auf_boden():
+	var Z:=6.0;var idx={}
+	for i in range(0,L.KOLL_F.size(),3):
+		var a:Vector3=L.KOLL_F[i];var b:Vector3=L.KOLL_F[i+1];var c:Vector3=L.KOLL_F[i+2]
+		var nn=(b-a).cross(c-a)
+		if nn.length_squared()<1e-8 or abs(nn.normalized().y)<0.7:continue
+		var m=(a+b+c)/3.0
+		if not STADT.has_point(Vector2(m.x,m.z)+C):continue
+		a.y+=L.FY(a.x,a.z);b.y+=L.FY(b.x,b.z);c.y+=L.FY(c.x,c.z)
+		var x0=int(floor(min(a.x,min(b.x,c.x))/Z));var x1=int(floor(max(a.x,max(b.x,c.x))/Z))
+		var z0=int(floor(min(a.z,min(b.z,c.z))/Z));var z1=int(floor(max(a.z,max(b.z,c.z))/Z))
+		if (x1-x0+1)*(z1-z0+1)>400:continue
+		for gx in range(x0,x1+1):
+			for gz in range(z0,z1+1):
+				var key=Vector2i(gx,gz)
+				if not idx.has(key):idx[key]=PackedVector3Array()
+				idx[key].append_array([a,b,c])
+	var n_mod=0;var n_gesamt=0
+	for key in L.INSTG:
+		if String(key).begins_with("B-") or not L.MODULE.has(key):continue
+		var ab:AABB=L.MODULE[key].get_aabb()
+		if ab.size.x>4.0 or ab.size.z>4.0:continue
+		for tk in L.INSTG[key]:
+			var buf:PackedFloat32Array=L.INSTG[key][tk]
+			for m in buf.size()/12:
+				var x=buf[m*12+3];var y=buf[m*12+7];var z=buf[m*12+11]
+				if not STADT.has_point(Vector2(x,z)+C):continue
+				n_gesamt+=1
+				var boden=-INF
+				var zelle=Vector2i(int(floor(x/Z)),int(floor(z/Z)))
+				if idx.has(zelle):
+					var T:PackedVector3Array=idx[zelle]
+					for t in range(0,T.size(),3):
+						var h=_tri_hoehe(T[t],T[t+1],T[t+2],x,z)
+						if is_nan(h):continue
+						if h<=y+0.25 and h>=y-1.5 and h>boden:boden=h
+				var hg=_stadt_gelaende(x+C.x,z+C.y)
+				if hg<=y+0.25 and hg>=y-1.5 and hg>boden:boden=hg
+				if boden>-INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
+			L.INSTG[key][tk]=buf
+	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt)
+func _tri_hoehe(a:Vector3,b:Vector3,c:Vector3,x:float,z:float)->float:
+	# Höhe des Dreiecks an (x,z), NAN wenn außerhalb
+	var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
+	if abs(d)<1e-9:return NAN
+	var l1=((b.z-c.z)*(x-c.x)+(c.x-b.x)*(z-c.z))/d
+	var l2=((c.z-a.z)*(x-c.x)+(a.x-c.x)*(z-c.z))/d
+	var l3=1.0-l1-l2
+	if l1<-0.001 or l2<-0.001 or l3<-0.001:return NAN
+	return l1*a.y+l2*b.y+l3*c.y

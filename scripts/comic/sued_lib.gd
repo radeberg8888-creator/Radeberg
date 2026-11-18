@@ -342,6 +342,15 @@ func kits_bauen():
 	_kit("dienst","polizei","sv_polizei",30.0,28.0,func():_k_polizei())
 	_kit("dienst","feuerwehr","sv_feuerwehr",34.0,30.0,func():_k_feuerwehr())
 	_kit("dienst","taxi","sv_taxi",26.0,22.0,func():_k_taxizentrale())
+	# Fundamente für Grundstücke am Hang (Stadt/Süd): 10 m tiefer Kasten unter der ganzen Fläche
+	var gr={}
+	for kn in K.KITS:
+		if kn.begins_with("nt_") or kn.begins_with("nd_") or kn.begins_with("su_sockel"):continue
+		var kk=K.KITS[kn];gr["su_sockel_%d_%d"%[int(kk.w),int(kk.d)]]=[kk.w,kk.d]
+	for sn in gr:
+		if K.KITS.has(sn):continue
+		var g=gr[sn]
+		_kit("dienst","sockel",sn,g[0],g[1],func():L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04),Basis(),0.0))
 	GL.ohne_tags=false
 	print("SUED Bausätze ",K.KITS.size()," ",Time.get_ticks_msec()-t0," ms")
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
@@ -755,6 +764,13 @@ func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	var aussen=Vector3(-n.x,0,-n.y);var rechts=Vector3.UP.cross(aussen)
 	var xf=Transform3D(Basis(rechts,Vector3.UP,aussen),Vector3(F.x,0,F.y))
 	PLATZ.append([kit,xf])
+	# am Hang (Höhenunterschied über die Fläche > 0,15 m) Fundament mitsetzen, damit keine Kante in der Luft hängt
+	var kk=K.KITS[kit];var sk="su_sockel_%d_%d"%[int(kk.w),int(kk.d)]
+	if K.KITS.has(sk) and L!=null and L.has_method("FY"):
+		var hs=[]
+		for q in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(-kk.w*0.5,0,-kk.d),Vector3(kk.w*0.5,0,-kk.d)]:
+			var w=xf*q;hs.append(L.FY(w.x,w.z))
+		if hs.max()-hs.min()>0.15 or kit.begins_with("sv_"):PLATZ.append([sk,xf])
 	for pk in K.KITS[kit].park:PARK.append([pk[0],xf*pk[1]])
 	return xf
 func _wahl(st:String,typ:String)->String:
