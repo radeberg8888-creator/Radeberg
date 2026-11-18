@@ -723,7 +723,9 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				elif ys-yg>0.15:
 					var aus=Vector3(n.x*sd,0,n.y*sd)
 					var rh=_strahl(Vector3(ai.x,ys-0.25,ai.y),Vector3(ai.x,ys-0.25,ai.y)+aus*1.2,true)
-					if rh.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])
+					# Bordstein-Schräge (Handy-Physik) liegt knapp unter der Oberkante -> auch dort prüfen
+					var rh2=_strahl(Vector3(ai.x,ys-0.08,ai.y),Vector3(ai.x,ys-0.08,ai.y)+aus*1.2,true)
+					if rh.is_empty() and rh2.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])
 
 # Diagnose: liegt die Gelände-Kollision dort, wo das sichtbare Gelände ist (Dreiecke wie im Netz)?
 func _tri_hg(x:float,z:float)->float:

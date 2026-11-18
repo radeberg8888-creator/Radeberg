@@ -519,7 +519,13 @@ func _stadt_bauen(faces:Array,d):
 	for pc in faces:
 		var A=abs(L._flaeche2(pc))
 		var c=_abdeckung(pc)
-		if c<0.3:rand.append(pc);continue
+		if c<0.3:
+			# schmale Restflächen zwischen zwei Blöcken (zu schmal für das 10-m-Raster): pflastern statt Rasengraben
+			var U=0.0;var cm=Vector2.ZERO
+			for i in pc.size():U+=pc[i].distance_to(pc[(i+1)%pc.size()]);cm+=pc[i]
+			cm/=pc.size()
+			if (A/max(U,1.0)<2.5 or A<250.0) and STADT.has_point(cm+C):L._platte(pc,-1.6,L.KB,L.M.pflaster,L.M.stein);continue
+			rand.append(pc);continue
 		var s=_stil_von(pc)
 		if s=="fassade" or s=="sued":fass.append(pc)
 		else:kit.append([pc,s])
@@ -1149,7 +1155,7 @@ func _norden()->Dictionary:
 			var pts=[Vector3(-hw,0,0),Vector3(hw,0,0),Vector3(-hw,0,-dd),Vector3(hw,0,-dd),Vector3(0,0,-dd*0.5)]
 			if kn.begins_with("nt_"):
 				var rr=clamp(kk.w*0.5,1.2,3.5)
-				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
+				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr),Vector3(-0.35,0,-0.35),Vector3(0.35,0,-0.35),Vector3(-0.35,0,0.35),Vector3(0.35,0,0.35)]
 			for q in pts:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
 				hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
@@ -1681,6 +1687,8 @@ func _deko_auf_boden():
 		var a:Vector3=L.KOLL_F[i];var b:Vector3=L.KOLL_F[i+1];var c:Vector3=L.KOLL_F[i+2]
 		var nn=(b-a).cross(c-a)
 		if nn.length_squared()<1e-8 or abs(nn.normalized().y)<0.7:continue
+		# kleine Dreiecke = Kollisionskästen der Deko selbst (Fuß einer Bank/Laterne), kein Boden
+		if max(a.distance_to(b),max(b.distance_to(c),c.distance_to(a)))<2.0:continue
 		var m=(a+b+c)/3.0
 		if not STADT.has_point(Vector2(m.x,m.z)+C):continue
 		a.y+=L.FY(a.x,a.z);b.y+=L.FY(b.x,b.z);c.y+=L.FY(c.x,c.z)
@@ -1695,8 +1703,13 @@ func _deko_auf_boden():
 	var n_mod=0;var n_gesamt=0
 	for key in L.INSTG:
 		if String(key).begins_with("B-") or not L.MODULE.has(key):continue
-		var ab:AABB=L.MODULE[key].get_aabb()
-		if ab.size.x>4.0 or ab.size.z>4.0:continue
+		# nach der Standfläche (unterste 40 cm) entscheiden: Bäume sind oben breit, unten nur ein Stamm
+		var me:Mesh=L.MODULE[key];var ab:AABB=me.get_aabb();var fu=Rect2();var erst=true
+		for v in me.get_faces():
+			if v.y<ab.position.y+0.4:
+				if erst:fu=Rect2(Vector2(v.x,v.z),Vector2.ZERO);erst=false
+				else:fu=fu.expand(Vector2(v.x,v.z))
+		if fu.size.x>4.0 or fu.size.y>4.0:continue
 		for tk in L.INSTG[key]:
 			var buf:PackedFloat32Array=L.INSTG[key][tk]
 			for m in buf.size()/12:
