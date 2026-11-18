@@ -687,7 +687,8 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				var rs=_strahl(Vector3(ai.x,h0+1.5,ai.y),Vector3(ai.x,h0-1.0,ai.y))
 				if rs.is_empty():continue
 				var ys=rs.position.y
-				if ys<h0-0.08:FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)])
+				# nur echtes Fehlen zählt (Treffer auf das Gelände statt auf eine Gehweg-/Platten-Kollision)
+				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)])
 				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
 				if rg.is_empty():continue
 				var yg=rg.position.y
