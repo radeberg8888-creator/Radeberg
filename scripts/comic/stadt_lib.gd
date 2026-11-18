@@ -1061,7 +1061,13 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 		# große waagerechte Fläche in Stücke teilen, damit Sicht und Kollision dem Höhenfeld folgen
 		var lab=Vector2(a.x-b.x,a.z-b.z).length();var lbc=Vector2(b.x-c.x,b.z-c.z).length();var lca=Vector2(c.x-a.x,c.z-a.z).length()
 		var lm=max(lab,max(lbc,lca))
-		if lm>boden_teil:
+		# nur teilen, wo das Höhenfeld wirklich gewölbt ist (Abweichung von der Ebene durch die Ecken > 4 cm)
+		var krumm=false
+		if lm>3.0:
+			var fa=FY(a.x,a.z);var fb=FY(b.x,b.z);var fc=FY(c.x,c.z)
+			for q in [[(a+b)*0.5,(fa+fb)*0.5],[(b+c)*0.5,(fb+fc)*0.5],[(c+a)*0.5,(fc+fa)*0.5],[(a+b+c)/3.0,(fa+fb+fc)/3.0]]:
+				if abs(FY(q[0].x,q[0].z)-q[1])>0.025:krumm=true;break
+		if krumm:
 			N_TEIL+=1
 			if lm==lab:
 				var m1=(a+b)*0.5
@@ -2086,6 +2092,12 @@ func _rundrechteck(a:Vector2,b:Vector2,r:float)->PackedVector2Array:
 		for j in range(1,k2):out.append(e.lerp(nx,float(j)/k2))
 	return out
 # Fläche als Platte extrudieren (y0..y1), Deckel mit Material oben, Seiten mit Material seite
+func _kante_teilen(p:Vector2,q:Vector2,tiefe:int)->PackedVector2Array:
+	# Kante an der Mitte teilen, solange das Höhenfeld dort von der Geraden abweicht (wie die Deckfläche)
+	var m=(p+q)*0.5
+	if tiefe<8 and p.distance_to(q)>3.0 and abs(FY(m.x,m.y)-(FY(p.x,p.y)+FY(q.x,q.y))*0.5)>0.025:
+		var r=_kante_teilen(p,m,tiefe+1);r.append_array(_kante_teilen(m,q,tiefe+1));return r
+	return PackedVector2Array([p])
 func _platte(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
 	var alt_k=koll_an;koll_an=true
 	_platte_k(poly,y0,y1,oben,seite)
@@ -2108,8 +2120,8 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 	var P2=PackedVector2Array()
 	for i in poly.size():
 		var p0=poly[i];var q0=poly[(i+1)%poly.size()]
-		var nst=int(ceil(p0.distance_to(q0)/8.0)) if hoehen_an else 1
-		for k in max(nst,1):P2.append(p0.lerp(q0,float(k)/max(nst,1)))
+		if hoehen_an:P2.append_array(_kante_teilen(p0,q0,0))
+		else:P2.append(p0)
 	for i in P2.size():
 		var p=P2[i];var q=P2[(i+1)%P2.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
 		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)

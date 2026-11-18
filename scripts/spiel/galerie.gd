@@ -660,6 +660,11 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 			sockel=(nm.begins_with("nd_") or cw.z<-3500.0) and not natur
 			var yb=0.0 if ab.position.y<0.6 else ab.position.y
 			var ex=ab.size.x*0.5;var ez=ab.size.z*0.5;var cx=ab.get_center().x;var cz=ab.get_center().z
+			# gemessen wird die Standfläche (unterste 35 cm des Modells), nicht der Umriss –
+			# sonst zählt der Laternenarm über der Fahrbahn oder eine Baumkrone als "schwebend"
+			var fu=_fuss(mm.mesh,ab)
+			if fu.size.x>0.0 or fu.size.y>0.0:
+				ex=fu.size.x*0.5;ez=fu.size.y*0.5;cx=fu.get_center().x;cz=fu.get_center().y
 			if natur:ex=min(ex,0.25);ez=min(ez,0.25)   # Stamm/Wurzel, nicht die Krone
 			else:ex=max(ex-0.15,0.0);ez=max(ez-0.15,0.0)
 			for q in [Vector3(cx,yb,cz),Vector3(cx-ex,yb,cz-ez),Vector3(cx+ex,yb,cz-ez),Vector3(cx-ex,yb,cz+ez),Vector3(cx+ex,yb,cz+ez)]:
@@ -675,6 +680,17 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.0:
 					FUNDE.append([kn,"versunken",-(ru.position.y-w.y),w])
+var _fuss_cache:={}
+func _fuss(me:Mesh,ab:AABB)->Rect2:
+	if _fuss_cache.has(me):return _fuss_cache[me]
+	var r=Rect2();var erst=true
+	var F=me.get_faces()
+	for v in F:
+		if v.y<ab.position.y+0.35:
+			if erst:r=Rect2(Vector2(v.x,v.z),Vector2.ZERO);erst=false
+			else:r=r.expand(Vector2(v.x,v.z))
+	_fuss_cache[me]=r
+	return r
 func _pruef_gehwege(mitte:Vector2,radius:float):
 	for r in spiel.welt.S.roads:
 		var sw:float=float(r.get("sw",0.0))
@@ -686,6 +702,8 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 			var an_kr=false
 			for jn in spiel.welt.S.junctions:
 				if P[i].distance_to(jn.p)<float(jn.r)+sw+w+2.0:an_kr=true;break
+			# Sackgassen-Ende: Gehweg hört vor dem Fahrbahnende auf
+			if P[i].distance_to(P[0])<w+sw+12.0 or P[i].distance_to(P[P.size()-1])<w+sw+12.0:an_kr=true
 			if an_kr:continue
 			var t:Vector2=T[i];var n=Vector2(-t.y,t.x)
 			for sd in [1.0,-1.0]:

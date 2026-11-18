@@ -1150,12 +1150,10 @@ func _norden()->Dictionary:
 			if kn.begins_with("nt_"):
 				var rr=clamp(kk.w*0.5,1.2,3.5)
 				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr)]
-			var hm=hy
 			for q in pts:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
 				hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
-			# Pflanzen/Steine am Steilhang nicht meterweit eingraben (Stamm misst nur ±0,25 m)
-			if kn.begins_with("nt_"):hy=max(hy,hm-0.7)-0.15
+			if kn.begins_with("nt_"):hy-=0.15
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
 			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn

@@ -343,17 +343,28 @@ func kits_bauen():
 	_kit("dienst","feuerwehr","sv_feuerwehr",34.0,30.0,func():_k_feuerwehr())
 	_kit("dienst","taxi","sv_taxi",26.0,22.0,func():_k_taxizentrale())
 	# Fundamente für Grundstücke am Hang (Stadt/Süd): 10 m tiefer Kasten unter der ganzen Fläche
+	# Größe nach der echten Standfläche des Bausatzes (unterste 40 cm), nicht nur nach dem Grundstück –
+	# sonst hängen Veranden, Treppen, Anbauten über den Rand des Fundaments hinaus in der Luft
 	var gr={}
-	for kn in K.KITS:
+	for kn in K.KITS.keys():
 		if kn.begins_with("nt_") or kn.begins_with("nd_") or kn.begins_with("su_sockel"):continue
-		var kk=K.KITS[kn];gr["su_sockel_%d_%d"%[int(kk.w),int(kk.d)]]=[kk.w,kk.d]
+		var kk=K.KITS[kn]
+		var r=Rect2(Vector2(-kk.w*0.5,-kk.d),Vector2(kk.w,kk.d))
+		if kk.mesh!=null:
+			for v in kk.mesh.get_faces():
+				if v.y<KB+0.4:r=r.expand(Vector2(v.x,v.z))
+		var x0=floor(max(r.position.x,-kk.w*0.5-2.0)*2.0)/2.0;var x1=ceil(min(r.end.x,kk.w*0.5+2.0)*2.0)/2.0
+		var z0=floor(max(r.position.y,-kk.d-2.0)*2.0)/2.0;var z1=min(ceil(r.end.y*2.0)/2.0,0.0)
+		var sn="su_sockel_%d_%d_%d_%d"%[int(x0*2),int(x1*2),int(z0*2),int(z1*2)]
+		gr[sn]=[x0,x1,z0,z1];SOCKEL_VON[kn]=sn
 	for sn in gr:
 		if K.KITS.has(sn):continue
 		var g=gr[sn]
 		var fb=func():
-			L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04),Basis(),0.0)
-			L.koll_box(_P(0,-5.02,g[1]*0.5),Vector3(g[0]-0.04,10.0,g[1]-0.04))
-		_kit("dienst","sockel",sn,g[0],g[1],fb)
+			var mz=Vector3((g[0]+g[1])*0.5,KB-5.25,(g[2]+g[3])*0.5);var gs=Vector3(g[1]-g[0]-0.04,10.0,g[3]-g[2]-0.04)
+			L.box(T(Color(0.6,0.57,0.52)),mz,gs,Basis(),0.0)
+			L.koll_box(mz+Vector3(0,0.23,0),gs)
+		_kit("dienst","sockel",sn,g[1]-g[0],g[3]-g[2],fb)
 	GL.ohne_tags=false
 	print("SUED Bausätze ",K.KITS.size()," ",Time.get_ticks_msec()-t0," ms")
 func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
@@ -763,12 +774,13 @@ func _belegen(F:Vector2,t:Vector2,n:Vector2,w:float,d:float):
 		var z=0.0
 		while z<=d+0.5:_occ(F+t*x+n*z);z+=1.0
 		x+=1.0
+var SOCKEL_VON:={}
 func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	var aussen=Vector3(-n.x,0,-n.y);var rechts=Vector3.UP.cross(aussen)
 	var xf=Transform3D(Basis(rechts,Vector3.UP,aussen),Vector3(F.x,0,F.y))
 	PLATZ.append([kit,xf])
 	# am Hang (Höhenunterschied über die Fläche > 0,15 m) Fundament mitsetzen, damit keine Kante in der Luft hängt
-	var kk=K.KITS[kit];var sk="su_sockel_%d_%d"%[int(kk.w),int(kk.d)]
+	var sk=SOCKEL_VON.get(kit,"")
 	# immer: Fundament mit Kollision trägt den Grundstücksboden (auch im Flachen keine Luft unter dem Boden)
 	if K.KITS.has(sk):PLATZ.append([sk,xf])
 	for pk in K.KITS[kit].park:PARK.append([pk[0],xf*pk[1]])
@@ -1090,9 +1102,12 @@ const KRUND:=3.0
 var BODEN:={}
 func _flaeche(poly:PackedVector2Array,y:float,m:Material):
 	var so=L._st(m,true);var idx=Geometry2D.triangulate_polygon(poly)
+	# wie die Platte darunter am gewölbten Hang teilen (sonst taucht der Gehweg unter die Platte) und begehbar machen
+	var ak=L.koll_an;var bt=L.boden_teil;L.koll_an=true;L.boden_teil=8.0 if L.hoehen_an else 0.0
 	for i in range(0,idx.size(),3):
 		var a=poly[idx[i]];var b=poly[idx[i+1]];var c=poly[idx[i+2]]
 		L._tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)
+	L.koll_an=ak;L.boden_teil=bt
 func wege():
 	var dreck=L._toon(Color(0.4,0.34,0.25))
 	for w in WEGE:
@@ -1171,7 +1186,7 @@ func _kachel(R:Rect2,tiefe:int)->int:
 				for band in geh:
 					for f in Geometry2D.intersect_polygons(e,band):
 						if Geometry2D.is_polygon_clockwise(f) or abs(L._flaeche2(f))<0.5:continue
-						_flaeche(f,KB+0.006,gw)
+						_flaeche(f,KB+0.025,gw)
 	return c
 
 # Strommasten (Ghetto/Süd), Laternen (Strand/Süd)
