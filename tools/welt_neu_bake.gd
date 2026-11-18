@@ -346,8 +346,15 @@ func _autobahn_laden(d):
 # Fläche minus Bänder, mit Raumindex: jedes Band schneidet nur die Stücke, deren Rechteck es berührt
 var _ST:=[]   # [poly, rect]
 var LOECHER:=0
+var _SL:=[]   # Durchgänge (Schlitze), die Löcher öffnen: werden später gepflastert
 func _abziehen_idx(band:PackedVector2Array):
 	var bb=L._bbox(band);var neu=[]
+	var sl2=[]
+	for e in _SL:
+		if not e[1].intersects(bb):sl2.append(e);continue
+		for x in Geometry2D.clip_polygons(e[0],band):
+			if x.size()>=3 and not Geometry2D.is_polygon_clockwise(x):sl2.append([x,L._bbox(x)])
+	_SL=sl2
 	for e in _ST:
 		if not e[1].intersects(bb):neu.append(e);continue
 		var res=Geometry2D.clip_polygons(e[0],band)
@@ -370,6 +377,11 @@ func _abziehen_idx(band:PackedVector2Array):
 					if q.distance_to(c)<bd:bd=q.distance_to(c);bp=q
 				var hr=h.duplicate();hr.reverse()
 				var schlitz=Geometry2D.offset_polyline(PackedVector2Array([c,bp+(bp-c).normalized()*2.0]),0.6)[0]
+				# der Durchgang bleibt begehbar: Stück im Block merken und später pflastern (sonst Rasengraben im Gehweg)
+				for x in Geometry2D.intersect_polygons(o,schlitz):
+					if Geometry2D.is_polygon_clockwise(x):continue
+					for y in Geometry2D.clip_polygons(x,hr):
+						if y.size()>=3 and not Geometry2D.is_polygon_clockwise(y):_SL.append([y,L._bbox(y)])
 				var u=Geometry2D.merge_polygons(hr,schlitz)
 				var ziel=hr
 				for m in u:
@@ -394,7 +406,7 @@ func _baender(P:PackedVector2Array,w:float)->Array:
 	return out
 func _flaechen()->Array:
 	var rr=Rect2(STADT.position-C,STADT.size)
-	_ST=[]
+	_ST=[];_SL=[]
 	# Startflächen: 300-m-Raster NUR zur Beschleunigung; danach Nachbarstücke an Rasterlinien wieder vereinen
 	_ST=[[PackedVector2Array([rr.position,Vector2(rr.end.x,rr.position.y),rr.end,Vector2(rr.position.x,rr.end.y)]),rr]]
 	for r in NETZ:
@@ -562,6 +574,11 @@ func _stadt_bauen(faces:Array,d):
 		if nb%10==0:L._fertig(false)
 		if nb%50==0:print("  Fassadenblöcke ",nb,"/",fass.size()," Häuser ",nh," RAM ",OS.get_static_memory_usage()/1048576)
 	BER["haeuser_fassade"]=nh
+	var nsl=0
+	for e in _SL:
+		if abs(L._flaeche2(e[0]))<0.3:continue
+		L._platte(e[0],-1.6,L.KB,L.M.pflaster,L.M.stein);nsl+=1
+	print("DURCHGAENGE gepflastert ",nsl)
 	_mark("fassaden")
 	# Bausatz-Viertel: Gehweg-Ring + Grün, Bausätze kommen von neu_sued
 	for e in kit:

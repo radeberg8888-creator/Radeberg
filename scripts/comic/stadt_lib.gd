@@ -2748,6 +2748,11 @@ func _ampeln():
 			var p=bv-dj*0.8
 			_ampel(Vector3(p.x,KB,p.y),Vector3(dj.x,0,dj.y),gruen);gruen=not gruen
 
+func _innen(pc:PackedVector2Array,p:Vector2,r:float)->bool:
+	if not Geometry2D.is_point_in_polygon(p,pc):return false
+	for i in pc.size():
+		if Geometry2D.get_closest_point_to_segment(p,pc[i],pc[(i+1)%pc.size()]).distance_to(p)<r:return false
+	return true
 func _strassenmoebel():
 	var schild_gesetzt=false
 	for pc in STADT_STUECKE:
@@ -2763,12 +2768,20 @@ func _strassenmoebel():
 				var nr=_naechste(x,25.0)
 				if nr[0]==null or nr[0].typ=="gasse":continue
 				var a=x+inn*0.9;var a3=Vector3(a.x,KB,a.y);var zur=Vector3(-inn.x,0,-inn.y)
-				if k%2==0:_laterne(a3,zur)
-				else:_baum(a3+Vector3(inn.x,0,inn.y)*0.2)
+				# nur setzen, wenn die ganze Standfläche auf dem Gehweg liegt (an runden Ecken sonst über der Bordkante)
+				if k%2==0:
+					if _innen(pc,a,0.45):_laterne(a3,zur)
+				else:
+					var ab_=a+inn*0.5   # Baumscheibe (r≈1,2 m) ganz auf dem Gehweg
+					if _innen(pc,ab_,1.3):_baum(Vector3(ab_.x,KB,ab_.y))
 				var z=rng.randf()
-				if z<0.14:_bank(Vector3(x.x+inn.x*(SWB-0.7)+t.x*4.0,KB,x.y+inn.y*(SWB-0.7)+t.y*4.0),zur)
-				elif z<0.26:_muell(Vector3(x.x+inn.x*0.6+t.x*3.0,KB,x.y+inn.y*0.6+t.y*3.0))
-				elif z<0.34:_hydrant(Vector3(x.x+inn.x*0.55-t.x*3.0,KB,x.y+inn.y*0.55-t.y*3.0))
+				var pb=x+inn*(SWB-0.7)+t*4.0;var pm=x+inn*0.6+t*3.0;var ph=x+inn*0.55-t*3.0
+				if z<0.14:
+					if _innen(pc,pb,0.9):_bank(Vector3(pb.x,KB,pb.y),zur)
+				elif z<0.26:
+					if _innen(pc,pm,0.4):_muell(Vector3(pm.x,KB,pm.y))
+				elif z<0.34:
+					if _innen(pc,ph,0.35):_hydrant(Vector3(ph.x,KB,ph.y))
 				if nr[0].typ=="einbahn" and not schild_gesetzt:
 					schild_gesetzt=true;_einbahnschild(Vector3(a.x+t.x*2.0,KB,a.y+t.y*2.0),nr[0],zur)
 				k+=1

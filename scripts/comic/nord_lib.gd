@@ -1276,7 +1276,7 @@ func platten():
 	# Band genau auf dem Kreis R um den Knoten abgeschnitten; die Ecken zwischen den Armen schließen exakt an
 	# diese Schnittkanten an (keine zwei Flächen übereinander, kein Spalt). Außenkante: Böschungsmauer.
 	var alt=L.koll_an;L.koll_an=true
-	var so=L._st(L.M.pflaster,true);var n_ok=0
+	var so=L._st(L.M.pflaster,true);var n_ok=0;var sk=L._st(L.M.stein,true)
 	ENDEN={}
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
@@ -1312,6 +1312,10 @@ func platten():
 				if auf_fahrbahn(mid,ri,0.3):continue
 				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),Vector3.UP)
 				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),Vector3.UP)
+				# Außenkante bis ins Gelände (wo das Grundstück tiefer liegt, kein Spalt unter dem Gehweg)
+				var aus=Vector3(n0.x,0,n0.y)
+				L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1,c1.y),Vector3(c1.x,y1-1.8,c1.y),aus)
+				L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1-1.8,c1.y),Vector3(a1.x,y0-1.8,a1.y),aus)
 				n_ok+=1
 				# Schnittkanten am Knoten merken (Richtung: vom Knoten weg)
 				if kn0>=0:_ende(kn0,ri,Vector3(a0.x,y0,a0.y),Vector3(a1.x,y0,a1.y),m0)
