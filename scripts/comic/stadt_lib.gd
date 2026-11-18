@@ -2127,9 +2127,13 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
 		if schraeg:
-			var pa=p+n*0.7;var qa=q+n*0.7
-			var E=Vector3(pa.x,0.0,pa.y);var F=Vector3(qa.x,0.0,qa.y)
-			KOLL_F.append_array([D,C,F,D,F,E])
+			# Schräge nur am Bordstein zur Fahrbahn; sonst senkrechte Kante mit Kollision (kein Spalt unter der Platte)
+			var nr=_naechste((p+q)*0.5,12.0)
+			if nr[0]!=null and nr[1]<float(nr[0].w)+1.2:
+				var pa=p+n*0.7;var qa=q+n*0.7
+				var E=Vector3(pa.x,0.0,pa.y);var F=Vector3(qa.x,0.0,qa.y)
+				KOLL_F.append_array([D,C,F,D,F,E])
+			else:KOLL_F.append_array([A,B,C,A,C,D])
 	koll_an=a_k
 
 func _stadt():
@@ -2680,7 +2684,7 @@ const AUTOFARBEN:=[Color(0.62,0.7,0.25),Color(0.42,0.66,0.78),Color(0.9,0.85,0.7
 func _auto_farbe()->Color:return AUTOFARBEN[rng.randi()%AUTOFARBEN.size()]
 
 # ---------- Markierungen, Zebrastreifen, Einbahnpfeile ----------
-func _quer(p:Vector2,t:Vector2,lat:float,laengs:float,breite:float,lang:float,y:=0.022,m:Material=null):
+func _quer(p:Vector2,t:Vector2,lat:float,laengs:float,breite:float,lang:float,y:=0.026,m:Material=null):
 	var rn=_rn(t);var c=p+rn*lat+t*laengs
 	box(m if m else M.markierung,Vector3(c.x,y,c.y),Vector3(breite,0.012,lang),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
 var ZEBRAS:=[]
@@ -2706,7 +2710,7 @@ func _markierungen():
 					_quer(p,t,0.0,0.0,0.3,2.4)
 					for sd in [-1,1]:
 						var tip=p+t*1.6;var d=(t.rotated(sd*2.5));var c=tip+d*0.6
-						box(M.markierung,Vector3(c.x,0.022,c.y),Vector3(0.28,0.012,1.3),Basis(Vector3.UP,atan2(d.x,d.y)),0.0)
+						box(M.markierung,Vector3(c.x,0.026,c.y),Vector3(0.28,0.012,1.3),Basis(Vector3.UP,atan2(d.x,d.y)),0.0)
 				s+=24.0
 	# Zebrastreifen + Haltelinien an jeder Kreuzung
 	for k in JN:
@@ -2727,11 +2731,11 @@ func _markierungen():
 				ZEBRAS.append(p)
 				var lat=-r.w+0.7
 				while lat<r.w-0.6:
-					_quer(p,t,lat,0.0,0.5,3.0,0.023);lat+=1.0
+					_quer(p,t,lat,0.0,0.5,3.0,0.027);lat+=1.0
 				var b2=_bei_s(r.P,r.S,s+dir*2.6)
 				var seite=-dir if r.typ!="einbahn" else 0
-				if r.typ=="einbahn":_quer(b2[0],b2[1],0.0,0.0,r.w*2.0-0.6,0.4,0.023)
-				else:_quer(b2[0],b2[1],seite*r.w*0.5,0.0,r.w-0.4,0.4,0.023)
+				if r.typ=="einbahn":_quer(b2[0],b2[1],0.0,0.0,r.w*2.0-0.6,0.4,0.027)
+				else:_quer(b2[0],b2[1],seite*r.w*0.5,0.0,r.w-0.4,0.4,0.027)
 
 func _ampeln():
 	for k in JN:

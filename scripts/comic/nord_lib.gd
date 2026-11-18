@@ -1271,6 +1271,40 @@ func fahrbahnen():
 func _vt(P:PackedVector2Array,i:int)->Vector2:
 	var a=P[max(i-1,0)];var b=P[min(i+1,P.size()-1)]
 	return (b-a).normalized()
+# Sackgasse: Gehweg läuft um das Fahrbahnende herum (U-Form), mit Kante bis ins Gelände
+func _sackgassen_enden(so,sk,jr:Dictionary)->int:
+	var n_e=0
+	for ri in ROADS.size():
+		var r=ROADS[ri]
+		if not r.stadt or r.sw<=0.0:continue
+		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
+		if n<2:continue
+		for e in [0,n-1]:
+			var frei=true
+			for kk in jr.get(ri,[]):
+				if P[e].distance_to(kk[1])<kk[2]+r.w:frei=false;break
+			if not frei:continue
+			var d:Vector2=(P[0]-P[1]).normalized() if e==0 else (P[n-1]-P[n-2]).normalized()
+			var nn=Vector2(-d.y,d.x);var y=Y[e]+0.11;var ex=r.w*0.6;var w=r.w;var sw=r.sw
+			var Q=func(a:Vector2,b:Vector2,c:Vector2,dd:Vector2):
+				L._tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)
+				L._tri(so,Vector3(a.x,y,a.y),Vector3(c.x,y,c.y),Vector3(dd.x,y,dd.y),Vector3.UP)
+			var p0=P[e]
+			for sd in [1.0,-1.0]:
+				Q.call(p0+nn*sd*w,p0+nn*sd*(w+sw),p0+nn*sd*(w+sw)+d*ex,p0+nn*sd*w+d*ex)
+			Q.call(p0+d*ex-nn*(w+sw),p0+d*ex+nn*(w+sw),p0+d*(ex+sw)+nn*(w+sw),p0+d*(ex+sw)-nn*(w+sw))
+			# Außenkante (drei Seiten) senkrecht ins Gelände
+			var ecken=[p0+nn*(w+sw),p0+d*(ex+sw)+nn*(w+sw),p0+d*(ex+sw)-nn*(w+sw),p0-nn*(w+sw)]
+			for i in 3:
+				var A=ecken[i];var B=ecken[i+1];var t=(B-A).normalized();var o=Vector3(t.y,0,-t.x)
+				if o.dot(Vector3(d.x,0,d.y))<0.0 and i==1:o=-o
+				var mitte_ab=(A+B)*0.5-p0
+				if Vector2(o.x,o.z).dot(mitte_ab)<0.0:o=-o
+				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y,B.y),Vector3(B.x,y-1.8,B.y),o)
+				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y-1.8,B.y),Vector3(A.x,y-1.8,A.y),o)
+			n_e+=1
+	print("NORD Sackgassen-Gehwege ",n_e)
+	return n_e
 func platten():
 	# Gehwege: ein durchgehendes Band je Straßenseite (Punkt-Normalen, keine Sägezähne). An Kreuzungen wird das
 	# Band genau auf dem Kreis R um den Knoten abgeschnitten; die Ecken zwischen den Armen schließen exakt an
@@ -1312,15 +1346,18 @@ func platten():
 				if auf_fahrbahn(mid,ri,0.3):continue
 				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),Vector3.UP)
 				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),Vector3.UP)
-				# Außenkante bis ins Gelände (wo das Grundstück tiefer liegt, kein Spalt unter dem Gehweg)
-				var aus=Vector3(n0.x,0,n0.y)
-				L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1,c1.y),Vector3(c1.x,y1-1.8,c1.y),aus)
-				L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1-1.8,c1.y),Vector3(a1.x,y0-1.8,a1.y),aus)
+				# Außenkante bis ins Gelände nur dort, wo die Straßen-Schürze fehlt (nahe Kreuzungen) – sonst doppelte Wand
+				var mo=(a1+c1)*0.5
+				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):
+					var aus=Vector3(n0.x,0,n0.y)
+					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1,c1.y),Vector3(c1.x,y1-1.8,c1.y),aus)
+					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1-1.8,c1.y),Vector3(a1.x,y0-1.8,a1.y),aus)
 				n_ok+=1
 				# Schnittkanten am Knoten merken (Richtung: vom Knoten weg)
 				if kn0>=0:_ende(kn0,ri,Vector3(a0.x,y0,a0.y),Vector3(a1.x,y0,a1.y),m0)
 				if kn1>=0:_ende(kn1,ri,Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),-m1)
 	n_ok+=_gehweg_ecken(so)
+	n_ok+=_sackgassen_enden(so,sk,jr)
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)
 	if not KNAST_WAND.is_empty():

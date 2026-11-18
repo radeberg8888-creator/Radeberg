@@ -602,6 +602,12 @@ func _schwebe_lauf():
 		_diag_gelaende(mitte,name)
 		_pruef_kopien(mitte,260.0)
 		_pruef_gehwege(mitte,260.0)
+		var t0=Time.get_ticks_msec()
+		var PR=preload("res://scripts/spiel/pruefung.gd").new(self)
+		PR.sammeln(mitte,200.0)
+		var t1=Time.get_ticks_msec()
+		PR.pruefen(mitte,200.0,FUNDE)
+		print("PRUEFUNG ",name," Boden-Dreiecke ",PR.BO.size()," Wände ",PR.VO.size()," Kanten ",PR.KANTEN.size()," sammeln ",t1-t0," ms prüfen ",Time.get_ticks_msec()-t1," ms")
 		gesamt+=FUNDE.size()
 		var arten={}
 		for f in FUNDE:
@@ -614,7 +620,7 @@ func _schwebe_lauf():
 		var ks=arten.keys();ks.sort_custom(func(a,b):return abs(arten[a][1][2])>abs(arten[b][1][2]))
 		for k in ks:
 			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3]," | Boden: ",f[4] if f.size()>4 else "-")
-			if nr<4:
+			if nr<8:
 				var w:Vector3=f[3]
 				# Nahbild von seitlich unten: freie Position im Kreis suchen (nicht in Hang oder Haus)
 				var cp=w+Vector3(5.5,0.9,5.5)
@@ -644,7 +650,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 		var nm:String=m.name
 		# K_B-…: Fassaden-Bauteile (Fenster, Gesimse) an Hauswänden – Teil des Hauses, kein eigenes Objekt
 		# nt_fern/ld_fern: Fern-Stellvertreter (erst ab 120 m sichtbar, nah steht das echte Modell)
-		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or nm.begins_with("nt_fern") or nm.begins_with("ld_fern") or m.multimesh==null or m.multimesh.mesh==null:continue
+		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or m.multimesh==null or m.multimesh.mesh==null:continue
 		if not m.is_visible_in_tree():continue
 		var ab:AABB=m.multimesh.mesh.get_aabb()
 		if ab.size.y<0.1 and ab.size.x<0.5:continue
@@ -667,7 +673,8 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				ex=fu.size.x*0.5;ez=fu.size.y*0.5;cx=fu.get_center().x;cz=fu.get_center().y
 			if natur:ex=min(ex,0.25);ez=min(ez,0.25)   # Stamm/Wurzel, nicht die Krone
 			else:ex=max(ex-0.15,0.0);ez=max(ez-0.15,0.0)
-			for q in [Vector3(cx,yb,cz),Vector3(cx-ex,yb,cz-ez),Vector3(cx+ex,yb,cz-ez),Vector3(cx-ex,yb,cz+ez),Vector3(cx+ex,yb,cz+ez)]:
+			for q in [Vector3(cx,yb,cz),Vector3(cx-ex,yb,cz-ez),Vector3(cx+ex,yb,cz-ez),Vector3(cx-ex,yb,cz+ez),Vector3(cx+ex,yb,cz+ez),
+					Vector3(cx,yb,cz-ez),Vector3(cx,yb,cz+ez),Vector3(cx-ex,yb,cz),Vector3(cx+ex,yb,cz)]:
 				var w=gx*q
 				var kn=nm.substr(0,nm.rfind("_")) if nm.rfind("_")>2 else nm
 				var r=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,-40,0))
@@ -698,13 +705,6 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 		var P:PackedVector2Array=r.P;var T=r.T;var Hh=r.h;var w:float=r.w
 		for i in range(0,P.size(),2):
 			if P[i].distance_to(mitte)>radius:continue
-			# an Kreuzungen endet der Gehweg gewollt (Fahrbahn der Querstraße bzw. Ecke) -> dort nicht messen
-			var an_kr=false
-			for jn in spiel.welt.S.junctions:
-				if P[i].distance_to(jn.p)<float(jn.r)+sw+w+2.0:an_kr=true;break
-			# Sackgassen-Ende: Gehweg hört vor dem Fahrbahnende auf
-			if P[i].distance_to(P[0])<w+sw+12.0 or P[i].distance_to(P[P.size()-1])<w+sw+12.0:an_kr=true
-			if an_kr:continue
 			var t:Vector2=T[i];var n=Vector2(-t.y,t.x)
 			for sd in [1.0,-1.0]:
 				var ai=P[i]+n*sd*(w+sw-0.25);var ao=P[i]+n*sd*(w+sw+0.4)
@@ -723,9 +723,7 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				elif ys-yg>0.15:
 					var aus=Vector3(n.x*sd,0,n.y*sd)
 					var rh=_strahl(Vector3(ai.x,ys-0.25,ai.y),Vector3(ai.x,ys-0.25,ai.y)+aus*1.2,true)
-					# Bordstein-Schräge (Handy-Physik) liegt knapp unter der Oberkante -> auch dort prüfen
-					var rh2=_strahl(Vector3(ai.x,ys-0.08,ai.y),Vector3(ai.x,ys-0.08,ai.y)+aus*1.2,true)
-					if rh.is_empty() and rh2.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])
+					if rh.is_empty():FUNDE.append(["Gehweg","Spalt",ys-yg,wo])
 
 # Diagnose: liegt die Gelände-Kollision dort, wo das sichtbare Gelände ist (Dreiecke wie im Netz)?
 func _tri_hg(x:float,z:float)->float:

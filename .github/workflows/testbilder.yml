@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 150
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +61,7 @@ jobs:
           export GALERIE_OUT=$PWD/build/testbilder/
           mkdir -p $GALERIE_OUT
           NUR="${{ github.event.inputs.nur }}"; [ -z "$NUR" ] && NUR=$(cat .github/test_nur 2>/dev/null || echo nord)
-          timeout 3000 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 || true
+          timeout 10800 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 || true
           grep -E "MESS|NORD Orte|SCRIPT ERROR" build/galerie.log | head -80
           cp build/galerie.log build/bake.log $GALERIE_OUT/ || true
           ls $GALERIE_OUT | wc -l

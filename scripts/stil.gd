@@ -202,7 +202,9 @@ void fragment(){
 	// ähnliche Steigung und bekommen keine Linie mehr
 	float ax=abs(zl-z),bx=abs(zr-z),ay=abs(zu-z),by=abs(zo-z);
 	float k=max(max(ax,bx)-3.0*min(ax,bx),0.0)+max(max(ay,by)-3.0*min(ay,by),0.0);
-	float e=smoothstep(0.03,0.08,k/max(z,0.5));
+	// höhere, breitere Schwelle: kleine Stufen am Boden (Bordstein, Plattenrand) liegen sonst knapp an der
+	// Grenze und flackern als gestrichelte Linie
+	float e=smoothstep(0.05,0.12,k/max(z,0.5));
 	// Umriss nur, wo sich auch die Farbe ändert: Kuppen und Böschungen (Boden vor gleichem Boden) bleiben ohne Linie
 	vec3 c0=texture(bild,uv).rgb;
 	float fd=max(max(length(c0-texture(bild,uv-vec2(px.x,0.0)).rgb),length(c0-texture(bild,uv+vec2(px.x,0.0)).rgb)),
@@ -212,7 +214,8 @@ void fragment(){
 	vec3 c=texture(bild,uv).rgb;
 	vec3 cl=texture(bild,uv-vec2(px.x,0.0)).rgb;vec3 cu=texture(bild,uv-vec2(0.0,px.y)).rgb;
 	float fk=length(c-cl)+length(c-cu);
-	e=max(e,smoothstep(0.22,0.5,fk)*0.55*(1.0-smoothstep(30.0,120.0,z)));
+	// Farbkanten nur nah und nur bei starkem Wechsel (Fugen/Muster im Boden ergeben sonst gepunktete Linien)
+	e=max(e,smoothstep(0.34,0.62,fk)*0.5*(1.0-smoothstep(18.0,60.0,z)));
 	ALBEDO=mix(c,vec3(0.07,0.06,0.08),e*staerke);
 }
 """

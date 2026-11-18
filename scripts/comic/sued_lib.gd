@@ -1186,7 +1186,7 @@ func _kachel(R:Rect2,tiefe:int)->int:
 				for band in geh:
 					for f in Geometry2D.intersect_polygons(e,band):
 						if Geometry2D.is_polygon_clockwise(f) or abs(L._flaeche2(f))<0.5:continue
-						_flaeche(f,KB+0.025,gw)
+						_flaeche(f,KB+0.016,gw)
 	return c
 
 # Strommasten (Ghetto/Süd), Laternen (Strand/Süd)

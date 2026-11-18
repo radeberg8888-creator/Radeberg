@@ -606,8 +606,37 @@ func _stadt_bauen(faces:Array,d):
 					teile=t2
 				for t in teile:
 					if abs(L._flaeche2(t))<0.3:continue
-					L._platte(t,-1.2,L.KB-0.02,L.M.pflaster,L.M.stein);fertig.append(t);n_rand+=1
+					L._platte(t,-1.2,L.KB-0.018,L.M.pflaster,L.M.stein);fertig.append(t);n_rand+=1
 	print("RANDGEHWEGE gepflastert ",n_rand)
+	# Gehwege unter der Hochstraße und neben der Bahn: dort wurden keine Blockflächen gebildet
+	var sperr=[]
+	for a in AB:
+		for bd in _baender(a.P,a.w+3.0):sperr.append([bd,L._bbox(bd)])
+	for b in BAHN:
+		for bd in _baender(b.P,5.0):sperr.append([bd,L._bbox(bd)])
+	var kern=[]
+	for b in BAHN:
+		for bd in _baender(b.P,2.4):kern.append([bd,L._bbox(bd)])
+	for r in NETZ:
+		for bd in _baender(r.P,r.w+0.05):kern.append([bd,L._bbox(bd)])
+	var n_sp=0;var gelegt=[]
+	for e in baender:
+		for x in sperr:
+			if not e[1].intersects(x[1]):continue
+			for st in Geometry2D.intersect_polygons(e[0],x[0]):
+				if Geometry2D.is_polygon_clockwise(st):continue
+				var teile=[st];var bb=L._bbox(st)
+				for kk in kern+gelegt:
+					if not bb.intersects(kk[1]):continue
+					var t2=[]
+					for t in teile:
+						for y in Geometry2D.clip_polygons(t,kk[0]):
+							if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+					teile=t2
+				for t in teile:
+					if abs(L._flaeche2(t))<0.3:continue
+					L._platte(t,-1.2,L.KB-0.018,L.M.pflaster,L.M.stein);gelegt.append([t,L._bbox(t)]);n_sp+=1
+	print("GEHWEGE an Hochstraße/Bahn gepflastert ",n_sp)
 	var nsl=0
 	for e in _SL:
 		if abs(L._flaeche2(e[0]))<0.3:continue
@@ -620,7 +649,7 @@ func _stadt_bauen(faces:Array,d):
 		L._platte(pc,-1.6,L.KB,L.M.pflaster,L.M.stein)
 		for inn in Geometry2D.offset_polygon(pc,-2.6,Geometry2D.JOIN_MITER):
 			if Geometry2D.is_polygon_clockwise(inn):continue
-			L._platte(inn,L.KB,L.KB+0.01,L.M.gras if e[1]!="docks" and e[1]!="industrie" and e[1]!="flug" else L.M.hof,L.M.stein_d)
+			L._platte(inn,L.KB,L.KB+0.017,L.M.gras if e[1]!="docks" and e[1]!="industrie" and e[1]!="flug" else L.M.hof,L.M.stein_d)
 	L._fertig(false)
 	# Straßenausstattung über alle Stadtblöcke
 	var alle=fass.duplicate()
@@ -653,8 +682,8 @@ func _fahrbahn(r):
 	for i in n-1:
 		var a=P[i]-N[i]*w;var b=P[i]+N[i]*w;var c=P[i+1]+N[i+1]*w;var dd=P[i+1]-N[i+1]*w
 		L._tri(so,Vector3(a.x,0.015,a.y),Vector3(b.x,0.015,b.y),Vector3(c.x,0.015,c.y),Vector3.UP);L._tri(so,Vector3(a.x,0.015,a.y),Vector3(c.x,0.015,c.y),Vector3(dd.x,0.015,dd.y),Vector3.UP)
-	L.koll_an=false
-	# Bankett: schräg nach außen unter das Gelände (an Blöcken verdeckt die Gehwegplatte)
+	# Bankett: schräg nach außen unter das Gelände (an Blöcken verdeckt die Gehwegplatte); mit Kollision,
+	# wo es sichtbar bleibt, sinkt sonst niemand ein
 	for i in n-1:
 		for sd in [-1.0,1.0]:
 			var a=P[i]+N[i]*w*sd;var b=P[i+1]+N[i+1]*w*sd;var a2=P[i]+N[i]*(w+2.2)*sd;var b2=P[i+1]+N[i+1]*(w+2.2)*sd
