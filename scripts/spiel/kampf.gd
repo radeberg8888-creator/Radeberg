@@ -44,6 +44,7 @@ func _ready():
 # Explosion (Auto): Lichtblitz, Feuerball, Schaden im Umkreis, Kettenreaktion
 func explosion(p:Vector3,quelle=null):
 	_ton("sniper",p,1.0);_ton("schrot",p,1.0)
+	spiel.passanten_schreck(p,70.0)
 	var l=OmniLight3D.new();l.light_color=Color(1,0.6,0.2);l.light_energy=12.0;l.omni_range=18.0;add_child(l);l.global_position=p+Vector3(0,1,0)
 	var fb=_partikel(Color(1.0,0.7,0.2),Color(0.2,0.15,0.1),40,0.9)
 	fb.global_position=p;fb.direction=Vector3.UP;fb.spread=180.0;fb.initial_velocity_min=3.0;fb.initial_velocity_max=9.0;fb.scale_amount_min=0.4;fb.scale_amount_max=1.2;fb.gravity=Vector3(0,2,0)
@@ -281,6 +282,7 @@ func _ray(a:Vector3,b:Vector3,aus:Array=[]):
 # schuetze: Node (Spieler oder Gegner); spieler_schuss: zählt für Fahndung/Missionen
 func schuss(schuetze,mz:Vector3,dir:Vector3,id:String,aus:Array,spieler_schuss:=false,treff_chance:=1.0):
 	var d=WD.daten(id)
+	if Engine.get_process_frames()%10==0:spiel.passanten_schreck(mz,55.0)
 	var kugeln=int(d.get("kugeln",1))
 	var streu=deg_to_rad(float(d.get("streuung",1.0)))
 	if spieler_schuss and zielt and spiel.spieler.velocity.length()<0.5:streu*=0.6

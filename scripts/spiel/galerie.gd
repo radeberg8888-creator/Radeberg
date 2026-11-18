@@ -650,7 +650,8 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 		var nm:String=m.name
 		# K_B-…: Fassaden-Bauteile (Fenster, Gesimse) an Hauswänden – Teil des Hauses, kein eigenes Objekt
 		# nt_fern/ld_fern: Fern-Stellvertreter (erst ab 120 m sichtbar, nah steht das echte Modell)
-		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or m.multimesh==null or m.multimesh.mesh==null:continue
+		# an der Wand befestigte Teile (Fassade, Klimaanlage, Schüssel) gehören zum Haus und stehen nicht auf dem Boden
+		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("K_B-") or nm.begins_with("K_klima") or nm.begins_with("K_schuessel") or m.multimesh==null or m.multimesh.mesh==null:continue
 		if not m.is_visible_in_tree():continue
 		var ab:AABB=m.multimesh.mesh.get_aabb()
 		if ab.size.y<0.1 and ab.size.x<0.5:continue

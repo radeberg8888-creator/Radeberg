@@ -17,7 +17,7 @@ var VG:={}                       # 2-m-Zelle -> PackedInt32Array
 var NAMEN:=[]                    # Mesh-Nummer -> Name
 var BEIDSEITIG:=[]               # Mesh-Nummer -> Material ohne Rückseiten-Ausblendung
 var KANTEN:=[]                   # Wand-Unterkanten [a,b,aussen_normal,oben_y,owner]
-const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","antenne","schornstein","turm","bruecke","autobahn","hochstr"]
+const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","antenne","schornstein","turm","bruecke","autobahn","hochstr","k_b-","klima","schuessel","hoch","stilkontur"]
 
 func _init(galerie):G=galerie
 

@@ -175,6 +175,7 @@ void fragment(){
 const GLAS:=KOPF+"""
 uniform vec3 farbe:source_color=vec3(0.16,0.3,0.42);
 uniform float licht=0.0;
+global uniform float nacht;
 void fragment(){
 	vec3 c=farbe;
 	// gemalte Spiegelung: heller Schrägstreifen + Himmel oben
@@ -182,8 +183,10 @@ void fragment(){
 	float streif=smoothstep(0.0,0.05,s)*(1.0-smoothstep(0.12,0.17,s));
 	c=mix(c,vec3(0.75,0.88,0.98),streif*0.55);
 	c=mix(c,vec3(0.55,0.75,0.92),smoothstep(0.55,1.0,fract(wp.y/3.1))*0.35);
+	float an=step(0.5,h21(floor(wp.xz*0.35)+floor(wp.y/3.1)));
+	c=mix(c,vec3(1.0,0.82,0.5),nacht*an*0.65);
 	ALBEDO=c; ROUGHNESS=0.35; SPECULAR=0.35;
-	EMISSION=farbe*licht;
+	EMISSION=farbe*licht+vec3(1.0,0.78,0.45)*nacht*an*0.8;
 }
 """
 # Gemaltes Fenster (eine Fläche statt ~40 Klötzchen): Rahmen, Sprossen, Glas mit Spiegelung, Vorhang,
@@ -197,6 +200,7 @@ void vertex(){ wp=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; vc=COLOR; dim=UV2; }
 const vec3 TUER[5]=vec3[5](vec3(0.2,0.35,0.55),vec3(0.55,0.15,0.15),vec3(0.2,0.45,0.3),vec3(0.35,0.22,0.12),vec3(0.15,0.15,0.18));
 const vec3 GLAS[4]=vec3[4](vec3(0.16,0.3,0.42),vec3(0.12,0.24,0.32),vec3(0.95,0.78,0.42),vec3(0.2,0.36,0.4));
 const vec3 INK=vec3(0.07,0.05,0.06);
+global uniform float nacht;
 void fragment(){
 	float x=UV.x; float y=UV.y; float fw=dim.x; float fh=dim.y; float hw=fw*0.5; float ax=abs(x);
 	int fr=int(round(vc.r*255.0)); int gl=int(round(vc.g*255.0)); int sh=int(round(vc.b*255.0)); float seed=vc.a;
@@ -237,6 +241,10 @@ void fragment(){
 			c*=mix(0.6,1.0,smoothstep(0.0,0.16,fh-0.045-y));
 			c*=mix(0.75,1.0,smoothstep(0.0,0.1,x+hw-0.045));
 			if(gl==2) em=g*0.25;
+			// nachts: etwa die Hälfte der Fenster warm erleuchtet (Emission, kein Licht)
+			float an=step(0.45,fract(sin(dot(floor(wp.xz*0.4)+floor(wp.y/2.9),vec2(12.9898,78.233)))*43758.5453));
+			c=mix(c,vec3(1.0,0.82,0.5),nacht*an*0.7);
+			em+=vec3(1.0,0.78,0.45)*nacht*an*0.9;
 			rough=0.35;
 		}
 		c=mix(INK,c,smoothstep(0.01+aa,0.026+aa,edge));
@@ -735,6 +743,13 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 			var x=(k+0.5)*w/n
 			_fenster(P,b,x,y0,fw,fhoch,stil,i)
 			if stil.balkon and i>=2 and k%2==0 and rng.randf()<0.6:_balkon(P,b,x,y0,stil)
+	# Kleinteile (Abschnitt 3.3): Klimaanlagen unter einzelnen Fenstern, Satellitenschüssel, Fallrohr an der Kante
+	if stock>=2 and w>=3.0:
+		for i in range(1,stock):
+			for k in n:
+				if rng.randf()<0.1:_klima(P.call((k+0.5)*w/n+0.15,eg+(i-1)*oh+0.32,0.27),b)
+		if rng.randf()<0.3:_schuessel(P.call(w*(0.2+0.6*rng.randf()),H-1.3,0.3),b)
+		if haupt:zyl(M.metall,P.call(w-0.14,0.05,0.12),P.call(w-0.14,H-0.35,0.12),0.055,1.0)
 	# Feuertreppe (Ziegelbauten, vorne)
 	if stil.feuer and vorne and stock>=3 and w>=7.0:_feuertreppe(P,b,w,eg,oh,stock)
 	# Erdgeschoss
@@ -743,6 +758,20 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 	else:
 		for k in n:_fenster(P,b,(k+0.5)*w/n,1.0,1.0,1.55,stil,0)
 
+func _klima(p:Vector3,b:Basis):
+	if leicht:_modul("klima",Transform3D(b,p),func():_klima_roh(),false);return
+	var a_t=Transform3D(b,p);_klima_teile(a_t)
+func _klima_roh():_klima_teile(Transform3D())
+func _klima_teile(t:Transform3D):
+	box(M.weiss,t*Vector3(0,0,0),Vector3(0.8,0.5,0.42),t.basis,0.03)
+	box(M.dunkel,t*Vector3(-0.12,0,0.215),Vector3(0.42,0.38,0.02),t.basis,0.0)
+	box(M.metall,t*Vector3(0,-0.3,-0.05),Vector3(0.7,0.06,0.5),t.basis,0.0)
+func _schuessel(p:Vector3,b:Basis):
+	if leicht:_modul("schuessel",Transform3D(b,p),func():_schuessel_teile(Transform3D()),false);return
+	_schuessel_teile(Transform3D(b,p))
+func _schuessel_teile(t:Transform3D):
+	box(M.metall,t*Vector3(0,0,-0.15),Vector3(0.06,0.06,0.3),t.basis,0.0)
+	kugel(M.weiss,t*Vector3(0,0.05,0.05),Vector3(0.36,0.36,0.09),1.06)
 func _fenster(P:Callable,b:Basis,x:float,y0:float,fw:float,fh:float,stil:Dictionary,i:int):
 	if leicht:_fenster_l(P,b,x,y0,fw,fh,stil,i);return
 	var glas:Material=M.glas[rng.randi()%M.glas.size()] if rng.randf()<0.35 else stil.glas
@@ -2752,6 +2781,30 @@ func _ampeln():
 			var p=bv-dj*0.8
 			_ampel(Vector3(p.x,KB,p.y),Vector3(dj.x,0,dj.y),gruen);gruen=not gruen
 
+func _gully_roh():
+	box(M.dunkel,Vector3.ZERO,Vector3(0.5,0.02,0.8),Basis(),0.0)
+	for k in 4:box(M.metall,Vector3(0,0.016,-0.27+k*0.18),Vector3(0.4,0.012,0.06),Basis(),0.0)
+func _parkuhr_roh():
+	zyl(M.metall,Vector3.ZERO,Vector3(0,1.15,0),0.04,1.0)
+	box(M.dunkel,Vector3(0,1.3,0),Vector3(0.22,0.32,0.16),Basis(),0.03)
+	box(M.gelb,Vector3(0,1.36,0.085),Vector3(0.14,0.1,0.01),Basis(),0.0)
+func _bushalt_roh():
+	# Wartehäuschen: Rückwand aus Glas, Dach, Bank, Schild (Front zur Straße = +z)
+	for x in [-1.6,1.6]:box(M.metall,Vector3(x,1.2,-0.6),Vector3(0.08,2.4,0.08),Basis(),0.0)
+	box(M.glas[0],Vector3(0,1.25,-0.62),Vector3(3.2,1.9,0.04),Basis(),0.0)
+	box(M.metall,Vector3(0,2.45,-0.15),Vector3(3.6,0.1,1.3),Basis(),0.03)
+	box(M.holz if M.has("holz") else M.dunkel,Vector3(0,0.45,-0.35),Vector3(2.4,0.08,0.4),Basis(),0.0)
+	for x in [-1.0,1.0]:box(M.metall,Vector3(x,0.22,-0.35),Vector3(0.06,0.44,0.3),Basis(),0.0)
+	zyl(M.metall,Vector3(2.1,0,0.3),Vector3(2.1,2.6,0.3),0.04,1.0)
+	box(M.gelb,Vector3(2.1,2.45,0.3),Vector3(0.5,0.5,0.04),Basis(),0.02)
+	box(M.gruen_l if M.has("gruen_l") else M.dunkel,Vector3(2.1,2.45,0.33),Vector3(0.3,0.3,0.01),Basis(),0.0)
+func _werbetafel_roh(i:int):
+	var f=[Color(0.9,0.3,0.2),Color(0.2,0.45,0.85),Color(0.95,0.8,0.15)][i]
+	for x in [-1.4,1.4]:box(M.metall,Vector3(x,1.6,0),Vector3(0.14,3.2,0.14),Basis(),0.0)
+	box(M.weiss,Vector3(0,3.6,0),Vector3(3.6,1.9,0.15),Basis(),0.04)
+	box(_toon(f),Vector3(0,3.6,0.08),Vector3(3.3,1.6,0.02),Basis(),0.0)
+	box(_toon(f.lightened(0.6)),Vector3(-0.5,3.85,0.095),Vector3(1.8,0.35,0.01),Basis(),0.0)
+	box(_toon(Color(0.1,0.1,0.12)),Vector3(0.6,3.35,0.095),Vector3(1.6,0.25,0.01),Basis(),0.0)
 func _innen(pc:PackedVector2Array,p:Vector2,r:float)->bool:
 	if not Geometry2D.is_point_in_polygon(p,pc):return false
 	for i in pc.size():
@@ -2786,6 +2839,19 @@ func _strassenmoebel():
 					if _innen(pc,pm,0.4):_muell(Vector3(pm.x,KB,pm.y))
 				elif z<0.34:
 					if _innen(pc,ph,0.35):_hydrant(Vector3(ph.x,KB,ph.y))
+				# Straßenausstattung (Abschnitt 3.2): Gullydeckel am Rinnstein, Parkuhren, Bushaltestellen, Werbetafeln
+				var gx=x-inn*0.55
+				if k%2==1 and leicht:_modul("gully",Transform3D(Basis(Vector3.UP,atan2(t.x,t.y)),Vector3(gx.x,0.026,gx.y)),func():_gully_roh(),false)
+				var z2=rng.randf()
+				var pp=x+inn*0.5+t*1.5
+				if z2<0.18 and leicht and _innen(pc,pp,0.3):
+					_modul("parkuhr",Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(pp.x,KB,pp.y)),func():_parkuhr_roh(),false)
+				elif z2<0.21 and leicht and _innen(pc,x+inn*1.8,1.6):
+					var bh=x+inn*1.8
+					_modul("bushalt",Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(bh.x,KB,bh.y)),func():_bushalt_roh(),false)
+				elif z2<0.235 and leicht and _innen(pc,x+inn*2.6,1.2):
+					var wt=x+inn*2.6;var wi=rng.randi()%3
+					_modul("werbung%d"%wi,Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(wt.x,KB,wt.y)),func():_werbetafel_roh(wi),false)
 				if nr[0].typ=="einbahn" and not schild_gesetzt:
 					schild_gesetzt=true;_einbahnschild(Vector3(a.x+t.x*2.0,KB,a.y+t.y*2.0),nr[0],zur)
 				k+=1

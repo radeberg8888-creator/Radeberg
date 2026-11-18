@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
@@ -105,6 +105,17 @@ jobs:
           (timeout 1200 $GODOT --headless --path . --import || true) > build/import2.log 2>&1
           ls assets/cache/comic/ | head; du -sh assets/cache/comic
           test -f assets/cache/comic/welt.scn && test -f assets/cache/comic/stadt_0_1.scn && test -f assets/cache/autos/c_trabant_gruen.scn
+
+      - name: Pflicht-Prüfung (alle 19 Viertel, ohne Funde kein Release)
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          export GALERIE_OUT=$PWD/build/pruefung/
+          mkdir -p $GALERIE_OUT
+          timeout 12000 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=schweben > build/pruefung.log 2>&1 || true
+          grep -E "SCHWEBT|FUND|SCRIPT ERROR|PRUEFUNG" build/pruefung.log | head -120
+          n=$(grep -oP "SCHWEBT GESAMT \K[0-9]+" build/pruefung.log || echo 999)
+          if [ "$n" != "0" ]; then echo "Prüfung hat $n Funde – kein Release"; exit 1; fi
+          rm -rf build/pruefung
 
       - name: Spieldaten-Paket exportieren und teilen
         run: |

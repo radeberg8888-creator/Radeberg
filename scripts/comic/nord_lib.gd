@@ -419,7 +419,7 @@ func kits_bauen():
 	for i in 6:_kit("nord","hochhaus","nd_hoch_%d"%i,26.0,26.0,func():_k_hochhaus(i))
 	for i in 5:_kit("nord","buero","nd_buero_%d"%i,22.0,18.0,func():_k_nbuero(i))
 	for i in 3:_kit("nord","platz","nd_platz_%d"%i,24.0,24.0,func():_k_platz(i))
-	for i in 5:_kit("nord","villa","nd_villa_%d"%i,30.0,32.0,func():_k_villa(i))
+	for i in 12:_kit("nord","villa","nd_villa_%d"%i,30.0,32.0,func():_k_villa(i))
 	for i in 6:_kit("nord","trailer","nd_trailer_%d"%i,12.0,16.0,func():_k_trailer(i))
 	# Einfamilienhäuser im Stil der Vorlagebilder (Holzverschalung, Schindeldach, Läden, Veranda)
 	for i in 8:_kit("nord","einfam_lang","nd_einfam_L%d"%i,12.0,24.0,func():_k_einfam(i,true))
@@ -501,52 +501,194 @@ func _k_platz(i:int):
 	for k in 4:L._baum(c+Vector3([-8,8,-8,8][k],0,[-8,-8,8,8][k]))
 	L._bank(c+Vector3(-4,0,6),Vector3(0,0,-1));L._bank(c+Vector3(4,0,-6),Vector3(0,0,1))
 func _k_villa(i:int):
-	_boden(30,32,Color(0.42,0.6,0.28))
-	var weiss=T([Color(0.96,0.95,0.92),Color(0.92,0.88,0.8),Color(0.85,0.85,0.88),Color(0.95,0.9,0.85),Color(0.9,0.93,0.95)][i])
+	# drei Bauarten mit Varianten: 0 modern (Flachdach, Beton, Glas, Lamellen), 1 mediterran (Ziegeldach, Turm,
+	# Bögen, Läden), 2 Hanghaus (Doppelgarage unten, Wohnhaus darüber, Außentreppe)
+	_boden(30,32,[Color(0.42,0.6,0.28),Color(0.45,0.62,0.3),Color(0.4,0.57,0.27)][i%3])
+	var art=i%3
+	if art==0:_villa_modern(i)
+	elif art==1:_villa_mediterran(i)
+	else:_villa_hang(i)
+	_villa_garten(i)
+func _dach_sattel(c:Vector3,B:float,TT:float,DH:float,farbe:Color,wand:Color,first_x:=true):
+	# Satteldach (First entlang x) mit Überstand und Giebeldreiecken in Wandfarbe
+	var w=atan2(DH,TT*0.5);var lg=sqrt(DH*DH+TT*TT*0.25)+0.8
+	for sz in [-1.0,1.0]:
+		_mb(farbe,c+Vector3(0,DH*0.5+0.12,sz*(TT*0.25+0.14)),Vector3(B+1.2,0.24,lg),Basis(Vector3.RIGHT,sz*w),0.04)
+		# Ziegelreihen (Rillen) für die Optik
+		for k in 4:_mb(farbe.darkened(0.18),c+Vector3(0,DH*(0.18+k*0.2)+0.25,sz*TT*0.5*(0.82-k*0.2)),Vector3(B+1.22,0.05,0.08),Basis(Vector3.RIGHT,sz*w),0.0)
+	_mb(farbe.darkened(0.25),c+Vector3(0,DH+0.2,0),Vector3(B+1.2,0.22,0.42),Basis(),0.0)
+	for sx in [-1.0,1.0]:
+		var a=c+Vector3(sx*B*0.5,0,-TT*0.5);var b=c+Vector3(sx*B*0.5,0,TT*0.5);var t=c+Vector3(sx*B*0.5,DH,0)
+		var st=L._st(T(wand));L._tri(st,a,b,t,Vector3(sx,0,0))
+func _dach_pyramide(c:Vector3,B:float,TT:float,DH:float,farbe:Color):
+	var st=L._st(T(farbe))
+	var e=[c+Vector3(-B*0.5-0.4,0,-TT*0.5-0.4),c+Vector3(B*0.5+0.4,0,-TT*0.5-0.4),c+Vector3(B*0.5+0.4,0,TT*0.5+0.4),c+Vector3(-B*0.5-0.4,0,TT*0.5+0.4)]
+	var top=c+Vector3(0,DH,0)
+	for k in 4:
+		var a=e[k];var b=e[(k+1)%4];var m=(a+b)*0.5-c;m.y=0
+		L._tri(st,a,b,top,(m.normalized()+Vector3(0,0.8,0)).normalized())
+func _cypresse(p:Vector3,h:float):
+	_mb(Color(0.35,0.26,0.18),p+Vector3(0,0.4,0),Vector3(0.18,0.8,0.18),Basis(),0.0)
+	L.kugel(T(Color(0.16,0.34,0.18)),p+Vector3(0,h*0.55,0),Vector3(0.75,h*0.5,0.75),1.06)
+func _villa_modern(i:int):
+	var weiss=T([Color(0.96,0.95,0.92),Color(0.86,0.85,0.83),Color(0.92,0.9,0.86),Color(0.78,0.78,0.76)][i%4])
+	var beton=Color(0.68,0.67,0.65)
 	var c=_P(-2,0,18)
 	L.box(weiss,c+Vector3(0,1.8,0),Vector3(16,3.6,11),Basis(),0.05)
 	L.box(weiss,c+Vector3(2,5.2,-1),Vector3(12,3.2,9),Basis(),0.05)
+	_mb(beton,c+Vector3(-5.5,1.8,0),Vector3(5,3.62,11.02),Basis(),0.0)   # Sichtbeton-Teil
 	L.box(T(Color(0.25,0.25,0.28)),c+Vector3(2,6.9,-1),Vector3(13,0.25,10),Basis(),0.03)
 	L.box(T(Color(0.25,0.25,0.28)),c+Vector3(0,3.7,0),Vector3(17,0.25,12),Basis(),0.03)
 	L.box(L.M.glas[1],c+Vector3(0,1.7,5.53),Vector3(12,2.8,0.05),Basis(),0.0)
 	L.box(L.M.glas[1],c+Vector3(2,5.1,3.53),Vector3(10,2.4,0.05),Basis(),0.0)
+	# Lamellen vor dem Obergeschoss, Glasgeländer an der Dachterrasse
+	var holz=Color(0.55,0.4,0.28)
+	for k in 14:_mb(holz,c+Vector3(-3.2+k*0.55,5.1,3.62),Vector3(0.12,2.9,0.12),Basis(),0.0)
+	_mb(Color(0.7,0.82,0.88),c+Vector3(-6,4.35,5.9),Vector3(4.0,0.95,0.04),Basis(),0.0)
+	# Rahmen der Glasfront
+	for x in [-6.0,-2.0,2.0,6.0]:_mb(Color(0.2,0.2,0.22),c+Vector3(x,1.7,5.58),Vector3(0.12,2.8,0.06),Basis(),0.0)
 	K.haupt(c+Vector3(0,3.5,0),Vector3(16,7,11),Basis(),Color(0.95,0.94,0.9),Color(0.25,0.25,0.28))
-	# Pool, Terrasse, Palmen, Mauer, Garage
+	# Pool, Terrasse, Palmen, Garage
 	L.box(L.M.pflaster,_P(-2,0.02,8.5),Vector3(14,0.04,5),Basis(),0.0)
 	L.box(T(Color(0.2,0.6,0.85)),_P(-4,0.03,8.0),Vector3(8,0.03,3.6),Basis(),0.0)
 	L.box(L.M.weiss,_P(-4,0.05,8.0),Vector3(8.6,0.1,4.2),Basis(),0.0)
-	palme(_P(7,0,7),8.0);palme(_P(-11,0,10),9.0)
+	for k in 2:_mb(Color(0.95,0.95,0.95),_P(1.2+k*1.4,0.25,7.2),Vector3(0.7,0.3,1.9),Basis(),0.0)   # Liegen
+	palme(_P(7,0,7),8.0+float(i%3));palme(_P(-11,0,10),9.0)
+	_cypresse(_P(-12.5,0,4.0),5.5)
 	L.box(weiss,_P(10,1.6,22),Vector3(7,3.2,8),Basis(),0.04);L.koll_box(_P(10,1.6,22),Vector3(7,3.2,8))
 	L.box(T(Color(0.4,0.4,0.42)),_P(10,1.3,17.98),Vector3(5,2.6,0.08),Basis(),0.0)
+func _villa_mediterran(i:int):
+	var creme=[Color(0.95,0.88,0.72),Color(0.93,0.84,0.66),Color(0.97,0.92,0.8),Color(0.9,0.8,0.62)][i%4]
+	var ziegel=[Color(0.74,0.36,0.22),Color(0.68,0.32,0.2),Color(0.78,0.42,0.26)][i%3]
+	var laden=[Color(0.25,0.45,0.32),Color(0.2,0.35,0.55),Color(0.5,0.32,0.2)][i%3]
+	var c=_P(-1,0,19)
+	var B:=15.0;var TT:=10.0;var H:=6.6
+	_mb(Color(0.62,0.58,0.52),c+Vector3(0,0.3,0),Vector3(B+0.3,0.6,TT+0.3))
+	_mb(creme,c+Vector3(0,0.6+H*0.5,0),Vector3(B,H,TT),Basis(),0.05)
+	K.haupt(c+Vector3(0,0.6+H*0.5,0),Vector3(B,H,TT),Basis(),creme,ziegel,1,true)
+	_dach_sattel(c+Vector3(0,0.6+H,0),B,TT,2.4,ziegel,creme)
+	# Zierleisten, Dachkante
+	_mb(Color(0.98,0.95,0.88),c+Vector3(0,0.6+H-0.15,TT*0.5+0.06),Vector3(B+0.1,0.3,0.12),Basis(),0.0)
+	_mb(Color(0.98,0.95,0.88),c+Vector3(0,3.75,TT*0.5+0.05),Vector3(B+0.1,0.18,0.1),Basis(),0.0)
+	# Turm mit Pyramidendach an der Ecke
+	var tc=c+Vector3(-B*0.5+1.8,0,TT*0.5-1.8)
+	_mb(creme,tc+Vector3(0,0.6+5.0,0),Vector3(4.0,10.0,4.0),Basis(),0.05)
+	_dach_pyramide(tc+Vector3(0,10.6,0),4.0,4.0,2.6,ziegel)
+	_ef_fenster(tc+Vector3(0,8.4,2.0),0.0,laden,0.9,1.3)
+	# Bogengang (Loggia) im Erdgeschoss
+	for k in 4:
+		var x=-2.5+k*3.0
+		_mb(Color(0.98,0.95,0.88),c+Vector3(x,1.9,TT*0.5+1.4),Vector3(0.5,2.6,0.5),Basis(),0.0)
+	_mb(Color(0.98,0.95,0.88),c+Vector3(2.0,3.4,TT*0.5+1.4),Vector3(9.6,0.5,0.6),Basis(),0.0)
+	for k in 3:L.zyl(T(creme),c+Vector3(-1.0+k*3.0,3.15,TT*0.5+1.1),c+Vector3(-1.0+k*3.0,3.15,TT*0.5+1.7),1.25,1.0)
+	_mb(Color(0.78,0.5,0.32),c+Vector3(2.0,0.62,TT*0.5+1.4),Vector3(9.6,0.06,2.6),Basis(),0.0)   # Fischgrät-Ziegelboden
+	# Fenster mit Läden, Balkon mit Blumenkästen
+	for x in [-3.6,0.0,3.6]:_ef_fenster(c+Vector3(x,5.0,TT*0.5),0.0,laden)
+	for sx in [-1.0,1.0]:
+		for z in [-2.4,2.4]:
+			_ef_fenster(c+Vector3(sx*B*0.5,2.4,z),sx*PI*0.5,laden);_ef_fenster(c+Vector3(sx*B*0.5,5.0,z),sx*PI*0.5,laden)
+	_mb(Color(0.2,0.2,0.22),c+Vector3(0,4.55,TT*0.5+0.75),Vector3(3.2,0.12,1.5),Basis(),0.0)
+	for k in 9:_mb(Color(0.15,0.15,0.17),c+Vector3(-1.5+k*0.375,5.0,TT*0.5+1.48),Vector3(0.05,0.9,0.05),Basis(),0.0)
+	_mb(Color(0.15,0.15,0.17),c+Vector3(0,5.45,TT*0.5+1.48),Vector3(3.2,0.06,0.06),Basis(),0.0)
+	for k in 3:L.kugel(T([Color(0.9,0.3,0.4),Color(0.95,0.75,0.2),Color(0.8,0.35,0.7)][k]),c+Vector3(-1.0+k*1.0,5.6,TT*0.5+1.45),Vector3(0.3,0.18,0.15),1.0)
+	# Schornstein mit kleinem Dach
+	_mb(creme,c+Vector3(B*0.3,0.6+H+1.8,-1.5),Vector3(0.9,3.0,0.9))
+	_mb(ziegel,c+Vector3(B*0.3,0.6+H+3.4,-1.5),Vector3(1.2,0.18,1.2),Basis(),0.0)
+	# Tür mit Vordach
+	_mb(Color(0.4,0.25,0.15),c+Vector3(4.6,1.75,TT*0.5+0.06),Vector3(1.4,2.3,0.08),Basis(),0.0)
+	# Innenhof-Brunnen und Zypressen
+	var br=_P(-4,0,8.5)
+	L.zyl(T(Color(0.8,0.75,0.65)),br,br+Vector3(0,0.55,0),1.4,1.0)
+	L.zyl(T(Color(0.25,0.55,0.75)),br+Vector3(0,0.5,0),br+Vector3(0,0.56,0),1.2,1.0)
+	L.zyl(T(Color(0.8,0.75,0.65)),br,br+Vector3(0,1.5,0),0.25,1.0)
+	_mb(Color(0.78,0.5,0.32),_P(-2,0.02,8.5),Vector3(13,0.04,5.5),Basis(),0.0)
+	for k in 4:_cypresse(_P(-13.0+k*0.0,0,6.0+k*4.0),5.0+float((i+k)%3))
+	_cypresse(_P(9.0,0,6.0),5.5)
+	L.box(T(creme),_P(10,1.6,23),Vector3(7,3.2,8),Basis(),0.04);L.koll_box(_P(10,1.6,23),Vector3(7,3.2,8))
+	_dach_sattel(_P(10,3.2,23),7.0,8.0,1.4,ziegel,creme)
+	L.box(T(Color(0.45,0.3,0.2)),_P(10,1.3,18.98),Vector3(5,2.6,0.08),Basis(),0.0)
+func _villa_hang(i:int):
+	# Doppelgarage auf Straßenhöhe vorne, Wohnhaus darüber, Treppe seitlich zum Eingang, Pflanzkübel, Wandlaternen
+	var wand=[Color(0.9,0.86,0.78),Color(0.78,0.82,0.86),Color(0.88,0.8,0.7),Color(0.84,0.84,0.8)][i%4]
+	var dach=[Color(0.3,0.3,0.32),Color(0.5,0.3,0.24),Color(0.36,0.33,0.3)][i%3]
+	var stein=Color(0.6,0.57,0.52)
+	var c=_P(0,0,14)
+	# Garagengeschoss (Bruchstein) mit zwei Toren
+	_mb(stein,c+Vector3(0,1.6,0),Vector3(14,3.2,12),Basis(),0.05)
+	for k in 6:_mb(stein.darkened(0.15),c+Vector3(0,0.45+k*0.5,6.01),Vector3(14.02,0.05,0.02),Basis(),0.0)
+	for x in [-3.4,3.4]:
+		_mb(Color(0.85,0.85,0.82),c+Vector3(x,1.25,6.04),Vector3(5.0,2.5,0.08),Basis(),0.0)
+		for k in 5:_mb(Color(0.7,0.7,0.68),c+Vector3(x,0.3+k*0.48,6.09),Vector3(4.9,0.04,0.02),Basis(),0.0)
+	L.koll_box(c+Vector3(0,1.6,0),Vector3(14,3.2,12))
+	# Wohngeschoss darüber, Satteldach
+	_mb(wand,c+Vector3(0,3.2+1.6,-0.5),Vector3(13,3.2,11),Basis(),0.05)
+	K.haupt(c+Vector3(0,3.2,0),Vector3(14,6.4,12),Basis(),wand,dach,1,true)
+	_dach_sattel(c+Vector3(0,6.4,-0.5),13.0,11.0,2.6,dach,wand)
+	for x in [-4.0,0.0,4.0]:_ef_fenster(c+Vector3(x,4.8,5.0),0.0,Color(0.2,0.3,0.25))
+	_mb(Color(0.95,0.94,0.9),c+Vector3(0,3.25,6.1),Vector3(14.1,0.18,0.3),Basis(),0.0)   # Gesims über den Toren
+	# Außentreppe rechts hoch zum Eingang, Geländer
+	for k in 11:
+		# jede Stufe als Block bis zum Boden (nichts hängt in der Luft)
+		_mb(stein,c+Vector3(8.0,(k+1)*0.15,5.0-k*0.32),Vector3(1.4,(k+1)*0.3,0.34),Basis(),0.0)
+		L.koll_box(c+Vector3(8.0,(k+1)*0.15,5.0-k*0.32),Vector3(1.4,(k+1)*0.3,0.34))
+	_mb(stein,c+Vector3(8.0,1.65,1.6),Vector3(1.4,3.3,0.6),Basis(),0.0)
+	_mb(Color(0.15,0.15,0.17),c+Vector3(8.7,2.2,3.4),Vector3(0.05,0.05,3.8),Basis(Vector3.RIGHT,0.75),0.0)
+	_mb(Color(0.4,0.26,0.16),c+Vector3(6.6,4.4,0.6),Vector3(0.08,2.2,1.1),Basis(),0.0)   # Haustür oben
+	# Wandlaternen, Hausnummer, Pflanzkübel
+	for x in [-6.2,0.0,6.2]:
+		_mb(Color(0.12,0.12,0.14),c+Vector3(x,2.4,6.12),Vector3(0.18,0.32,0.14),Basis(),0.0)
+		_mb(Color(1.0,0.9,0.6),c+Vector3(x,2.4,6.2),Vector3(0.12,0.2,0.04),Basis(),0.0)
+	_mb(Color(0.95,0.95,0.92),c+Vector3(-0.2,2.7,6.1),Vector3(0.5,0.3,0.04),Basis(),0.0)
+	for x in [-7.5,7.5]:
+		L.zyl(T(Color(0.55,0.35,0.25)),_P(x,0,1.2),_P(x,0.7,1.2),0.45,1.0)
+		L.kugel(T(Color(0.3,0.55,0.25)),_P(x,1.0,1.2),Vector3(0.55,0.5,0.55),1.06)
+	# Einfahrt vor den Toren
+	_mb(Color(0.5,0.49,0.47),_P(0,0.01,4.0),Vector3(13.0,0.04,8.0),Basis(),0.0)
+	palme(_P(-11,0,20),8.0)
+	_cypresse(_P(11.5,0,24.0),5.0)
+func _villa_garten(i:int):
 	# Gartenmauern: warmer Putz statt Weiß, Pfeiler alle 4 m, Abdeckplatte oben, Sockelstreifen unten,
 	# Pflanzen am Fuß (zur Straße). Mauern reichen in den Sockel hinunter (am Hang keine Luft darunter).
-	var putz=T([Color(0.86,0.8,0.7),Color(0.82,0.76,0.66),Color(0.88,0.84,0.76),Color(0.8,0.74,0.64),Color(0.85,0.82,0.74)][i])
-	var stein=T(Color(0.62,0.6,0.56));var deck=T(Color(0.5,0.48,0.45))
+	# Vorn eine Öffnung für die Zufahrt (Garage): modern/mediterran rechts, Hanghaus in der Mitte
+	var o0=5.0;var o1=15.0
+	if i%3==2:o0=-7.4;o1=9.2
+	var putz=T([Color(0.86,0.8,0.7),Color(0.82,0.76,0.66),Color(0.88,0.84,0.76),Color(0.8,0.74,0.64),Color(0.85,0.82,0.74)][i%5])
+	var stein=T([Color(0.62,0.6,0.56),Color(0.66,0.55,0.45),Color(0.58,0.56,0.54)][i%3]);var deck=T(Color(0.5,0.48,0.45))
 	for sx in [-1,1]:
 		var x=sx*(15-0.15)
 		L.box(putz,_P(x,-0.4,16),Vector3(0.3,5.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
 		L.box(deck,_P(x,2.26,16),Vector3(0.46,0.12,32.1),Basis(),0.0)
 		L.box(stein,_P(x,0.2,16),Vector3(0.34,0.4,32.02),Basis(),0.0)
 		for k in 9:L.box(stein,_P(x,1.1,0.3+k*3.9),Vector3(0.5,2.3,0.5),Basis(),0.0)
-	L.box(putz,_P(-5,-0.4,0.2),Vector3(20,5.2,0.3),Basis(),0.02);L.koll_box(_P(-5,1.1,0.2),Vector3(20,2.2,0.3))
-	L.box(deck,_P(-5,2.26,0.2),Vector3(20.1,0.12,0.46),Basis(),0.0)
-	L.box(stein,_P(-5,0.2,0.2),Vector3(20.02,0.4,0.34),Basis(),0.0)
-	for k in 6:L.box(stein,_P(-14.8+k*4.0,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
-	# Pflanzbeet vor der Mauer: Steintrog, der bis 1,5 m unter Grundstückshöhe reicht (steht damit auch auf
-	# tiefer liegendem Gehweg auf), darin eine gestutzte Hecke als Band mit leicht unregelmäßiger Oberkante
-	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6))
-	L.box(stein,_P(-5,-0.75,-0.45),Vector3(20,1.9,0.62),Basis(),0.02)
-	L.box(deck,_P(-5,0.22,-0.45),Vector3(20.04,0.06,0.66),Basis(),0.0)
-	# Trog nicht als glatte Fläche: Steinfugen alle 1 m und ein dunklerer Sockelstreifen unten
-	var fuge=T(Color(0.46,0.44,0.41))
-	for k in 21:L.box(fuge,_P(-15.0+k*1.0,-0.75,-0.77),Vector3(0.05,1.9,0.02),Basis(),0.0)
-	for k in 3:L.box(fuge,_P(-5,-1.4+k*0.55,-0.77),Vector3(20.0,0.04,0.02),Basis(),0.0)
-	for k in 10:
-		var hh=0.55+0.12*sin(float(k)*1.7+float(i))
-		L.box(laub,_P(-14.0+k*2.0,0.25+hh*0.5,-0.45),Vector3(2.02,hh,0.5),Basis(),0.03)
-		if k%3==0:L.kugel(bluete,_P(-14.0+k*2.0,0.3+hh,-0.45),Vector3(0.22,0.14,0.22),1.0)
-	L.box(T(Color(0.15,0.15,0.17)),_P(10,1.0,0.2),Vector3(8,2.0,0.1),Basis(),0.0)
-	L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i])
+	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6));var fuge=T(Color(0.46,0.44,0.41))
+	for seg in [[-15.0,o0],[o1,15.0]]:
+		var x0:float=seg[0];var x1:float=seg[1];var lg=x1-x0
+		if lg<0.6:continue
+		var xm=(x0+x1)*0.5
+		L.box(putz,_P(xm,-0.4,0.2),Vector3(lg,5.2,0.3),Basis(),0.02);L.koll_box(_P(xm,1.1,0.2),Vector3(lg,2.2,0.3))
+		L.box(deck,_P(xm,2.26,0.2),Vector3(lg+0.1,0.12,0.46),Basis(),0.0)
+		L.box(stein,_P(xm,0.2,0.2),Vector3(lg+0.02,0.4,0.34),Basis(),0.0)
+		var k=0.0
+		while x0+0.2+k<=x1-0.2:
+			L.box(stein,_P(x0+0.2+k,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
+			k+=4.0
+		L.box(stein,_P(x1-0.2,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
+		# Pflanzbeet vor der Mauer: Steintrog bis 1,5 m unter Grundstückshöhe, gestutzte Hecke als Band
+		L.box(stein,_P(xm,-0.75,-0.45),Vector3(lg,1.9,0.62),Basis(),0.02)
+		L.box(deck,_P(xm,0.22,-0.45),Vector3(lg+0.04,0.06,0.66),Basis(),0.0)
+		var n=int(floor(lg))
+		for q in n+1:L.box(fuge,_P(x0+q*lg/max(n,1),-0.75,-0.77),Vector3(0.05,1.9,0.02),Basis(),0.0)
+		for q in 3:L.box(fuge,_P(xm,-1.4+q*0.55,-0.77),Vector3(lg,0.04,0.02),Basis(),0.0)
+		var nh=max(1,int(round(lg/2.0)));var bw=lg/nh
+		for q in nh:
+			var hh=0.55+0.12*sin(float(q)*1.7+float(i)+x0)
+			L.box(laub,_P(x0+bw*(q+0.5),0.25+hh*0.5,-0.45),Vector3(bw+0.02,hh,0.5),Basis(),0.03)
+			if q%3==0:L.kugel(bluete,_P(x0+bw*(q+0.5),0.3+hh,-0.45),Vector3(0.22,0.14,0.22),1.0)
+	# Tor in der Öffnung (Hanghaus: offen, Einfahrt direkt vor den Garagen)
+	if i%3!=2:L.box(T(Color(0.15,0.15,0.17)),_P((o0+o1)*0.5,1.0,0.2),Vector3(o1-o0-2.0,2.0,0.1),Basis(),0.0)
+	var auto=["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i%5]
+	if i%3==2:L._park(Transform3D(Basis(Vector3.UP,PI),_P(-3.4,0.0,4.2)),auto)
+	else:L._park(Transform3D(Basis(Vector3.UP,PI),_P(10,0.0,12)),auto)
 # Grundstücke im Norden liegen am Hang: unter der Rasenplatte ein 4 m tiefer Sockel (Erde/Mauer),
 # damit nichts in der Luft hängt, wenn das Gelände neben dem Grundstück abfällt
 func _boden(w:float,d:float,farbe:Color):
@@ -565,7 +707,9 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 	var mit=func():
 		f.call()
 		if not (name.begins_with("nt_") or name.contains("kaktus") or name.contains("fels") or name.contains("jet")):
-			L.box(T(Color(0.6,0.57,0.52)),_P(0,-5.25,d*0.5),Vector3(w-0.04,10.0,d-0.04),Basis(),0.0)
+			# Sockel als Bruchstein-/Ziegelmauer (keine glatte Platte), oben eine Abdeckkante
+			L.box(L.M.ziegel[3],_P(0,-5.25,d*0.5),Vector3(w-0.04,10.0,d-0.04),Basis(),0.0)
+			L.box(T(Color(0.52,0.5,0.47)),_P(0,-0.3,d*0.5),Vector3(w+0.02,0.14,d+0.02),Basis(),0.0)
 			# Sockel mit Kollision (Oberkante knapp unter dem Grundstücksboden): man läuft nicht durch ihn hindurch
 			L.koll_box(_P(0,-5.02,d*0.5),Vector3(w-0.04,10.0,d-0.04))
 	super._kit(stil_,typ,name,w,d,mit)
@@ -643,8 +787,33 @@ func _k_einfam(i:int,lang:bool):
 	if i%2==0:
 		for k in 14:_mb(weiss,_P(-5.8+k*0.36,0.45,0.25),Vector3(0.1,0.9,0.05),Basis(),0.0)
 		_mb(weiss,_P(-3.45,0.7,0.25),Vector3(4.8,0.08,0.06),Basis(),0.0)
-	# (Schuppen/Garage hinten im Garten entfernt: am Hang ragten sie aus dem Nachbargrundstück; echte Garagen
-	# mit Einfahrt kommen mit Schritt 2)
+	# Holzhaus-Variante: Bretterverkleidung (waagerechte Leisten) und Spitzgaube im Dach
+	if i%4==3:
+		var holz=wand.darkened(0.25)
+		for k in int(H/0.45):
+			for sz in [-1.0,1.0]:_mb(holz,c+Vector3(0,0.9+k*0.45,sz*(TT*0.5+0.015)),Vector3(B+0.02,0.05,0.03),Basis(),0.0)
+			for sx in [-1.0,1.0]:_mb(holz,c+Vector3(sx*(B*0.5+0.015),0.9+k*0.45,0),Vector3(0.03,0.05,TT+0.02),Basis(),0.0)
+		var g=c+Vector3(-1.5,0.7+H+DH*0.35,TT*0.25+0.4)
+		_mb(wand,g,Vector3(1.8,1.4,1.6),Basis(),0.03)
+		_ef_fenster(g+Vector3(0,0,0.8),0.0,laden,0.8,0.9)
+		var st=L._st(T(dach))
+		L._tri(st,g+Vector3(-1.1,0.7,0.9),g+Vector3(1.1,0.7,0.9),g+Vector3(0,1.5,0.9),Vector3(0,0,1))
+		for sx in [-1.0,1.0]:_mb(dach,g+Vector3(sx*0.6,1.1,0.0),Vector3(1.3,0.12,2.0),Basis(Vector3.FORWARD,sx*0.6),0.03)
+	# Carport am Ende der Einfahrt (lange Grundstücke), Gartentisch mit Schirm oder Schaukel
+	if lang:
+		for x in [ex-1.2,ex+1.2]:
+			for z in [d*0.5-2.0,d*0.5+3.0]:_mb(Color(0.4,0.3,0.22),_P(x,1.2,z),Vector3(0.15,2.4,0.15),Basis(),0.0)
+		_mb(dach,_P(ex,2.45,d*0.5+0.5),Vector3(3.0,0.12,5.6),Basis(),0.03)
+	if i%2==1:
+		var gp=_P(-3.0,0,d-2.8)
+		L.zyl(T(Color(0.95,0.95,0.92)),gp,gp+Vector3(0,0.75,0),0.6,1.0)
+		L.zyl(T(Color(0.9,0.9,0.88)),gp,gp+Vector3(0,2.2,0),0.04,1.0)
+		L.kugel(T([Color(0.85,0.3,0.25),Color(0.25,0.5,0.75)][i%4/2]),gp+Vector3(0,2.25,0),Vector3(1.3,0.28,1.3),1.04)
+	else:
+		var sp=_P(2.5,0,d-3.0)
+		for sx in [-1.0,1.0]:_mb(Color(0.45,0.32,0.2),sp+Vector3(sx*1.0,1.0,0),Vector3(0.12,2.0,0.12),Basis(Vector3.FORWARD,sx*0.15),0.0)
+		_mb(Color(0.45,0.32,0.2),sp+Vector3(0,2.0,0),Vector3(2.4,0.12,0.12),Basis(),0.0)
+		_mb(Color(0.3,0.3,0.32),sp+Vector3(0,0.55,0),Vector3(0.6,0.06,0.3),Basis(),0.0)
 func _k_trailer(i:int):
 	_boden(12,16,Color(0.62,0.52,0.36))
 	var c=_P(-1.0,0,8.0);var al=T([Color(0.82,0.82,0.8),Color(0.85,0.8,0.65),Color(0.7,0.78,0.8),Color(0.8,0.7,0.6),Color(0.78,0.84,0.76),Color(0.9,0.88,0.84)][i])

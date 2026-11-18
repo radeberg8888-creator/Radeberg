@@ -28,6 +28,14 @@ func setup(s):
 			var p2=Vector2(im.p.x,im.p.z) if im.p is Vector3 else im.p
 			if im.art=="lager":_ort("lager",p2,func(o):_lager(o,p2))
 			elif im.art=="autohandel":_ort("autohandel",p2,func(o):_autohandel(o,p2))
+	# Straßenleben (Abschnitt 4.2): Szenen auf Gehwegen in den Vierteln
+	for e in [["bar",Vector2(250,-350)],["bar",Vector2(-2300,700)],["club",Vector2(-150,-650)],["gang",Vector2(-262,1040)],["gang",Vector2(-120,980)],
+			["strand",Vector2(-2300,760)],["strand",Vector2(-2200,640)],["angler",Vector2(560,2160)],["musiker",Vector2(-150,-650)],["musiker",Vector2(300,-300)],
+			["obdachlos",Vector2(-262,1040)],["obdachlos",Vector2(320,-420)],["touristen",Vector2(-120,-700)],["touristen",Vector2(-2350,700)],
+			["laden",Vector2(250,-350)],["laden",Vector2(496,-168)],["laden",Vector2(2550,850)],["baustelle",Vector2(900,640)],["baustelle",Vector2(-1083,-504)],
+			["liefer",Vector2(250,1560)],["liefer",Vector2(2550,850)],["taxistand",Vector2(200,-380)],["bus",Vector2(-150,-620)],["jogger",Vector2(-150,-1450)]]:
+		var art:String=e[0];var m:Vector2=e[1]
+		_ort(art,m,func(o):_szene(o,art,m))
 	if "DIENSTE" in W:
 		for d in W.DIENSTE:
 			var p3:Vector2=d.p;var yaw:float=d.yaw
@@ -160,3 +168,72 @@ func _dienst(o,art:String,p:Vector2,yaw:float):
 		"taxi":
 			for k in 3:_auto(o,"c_taxi",hof+quer*(3.0+k*3.2),yaw)
 			_figur(o,"daya",null,[hof+quer*5.0],"idle");_figur(o,"joe",null,[hof+quer*6.2],"talk")
+
+# ---------------- Straßenszenen ----------------
+# nächster Gehwegpunkt (Straße + seitlich auf den Gehweg) und Richtung zur Straße
+func _gehweg(m:Vector2,k:int)->Array:
+	var S=spiel.welt.S;var best=null;var bd=1e9;var bi=0
+	for r in S.roads:
+		if not r.typ in ["strasse","allee","gasse"] or float(r.get("sw",0.0))<=0.0:continue
+		var P:PackedVector2Array=r.P
+		for i in range(0,P.size(),3):
+			var d=P[i].distance_to(m)
+			if d<bd:bd=d;best=r;bi=i
+	if best==null:return [m,Vector2(0,1)]
+	var P:PackedVector2Array=best.P;var i=clamp(bi+k*3,0,P.size()-2)
+	var t=(P[i+1]-P[i]).normalized();var n=Vector2(-t.y,t.x)*(1.0 if k%2==0 else -1.0)
+	var q=P[i]+n*(float(best.w)+float(best.sw)*0.6)
+	return [q,-n]
+func _blick(f,zu:Vector2):f.n.rotation.y=atan2(zu.x,zu.y)
+func _szene(o,art:String,m:Vector2):
+	var nacht=spiel.zeit/60.0<6.0 or spiel.zeit/60.0>=22.0
+	match art:
+		"bar","club":
+			var g=_gehweg(m,1);var q:Vector2=g[0];var zu:Vector2=g[1]
+			var tuer=_figur(o,"hqman",Color(0.05,0.05,0.06),[q-zu*1.0],"idle");_blick(tuer,zu)   # Türsteher
+			for k in (6 if nacht else 2):
+				_figur(o,["female","joe","daya","biker"][k%4],null,[q+Vector2(randf_range(-4,4),randf_range(-4,4))+zu*1.5],"dance" if nacht and k%2==0 else "talk")
+			if art=="club":
+				for k in 3:_figur(o,"biker",Color(0.1,0.08,0.06),[q+zu*3.0+Vector2(k*1.2,0)],"talk")
+				_auto(o,["c_harley_hoellenhunde","c_harley_sachsenriders","c_harley_elbewoelfe"][randi()%3],q+zu*5.0,randf()*TAU)
+		"gang":
+			var g=_gehweg(m,2);var q:Vector2=g[0]
+			for k in 5:
+				var a=k*TAU/5.0;var f=_figur(o,["daya","biker","joe"][k%3],[Color(0.45,0.1,0.55),Color(0.1,0.35,0.15)][k%2],[q+Vector2(cos(a),sin(a))*1.6],"talk" if k%2==0 else "idle")
+				f.n.rotation.y=atan2(-cos(a),-sin(a))
+		"strand":
+			for k in 6:_figur(o,["female","joe","daya"][k%3],[Color(0.95,0.85,0.2),Color(0.2,0.6,0.85),Color(0.9,0.3,0.3)][k%3],_zufall_um(m,25.0,3),"walk","",0.9)   # Badegäste
+			for k in 2:_figur(o,"joe",Color(0.1,0.3,0.6),[m+Vector2(8+k*1.3,4)],"talk")   # Surfer
+		"angler":
+			for k in 3:
+				var f=_figur(o,["joe","hqman","daya"][k],Color(0.3,0.33,0.2),[m+Vector2(k*6.0,0)],"idle");f.n.rotation.y=PI
+		"musiker":
+			var g=_gehweg(m,3);var f=_figur(o,"biker",null,[g[0]],"dance");_blick(f,g[1])
+			for k in 3:
+				var z=_figur(o,["female","joe","hqman"][k],null,[g[0]+g[1]*2.5+Vector2(k-1.0,0)],"idle");_blick(z,-g[1])
+		"obdachlos":
+			var g=_gehweg(m,4);var f=_figur(o,"joe",Color(0.3,0.26,0.2),[g[0]-g[1]*1.2],"idle");_blick(f,g[1])
+		"touristen":
+			var g=_gehweg(m,5)
+			for k in 4:_figur(o,["female","hqman"][k%2],[Color(0.95,0.95,0.9),Color(0.9,0.6,0.2)][k%2],[g[0]+Vector2(k*0.9,0),g[0]+Vector2(k*0.9+8,2)],"walk","",0.7)
+		"laden":
+			for k in 2:
+				var g=_gehweg(m,6+k*2);var f=_figur(o,"hqman",Color(0.6,0.15,0.12),[g[0]-g[1]*1.4],"idle");_blick(f,g[1])   # Verkäufer vor dem Laden
+		"baustelle":
+			var g=_gehweg(m,2)
+			for k in 3:_figur(o,["joe","daya","biker"][k],WESTE,[g[0]+Vector2(k*1.5,0)],"talk" if k==0 else "idle")
+			_auto(o,"c_lkw_bau",g[0]+g[1]*4.0,randf()*TAU)
+		"liefer":
+			var g=_gehweg(m,3);_auto(o,["c_transporter_post","c_transporter_weiss"][randi()%2],g[0]+g[1]*3.0,atan2(g[1].y,-g[1].x))
+			_figur(o,"joe",Color(0.95,0.75,0.1),[g[0],g[0]-g[1]*3.0],"walk","",1.0)
+		"taxistand":
+			var g=_gehweg(m,1)
+			for k in 3:_auto(o,"c_taxi",g[0]+g[1]*3.0+Vector2(g[1].y,-g[1].x)*k*5.0,atan2(g[1].y,-g[1].x))
+			_figur(o,"daya",null,[g[0]],"talk")
+		"bus":
+			var g=_gehweg(m,2)
+			for k in 4:
+				var f=_figur(o,["female","joe","hqman","daya"][k],null,[g[0]+Vector2(g[1].y,-g[1].x)*k*0.9],"idle");_blick(f,g[1])
+		"jogger":
+			var g=_gehweg(m,0);var g2=_gehweg(m,8)
+			for k in 2:_figur(o,["female","joe"][k],Color(0.2,0.5,0.9),[g[0],g2[0]],"walk","",2.6)

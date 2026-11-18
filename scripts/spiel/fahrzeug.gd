@@ -24,7 +24,76 @@ static func vorlage(k:String)->Node3D:
 		var p="res://assets/cache/autos/"+k+".scn"
 		if ResourceLoader.exists(p):_tmpl[k]=load(p).instantiate()   # vorbereitet: Räder einzeln, Front = +Z
 		else:_tmpl[k]=VH.make(k)
+		_zusammenfassen(_tmpl[k])
 	return _tmpl[k]
+
+# Leistung: alle Karosserieteile (ohne Räder) nach Material zu EINEM Mesh zusammenfassen (je Material eine Fläche)
+# und ein einfaches Fern-Mesh mit nur einem Material ab 80 m. Weniger Zeichenaufrufe pro Auto.
+static func _ist_rad(n:Node,root:Node)->bool:
+	var q=n
+	while q!=null and q!=root:
+		if String(q.name).begins_with("Rad"):return true
+		q=q.get_parent()
+	return false
+static func _zusammenfassen(root:Node3D):
+	var teile={}   # Material -> [V,N,UV,C,I]
+	var alle=[];var fern=[PackedVector3Array(),PackedVector3Array(),PackedColorArray()]
+	for mi in root.find_children("*","MeshInstance3D",true,false):
+		if mi.mesh==null or _ist_rad(mi,root) or not mi.visible:continue
+		var xf:Transform3D=root.global_transform.affine_inverse()*mi.global_transform if mi.is_inside_tree() else _rel(mi,root)
+		var ok=true
+		for si in mi.mesh.get_surface_count():
+			if mi.mesh.surface_get_primitive_type(si)!=Mesh.PRIMITIVE_TRIANGLES:ok=false
+		if not ok:continue
+		for si in mi.mesh.get_surface_count():
+			var m=mi.get_active_material(si)
+			var a=mi.mesh.surface_get_arrays(si)
+			var V:PackedVector3Array=a[Mesh.ARRAY_VERTEX];var N=a[Mesh.ARRAY_NORMAL];var UV=a[Mesh.ARRAY_TEX_UV];var CO=a[Mesh.ARRAY_COLOR];var I=a[Mesh.ARRAY_INDEX]
+			if not teile.has(m):teile[m]=[PackedVector3Array(),PackedVector3Array(),PackedVector2Array(),PackedColorArray(),PackedInt32Array()]
+			var t=teile[m];var b0=t[0].size()
+			for i in V.size():
+				t[0].append(xf*V[i]);t[1].append((xf.basis*(N[i] if N!=null and N.size()>i else Vector3.UP)).normalized())
+				t[2].append(UV[i] if UV!=null and UV.size()>i else Vector2.ZERO);t[3].append(CO[i] if CO!=null and CO.size()>i else Color(1,1,1))
+			if I!=null and I.size()>0:
+				for x in I:t[4].append(b0+x)
+			else:
+				for x in V.size():t[4].append(b0+x)
+			# Fern-Mesh: Farbe des Materials als Ecke-Farbe
+			var fc=Color(0.5,0.5,0.52)
+			if m is BaseMaterial3D:fc=m.albedo_color
+			elif m is ShaderMaterial:
+				for pn in ["farbe","albedo","albedo_color","grund"]:
+					var v=m.get_shader_parameter(pn)
+					if v is Color:fc=v;break
+			if m is BaseMaterial3D and m.cull_mode==BaseMaterial3D.CULL_FRONT:continue   # Kontur-Hülle nicht ins Fern-Mesh
+			var idx=I if I!=null and I.size()>0 else range(V.size())
+			for x in idx:fern[0].append(xf*V[x]);fern[1].append((xf.basis*(N[x] if N!=null and N.size()>x else Vector3.UP)).normalized());fern[2].append(fc)
+		alle.append(mi)
+	if alle.size()<2:return
+	var am=ArrayMesh.new();var n=0
+	for m in teile:
+		var t=teile[m];var arr=[];arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX]=t[0];arr[Mesh.ARRAY_NORMAL]=t[1];arr[Mesh.ARRAY_TEX_UV]=t[2];arr[Mesh.ARRAY_COLOR]=t[3];arr[Mesh.ARRAY_INDEX]=t[4]
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);am.surface_set_material(n,m);n+=1
+	for mi in alle:mi.get_parent().remove_child(mi);mi.queue_free()
+	var k=MeshInstance3D.new();k.name="Karosserie";k.mesh=am;root.add_child(k)
+	k.visibility_range_end=80.0;k.visibility_range_end_margin=8.0
+	var fm=ArrayMesh.new();var fa=[];fa.resize(Mesh.ARRAY_MAX)
+	fa[Mesh.ARRAY_VERTEX]=fern[0];fa[Mesh.ARRAY_NORMAL]=fern[1];fa[Mesh.ARRAY_COLOR]=fern[2]
+	if fern[0].size()>0:
+		fm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,fa)
+		var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.roughness=0.9
+		mat.diffuse_mode=BaseMaterial3D.DIFFUSE_TOON;mat.specular_mode=BaseMaterial3D.SPECULAR_DISABLED
+		fm.surface_set_material(0,mat)
+		var f=MeshInstance3D.new();f.name="Fern";f.mesh=fm;root.add_child(f)
+		f.visibility_range_begin=80.0;f.visibility_range_begin_margin=8.0;f.visibility_range_end=360.0
+		f.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+static func _rel(n:Node3D,root:Node3D)->Transform3D:
+	var xf=Transform3D();var q:Node=n
+	while q!=null and q!=root:
+		if q is Node3D:xf=q.transform*xf
+		q=q.get_parent()
+	return xf
 
 var hp:=1000.0
 var wrack:=false
@@ -277,6 +346,7 @@ var _spin:=0.0
 func sicht_grenzen(v:Node):
 	for n in v.find_children("*","GeometryInstance3D",true,false):
 		var nm:String=n.name
+		if nm=="Karosserie" or nm=="Fern":continue   # eigene Bereiche (nah bis 80 m, fern ab 80 m)
 		n.visibility_range_end=70.0 if nm.begins_with("Rad") else 240.0
 		if nm.begins_with("Rad"):n.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 func setup(k:String):
@@ -461,6 +531,26 @@ func ki_schritt(dt:float,hindernisse:Array):
 		if ahead<0:continue
 		var side=abs(d.dot(global_transform.basis.x))
 		if side<1.9:frei=min(frei,max(0.0,(dist-8.0)*0.9))
+		# Einsatzfahrzeug mit Blaulicht dicht hinter mir: rechts ranfahren und langsam werden
+	for o in hindernisse:
+		if o==self or not ("_blau" in o) or o._blau.is_empty():continue
+		var d2=o.global_position-me;d2.y=0
+		if d2.length()<30.0 and d2.dot(fw)<0.0:_platz=2.5
+	if _platz>0.0:_platz-=dt;frei=min(frei,3.0)
+	# Ampel am Straßenende (Kreuzung): Phasen grün/gelb/rot, an der Haltelinie warten
+	var L0=S.length(ki_road);var bis_ende=(L0-ki_s) if ki_dir>0 else ki_s
+	if bis_ende<26.0 and ki_road.typ in ["strasse","allee"]:
+		var rot=_ampel_rot(L0)
+		if rot and bis_ende>5.0:frei=min(frei,max(0.0,(bis_ende-7.0)*0.8))
+	else:_ampel_j=null
+	# blockiert: nach ein paar Sekunden hupen
+	if frei<0.5 and ki_speed<0.5 and _platz<=0.0 and bis_ende>9.0:
+		_steh+=dt
+		if _steh>4.0 and randf()<0.01:
+			_steh=0.0
+			var sp=get_parent()
+			if sp and "klang" in sp and sp.klang:sp.klang.signal_bei("hupe",global_position)
+	else:_steh=0.0
 	ki_speed=move_toward(ki_speed,frei,dt*(6.0 if frei<ki_speed else 2.5))
 	ki_s+=ki_speed*dt*ki_dir
 	if _ki_ton:_ki_ton.pitch_scale=clamp(1.0+ki_speed/14.0,0.8,3.0)
@@ -468,7 +558,22 @@ func ki_schritt(dt:float,hindernisse:Array):
 	if ki_s<2.0 or ki_s>L-2.0:_ki_weiter()
 	_ki_place(dt)
 
+var _platz:=0.0;var _steh:=0.0;var _rechts:=0.0;var _ampel_j=null;var _ampel_a:=true
+# Phase je Kreuzung: Straße a hat 13 s grün, 2 s gelb, dann Straße b (gleich lang)
+func _ampel_rot(L0:float)->bool:
+	if _ampel_j==null:
+		var pe=S.at(ki_road,L0 if ki_dir>0 else 0.0)[0]
+		for j in S.junctions:
+			if j.p.distance_to(pe)<16.0 and (S.roads[j.a]==ki_road or S.roads[j.b]==ki_road):
+				_ampel_j=j;_ampel_a=S.roads[j.a]==ki_road;break
+		if _ampel_j==null:_ampel_j={};return false
+	if _ampel_j.is_empty():return false
+	var t=fmod(Time.get_ticks_msec()/1000.0+float(abs(hash(_ampel_j.p)))*0.001,30.0)
+	var gruen_a=t<13.0
+	var gelb=(t>=13.0 and t<15.0) or t>=28.0
+	return gelb or (gruen_a!=_ampel_a)
 func _ki_weiter():
+	_ampel_j=null
 	# am Straßenende: an einer Kreuzung abbiegen, sonst wenden
 	var p=S.at(ki_road,clamp(ki_s,0.0,S.length(ki_road)))[0]
 	var opts=[]
@@ -501,7 +606,8 @@ func _lane(r)->float:
 func _ki_place(dt:float):
 	var a=S.at(ki_road,clamp(ki_s,0.0,S.length(ki_road)))
 	var t:Vector2=a[2]*ki_dir;var n=Vector2(-t.y,t.x)
-	var p:Vector2=a[0]+n*ki_lane    # Rechtsverkehr: n zeigt in Fahrtrichtung nach rechts
+	_rechts=move_toward(_rechts,1.3 if _platz>0.0 else 0.0,dt*1.5)
+	var p:Vector2=a[0]+n*(ki_lane+_rechts)    # Rechtsverkehr: n zeigt in Fahrtrichtung nach rechts
 	var y=a[1]+0.04
 	# Steigung der Straße übernehmen (sonst steckt bei Gefälle Bug oder Heck in der Fahrbahn)
 	var L=S.length(ki_road)

@@ -37,6 +37,7 @@ var welt;var st;var spieler;var kam;var hud;var mini
 var auto=null            # Fahrzeug, in dem der Spieler sitzt
 var ui:CanvasLayer
 var belebung=null
+var klang=null
 var biker=null
 var zug=null
 var _fps_l:Label;var _fps_t:=0.0;var _fps_max:=0.0;var _fps_n:=0
@@ -129,7 +130,7 @@ func _ready():
 	_zonen();_geldautomaten();_log("zonen ok")
 	wirt.setup();_log("wirtschaft ok")
 	story=load("res://scripts/spiel/story.gd").new();story.spiel=self;add_child(story);story.setup();_log("story ok")
-	_passanten_pool(22)
+	_passanten_pool(PASSANTEN_STUFE[_grafik()])
 	var r3=RandomNumberGenerator.new();r3.seed=99
 	_fahrer_ped=PE.make(PE.CIVIL[0],r3);add_child(_fahrer_ped);_fahrer_ped.visible=false
 	_log("passanten ok")
@@ -373,6 +374,7 @@ func _spieler():
 	wirt=WIRT.new();wirt.spiel=self;add_child(wirt)
 	if "comic" in welt:
 		if not "belebung" in _arg("--ohne"):belebung=load("res://scripts/spiel/belebung.gd").new();add_child(belebung);belebung.setup(self)
+		if not "klang" in _arg("--ohne"):klang=load("res://scripts/spiel/klang.gd").new();add_child(klang);klang.setup(self)
 		if not "biker" in _arg("--ohne"):biker=load("res://scripts/spiel/biker.gd").new();add_child(biker);biker.setup(self)
 		if "BAHN" in welt and not welt.BAHN.is_empty() and _arg("--ohnezug")=="":
 			zug=load("res://scripts/spiel/zug.gd").new();add_child(zug);zug.setup(self,welt.BAHN)
@@ -504,6 +506,8 @@ func _tageszeit():
 	var lm=welt.get_meta("lampen_mat",null) if welt.has_meta("lampen_mat") else (welt.LV.lampen_mat if welt.LV else null)
 	if lm:lm.emission_energy_multiplier=lerp(7.0,0.4,tag)
 	if auto!=null:auto.scheinwerfer(tag<0.45)
+	# Fenster leuchten nachts (Emission im Fenster-Shader, kein Licht)
+	RenderingServer.global_shader_parameter_set("nacht",clamp(1.0-tag*1.6,0.0,1.0))
 
 func uhrzeit_text()->String:
 	return "%02d:%02d"%[int(zeit/60.0)%24,int(zeit)%60]
@@ -758,7 +762,7 @@ const FARB_COMIC=["c_trabant_gruen","c_trabant_blau","c_trabant_beige","c_traban
 	"c_e30_gruen","c_e30_silber","c_e30_schwarz","c_luxus_schwarz","c_luxus_silber","c_muscle_orange","c_muscle_schwarz","c_suv_grau","c_suv_gruen","c_trabant_gruen","c_wartburg_blau"]
 var FARB=["small_car","taxi","mercedes","bmw_e30","audi_rs7","f100","small_car","mercedes","taxi","porsche911","polizei","bmw_e30",
 	"bmw_m8","audi_r8","jdm","supra","f100","dodge","small_car","audi_rs7","rtw","hudson","mercedes","hoonicorn","bugatti","taxi"]
-func _ziel_anzahl()->int:return [14,22,30][int(st.e.sichtweite)]
+func _ziel_anzahl()->int:return [20,30,45,60][_grafik()]
 func _verkehr_pflege(p:Vector3):
 	if "verkehr" in _arg("--ohne"):return
 	var p2=Vector2(p.x,p.z)
@@ -825,57 +829,164 @@ func _spawn_auto(p2:Vector2):
 		c.setup(k)
 		var dir=1 if rng.randf()<0.5 else -1
 		c.als_ki(r,s,dir,c._lane(r),welt.S)
+		# Einsatzfahrt: Blaulicht, Sirene, schneller – die anderen fahren rechts ran
+		if k in ["c_feuerwehr","c_rtw","c_polizei"] and rng.randf()<0.4:
+			c.blaulicht(true);c.ki_ziel*=1.5
+			if klang:klang.signal_bei("sirene",c.global_position)
 		verkehr.append(c)
 		return
 
 # ---------------- Passanten ----------------
+# Pool-Größe je Grafikstufe (Akku sparen / Mittel / Hoch / Ultra)
+const PASSANTEN_STUFE:=[30,50,70,90]
+# Dichte je Viertel (Mitte, Faktor); dazwischen 0,15. Nachts weniger, außer an Bars/Clubs (Innenstadt, Strand)
+const DICHTE_VIERTEL:=[[Vector2(250,-350),1.0],[Vector2(-150,-650),1.0],[Vector2(-2300,700),0.95],[Vector2(496,-168),0.8],
+	[Vector2(2550,850),0.7],[Vector2(250,1560),0.7],[Vector2(-262,1040),0.6],[Vector2(900,640),0.35],[Vector2(500,2090),0.35],
+	[Vector2(-1083,-504),0.5],[Vector2(-150,-1450),0.4],[Vector2(2900,-300),0.5],[Vector2(945,-5847),0.08],[Vector2(1828,-4937),0.05],
+	[Vector2(-2504,-8463),0.45],[Vector2(-1609,-9248),0.4],[Vector2(1752,-7559),0.45],[Vector2(-119,-9032),0.35],[Vector2(-600,-7000),0.03]]
+const NACHTLEBEN:=[Vector2(250,-350),Vector2(-2300,700),Vector2(-150,-650)]
+func _dichte(q:Vector2)->float:
+	var f=0.15;var bd=1e9
+	for e in DICHTE_VIERTEL:
+		var d=q.distance_to(e[0])
+		if d<bd and d<1300.0:bd=d;f=e[1]
+	var h=zeit/60.0
+	if h<6.0 or h>=22.0:
+		var bar=false
+		for b in NACHTLEBEN:
+			if q.distance_to(b)<500.0:bar=true;break
+		f*=0.7 if bar else 0.3
+	return f
+var _pool_rng:=RandomNumberGenerator.new()
 func _passanten_pool(n:int):
-	var r2=RandomNumberGenerator.new();r2.seed=11
-	for i in n:
-		var ps=PE.make(PE.CIVIL[i%PE.CIVIL.size()],r2);add_child(ps);ps.visible=false
-		var e={"n":ps,"r":null,"s":0.0,"dir":1,"seite":1,"v":r2.randf_range(1.1,1.6),"tot":0.0,"flucht":0.0}
-		var kb=PK.new();kb.spiel=self;kb.eintrag=e;kb.collision_layer=4;kb.collision_mask=0;kb.sync_to_physics=false
-		var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.28;cap.height=1.7;cs.shape=cap;cs.position.y=0.86;kb.add_child(cs)
-		add_child(kb);e["k"]=kb
-		passanten.append(e)
+	_pool_rng.seed=11
+	for i in n:_passant_neu()
+func _passant_neu():
+	var r2=_pool_rng;var i=passanten.size()
+	var ps=PE.make(PE.CIVIL[i%PE.CIVIL.size()],r2);add_child(ps);ps.visible=false
+	var e={"n":ps,"r":null,"s":0.0,"dir":1,"seite":1,"v":r2.randf_range(1.1,1.6),"tot":0.0,"flucht":0.0,
+		"id":i,"acc":0.0,"st":"laufen","t":r2.randf_range(8.0,30.0),"anim":"walk","sicht":true}
+	var kb=PK.new();kb.spiel=self;kb.eintrag=e;kb.collision_layer=4;kb.collision_mask=0;kb.sync_to_physics=false
+	var cs=CollisionShape3D.new();var cap=CapsuleShape3D.new();cap.radius=0.28;cap.height=1.7;cs.shape=cap;cs.position.y=0.86;kb.add_child(cs)
+	add_child(kb);e["k"]=kb
+	# Animation nur im Takt der Figur weiterrechnen (fern seltener), außerhalb des Bildes gar nicht
+	var ap:AnimationPlayer=ps.get_meta("anim",null)
+	if ap:ap.callback_mode_process=AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	var vn=VisibleOnScreenNotifier3D.new();vn.aabb=AABB(Vector3(-0.5,0,-0.5),Vector3(1,2,1));ps.add_child(vn)
+	vn.screen_entered.connect(func():e.sicht=true);vn.screen_exited.connect(func():e.sicht=false)
+	passanten.append(e)
+
+func _anim(e,a:String,sp:=1.0):
+	if e.anim==a:return
+	e.anim=a;PE.play(e.n,a,randf(),sp)
+
+# Verhalten (Zustände): laufen, joggen, stehen_und_reden, telefonieren, warten_an_ampel, fotografieren, shoppen,
+# essen_trinken, streiten, tanzen (nachts vor Bars), betteln. Sie bleiben auf dem Gehweg und fliehen bei Gefahr.
+const ZUSTAENDE:=[["stehen_und_reden","talk",0.22],["telefonieren","idle",0.16],["shoppen","idle",0.14],["fotografieren","idle",0.1],
+	["essen_trinken","idle",0.1],["streiten","shake",0.05],["warten_an_ampel","idle",0.15],["betteln","idle",0.03],["tanzen","dance",0.05]]
+func _neuer_zustand(e,q:Vector2):
+	var nacht=zeit/60.0<6.0 or zeit/60.0>=22.0
+	var x=randf()
+	if x<0.12 and not nacht:
+		e.st="joggen";e.t=randf_range(15.0,40.0);_anim(e,"run",0.75);return
+	if x<0.55:
+		e.st="laufen";e.t=randf_range(10.0,35.0);_anim(e,"walk");return
+	var summe=0.0
+	for z in ZUSTAENDE:summe+=z[2]
+	var w=randf()*summe
+	for z in ZUSTAENDE:
+		w-=z[2]
+		if w<=0.0:
+			if z[0]=="tanzen" and not nacht:break
+			e.st=z[0];e.t=randf_range(5.0,16.0);_anim(e,z[1])
+			# zu zweit reden/streiten: der nächste freie Laufende in der Nähe dreht sich zu
+			if z[0] in ["stehen_und_reden","streiten"]:
+				for o in passanten:
+					if o!=e and o.st=="laufen" and o.r==e.r and o.n.visible and o.n.global_position.distance_to(e.n.global_position)<6.0:
+						o.st=e.st;o.t=e.t;_anim(o,z[1]);o["partner"]=e;e["partner"]=o;break
+			return
+	e.st="laufen";e.t=randf_range(10.0,30.0);_anim(e,"walk")
 
 func _passanten_pflege(p:Vector3,dt:float):
 	if "passanten" in _arg("--ohne"):return
 	var p2=Vector2(p.x,p.z)
+	var ziel=PASSANTEN_STUFE[_grafik()]
+	# Pool wächst nach einer höheren Grafikstufe langsam nach (eine Figur alle 20 Bilder, kein Ruckeln)
+	if passanten.size()<ziel and Engine.get_process_frames()%20==0:_passant_neu()
+	var fr=Engine.get_process_frames()
+	var aktiv=0
 	for e in passanten:
 		var n=e.n
+		if e.id>=ziel:
+			if n.visible:n.visible=false;e.r=null
+			continue
 		if e.tot>0.0:
 			e.tot-=dt
 			if e.tot<=0.0 or Vector2(n.global_position.x,n.global_position.z).distance_to(p2)>170.0:
 				e.tot=0.0;e.r=null;n.visible=false;n.rotation.x=0.0;n.position.y=0.0
-				var ap:AnimationPlayer=n.get_meta("anim",null)
-				if ap:ap.play()
 			continue
-		if e.r==null or Vector2(n.global_position.x,n.global_position.z).distance_to(p2)>170.0:
-			# neu setzen: Gehweg in einem Stadtviertel 40–150 m entfernt
-			if Engine.get_process_frames()%3!=0:continue
+		var dist=Vector2(n.global_position.x,n.global_position.z).distance_to(p2) if e.r!=null else 1e9
+		if e.r==null or dist>150.0:
+			# neu setzen: Gehweg 40–150 m entfernt, je nach Viertel und Tageszeit mehr oder weniger Leute
+			if e.r!=null:e.r=null;n.visible=false
+			if (fr+e.id)%6!=0:continue
 			var r=welt.S.roads[rng.randi()%welt.S.roads.size()]
 			if not r.typ in ["strasse","allee","gasse"]:continue
 			var L=welt.S.length(r);var s=rng.randf()*L;var a=welt.S.at(r,s)
 			var d=a[0].distance_to(p2)
 			if d<40.0 or d>150.0 or welt.B.district(a[0])==null:continue
+			if rng.randf()>_dichte(a[0]):continue
 			if welt.has_method("bereit") and not welt.bereit(a[0]):continue
 			e.r=r;e.s=s;e.dir=1 if rng.randf()<0.5 else -1;e.seite=1 if rng.randf()<0.5 else -1
-			n.visible=true;PE.play(n,"walk",rng.randf())
+			e.acc=0.0;e.anim="";e.erase("partner");n.visible=true;_neuer_zustand(e,a[0])
+			continue
+		aktiv+=1
+		# Takt nach Entfernung: nah jedes Bild, mittel jedes 3., fern jedes 6.
+		e.acc+=dt
+		var takt=1 if dist<25.0 else (3 if dist<70.0 else 6)
+		if (fr+e.id)%takt!=0:continue
+		var t_=e.acc;e.acc=0.0
+		var ap:AnimationPlayer=n.get_meta("anim",null)
+		if ap and e.sicht:ap.advance(t_)
 		var r=e.r;var L=welt.S.length(r)
 		if e.flucht>0.0:
-			e.flucht-=dt
-			if e.flucht<=0.0:PE.play(n,"walk")
-		e.s+=e.v*dt*e.dir*(3.2 if e.flucht>0.0 else 1.0)
-		if e.s<3.0 or e.s>L-3.0:e.dir=-e.dir;e.s=clamp(e.s,3.0,L-3.0)
+			e.flucht-=t_
+			if e.flucht<=0.0:e.st="laufen";e.t=10.0;_anim(e,"walk")
+		else:
+			e.t-=t_
+			if e.t<=0.0:_neuer_zustand(e,Vector2(n.global_position.x,n.global_position.z))
+		var geht=e.flucht>0.0 or e.st in ["laufen","joggen"]
+		if geht:
+			e.s+=e.v*t_*e.dir*(3.2 if e.flucht>0.0 else (2.0 if e.st=="joggen" else 1.0))
+			if e.s<3.0 or e.s>L-3.0:
+				# am Straßenende (Kreuzung): kurz an der Ampel warten, dann umdrehen
+				e.dir=-e.dir;e.s=clamp(e.s,3.0,L-3.0)
+				if e.flucht<=0.0 and randf()<0.5:e.st="warten_an_ampel";e.t=randf_range(4.0,10.0);_anim(e,"idle")
 		var a=welt.S.at(r,e.s);var t:Vector2=a[2];var nn=Vector2(-t.y,t.x)
 		var q:Vector2=a[0]+nn*e.seite*(r.w+r.sw*0.55)
-		n.global_position=Vector3(q.x,a[1]+0.14,q.y);n.rotation.y=atan2(t.x*e.dir,t.y*e.dir)
+		n.global_position=Vector3(q.x,a[1]+0.14,q.y)
+		if geht:n.rotation.y=atan2(t.x*e.dir,t.y*e.dir)
+		elif e.has("partner") and is_instance_valid(e.partner.n) and e.partner.st==e.st:
+			var o=e.partner.n.global_position-n.global_position
+			if o.length()>0.3:n.rotation.y=atan2(o.x,o.z)
+		elif e.st in ["shoppen","fotografieren","telefonieren","betteln","essen_trinken"]:
+			# zum Haus bzw. zur Straße schauen
+			var zu=nn*e.seite*(1.0 if e.st in ["shoppen","fotografieren"] else -1.0)
+			n.rotation.y=atan2(zu.x,zu.y)
 		e.k.global_position=n.global_position
-		# vor dem Spieler-Auto zur Seite springen
+		# Autos ausweichen: vor dem Spieler-Auto zur Seite springen, vor schnellen Autos stehen bleiben und schauen
 		if auto!=null and auto.global_position.distance_to(n.global_position)<3.0 and auto.kmh()>15:
 			e.r=null;n.visible=false
 
+# Schüsse/Explosionen: alle Passanten in der Nähe rennen weg
+func passanten_schreck(p:Vector3,r:float):
+	for o in passanten:
+		if o.tot<=0.0 and o.n.visible and o.n.global_position.distance_to(p)<r:
+			if o.flucht<=0.0:o.dir=-o.dir
+			o.flucht=12.0;_anim(o,"run")
+	# Verkehr in der Nähe gibt Gas und fährt weg
+	for c in verkehr:
+		if is_instance_valid(c) and c.global_position.distance_to(p)<r:c.ki_ziel=min(c.ki_ziel*1.6,24.0)
 # Passant getroffen: fällt um, die anderen in der Nähe rennen weg
 func passant_treffer(e,von):
 	if e.tot>0.0 or not e.n.visible:return
@@ -887,7 +998,7 @@ func passant_treffer(e,von):
 	if von==spieler or (auto!=null and von==auto):kampf.verbrechen(0.7)
 	for o in passanten:
 		if o!=e and o.tot<=0.0 and o.n.visible and o.n.global_position.distance_to(n.global_position)<40.0:
-			o.flucht=12.0;o.dir=-o.dir;PE.play(o.n,"run")
+			o.flucht=12.0;o.dir=-o.dir;_anim(o,"run")
 
 # ---------------- Läden / Zonen ----------------
 var _tage:=0.0
