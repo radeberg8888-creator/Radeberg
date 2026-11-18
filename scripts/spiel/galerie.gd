@@ -675,7 +675,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				if not r.is_empty() and _tri_hg(w.x,w.z)>w.y+0.05:r={}
 				if not r.is_empty():
 					var luft=w.y-r.position.y
-					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))])
+					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))+" Ursprung y:"+str(snapped(gx.origin.y,0.01))+" Fuß:"+str(snapped(ab.position.y,0.01))+" q:"+str(q)])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.0:
@@ -713,7 +713,7 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				if rs.is_empty():continue
 				var ys=rs.position.y
 				# nur echtes Fehlen zählt (Treffer auf das Gelände statt auf eine Gehweg-/Platten-Kollision)
-				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)])
+				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)+" Straße:"+str(r.get("n","?"))+" w:"+str(w)+" sw:"+str(sw)+" i:"+str(i)+"/"+str(P.size())+" P:"+str(P[i])])
 				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
 				if rg.is_empty():continue
 				var yg=rg.position.y
