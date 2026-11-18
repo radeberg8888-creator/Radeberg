@@ -1292,13 +1292,33 @@ func _gelaende_und_daten(ND:Dictionary):
 		if not PL.has(key):PL[key]=[]
 		PL[key].append(p)
 	# Kollision: Fahrbahnen/Platten folgen dem Feld, Häuser sind fertig
-	var KK={}
+	var KK={};var n_lang=0
 	for i in range(0,L.KOLL_F.size(),3):
-		var a=L.KOLL_F[i];var b=L.KOLL_F[i+1];var c=L.KOLL_F[i+2]
-		a.y+=L.FY(a.x,a.z);b.y+=L.FY(b.x,b.z);c.y+=L.FY(c.x,c.z)
-		var key=schl.call((a+b+c)/3.0)
-		if not KK.has(key):KK[key]=PackedVector3Array()
-		KK[key].append_array([a,b,c])
+		# lange Dreiecke (flache Platten über hunderte Meter) in Stücke ≤ 40 m: sonst landet die Kollision in der
+		# Kachel ihres Schwerpunkts und fehlt, solange diese Kachel nicht geladen ist
+		var stapel=[[L.KOLL_F[i],L.KOLL_F[i+1],L.KOLL_F[i+2]]]
+		while not stapel.is_empty():
+			var t=stapel.pop_back();var a:Vector3=t[0];var b:Vector3=t[1];var c:Vector3=t[2]
+			var lab=Vector2(a.x-b.x,a.z-b.z).length();var lbc=Vector2(b.x-c.x,b.z-c.z).length();var lca=Vector2(c.x-a.x,c.z-a.z).length()
+			var lm=max(lab,max(lbc,lca))
+			if lm>40.0:
+				n_lang+=1
+				if lm==lab:
+					var m1=(a+b)*0.5
+					stapel.append([a,m1,c]);stapel.append([m1,b,c])
+				elif lm==lbc:
+					var m2=(b+c)*0.5
+					stapel.append([a,b,m2]);stapel.append([a,m2,c])
+				else:
+					var m3=(c+a)*0.5
+					stapel.append([a,b,m3]);stapel.append([m3,b,c])
+				continue
+			a.y+=L.FY(a.x,a.z);b.y+=L.FY(b.x,b.z);c.y+=L.FY(c.x,c.z)
+			var key=schl.call((a+b+c)/3.0)
+			if not KK.has(key):KK[key]=PackedVector3Array()
+			KK[key].append_array([a,b,c])
+	print("STADT Kollision lange Dreiecke geteilt ",n_lang)
+	for key in KK.keys():kachel.call(key)   # auch Kacheln ohne sichtbare Teile bekommen ihre Kollision
 
 	for i in range(0,L.KOLL_N.size(),3):
 		var key=schl.call((L.KOLL_N[i]+L.KOLL_N[i+1]+L.KOLL_N[i+2])/3.0)
