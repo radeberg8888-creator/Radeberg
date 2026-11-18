@@ -541,6 +541,16 @@ func _stadt_bauen(faces:Array,d):
 		var s=_stil_von(pc)
 		if s=="fassade" or s=="sued":fass.append(pc)
 		else:kit.append([pc,s])
+	# Diagnose: in welcher Fläche liegen die letzten Prüf-Funde?
+	for wp in [Vector2(245.83,2056.98),Vector2(899.49,401.78),Vector2(2770.02,-125.65),Vector2(-2240.14,688.91),Vector2(-75.17,989.18),Vector2(2357.21,974.78),Vector2(690.07,-179.32)]:
+		var lp=wp-C;var art="keine"
+		for pc in fass:
+			if Geometry2D.is_point_in_polygon(lp,pc):art="fassade";break
+		for e in kit:
+			if Geometry2D.is_point_in_polygon(lp,e[0]):art="bausatz_"+e[1];break
+		for pc in rand:
+			if Geometry2D.is_point_in_polygon(lp,pc):art="rand";break
+		print("DIAG Fläche bei ",wp,": ",art)
 	var dump={"fass":[],"kit":[],"rand":[]}
 	for pc in fass:dump.fass.append(Array(pc).map(func(v):return [v.x+CX,v.y+CZ]))
 	for e in kit:dump.kit.append({"s":e[1],"P":Array(e[0]).map(func(v):return [v.x+CX,v.y+CZ])})
@@ -574,6 +584,30 @@ func _stadt_bauen(faces:Array,d):
 		if nb%10==0:L._fertig(false)
 		if nb%50==0:print("  Fassadenblöcke ",nb,"/",fass.size()," Häuser ",nh," RAM ",OS.get_static_memory_usage()/1048576)
 	BER["haeuser_fassade"]=nh
+	# Randflächen (kaum Stadtfläche, ohne Platte): wenigstens den Gehwegstreifen entlang der Straßen pflastern –
+	# sonst steht der Gehweg der Straße dort auf dem Gelände (ohne Kollision, Rasenstreifen am Bordstein)
+	var swb={"allee":3.5,"strasse":2.5,"gasse":1.2,"land":1.6}
+	var baender=[]
+	for r in NETZ:
+		for b in _baender(r.P,r.w+swb.get(r.typ,2.5)+0.3):baender.append([b,L._bbox(b)])
+	var n_rand=0
+	for pc in rand:
+		var bb=L._bbox(pc);var fertig=[]
+		for e in baender:
+			if not bb.intersects(e[1]):continue
+			for x in Geometry2D.intersect_polygons(pc,e[0]):
+				if Geometry2D.is_polygon_clockwise(x):continue
+				var teile=[x]
+				for f in fertig:
+					var t2=[]
+					for t in teile:
+						for y in Geometry2D.clip_polygons(t,f):
+							if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+					teile=t2
+				for t in teile:
+					if abs(L._flaeche2(t))<0.3:continue
+					L._platte(t,-1.2,L.KB-0.02,L.M.pflaster,L.M.stein);fertig.append(t);n_rand+=1
+	print("RANDGEHWEGE gepflastert ",n_rand)
 	var nsl=0
 	for e in _SL:
 		if abs(L._flaeche2(e[0]))<0.3:continue
