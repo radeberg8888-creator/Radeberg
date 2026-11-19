@@ -2437,7 +2437,7 @@ func _block(pc:PackedVector2Array)->int:
 					var l2=_parzellen(q2,in2,11.0);var a2=l2.map(func(x):return x[0])
 					for lot in l2:
 						_gebaeude(lot[0],q2,in2,rng.randi_range(2,4),lot[1],a2);anz+=1
-					for x in in2:_hof2(x,true)
+					for x in in2:_hof2(x,true,-1.0)   # Belag liegt schon (äußerer Hof)
 					continue
 			_hof2(q,true)
 	return anz
@@ -2680,12 +2680,16 @@ func _fenster_klein(o:Vector3,r:Vector3,a:Vector3,w:float,y:float,stil:Dictionar
 	box(M.stein,o+r*(w*0.5)+Vector3(0,y-0.05,0)+a*0.12,Vector3(fw+0.3,0.1,0.24),b,0.02)
 
 var _hofbelag:Material
-func _hof2(q:PackedVector2Array,deko:=true):
-	if _hofbelag==null:_hofbelag=_shader(ASPHALT,{"farbe":Color(0.42,0.41,0.4)})
+func _hof2(q:PackedVector2Array,deko:=true,yh:=0.025):
+	# Hofbelag 2,5 cm über dem Gehwegpflaster (gewollte Kante, kein Z-Fighting), begehbar; yh<0: nur Deko
+	# (Höhe bleibt unter KB+0.03, sonst folgt die Fläche nicht dem Gelände)
+	if _hofbelag==null:_hofbelag=_shader(ASPHALT,{"farbe":Color(0.42,0.41,0.4)});_hofbelag.resource_name="hofbelag"
 	var s=_st(_hofbelag,true)
-	var idx=Geometry2D.triangulate_polygon(q)
+	var idx=Geometry2D.triangulate_polygon(q) if yh>=0.0 else PackedInt32Array()
+	var ak=koll_an;koll_an=true;var bt=boden_teil;boden_teil=8.0 if hoehen_an else 0.0
 	for i in range(0,idx.size(),3):
-		_tri(s,Vector3(q[idx[i]].x,KB+0.012,q[idx[i]].y),Vector3(q[idx[i+1]].x,KB+0.012,q[idx[i+1]].y),Vector3(q[idx[i+2]].x,KB+0.012,q[idx[i+2]].y),Vector3.UP)
+		_tri(s,Vector3(q[idx[i]].x,KB+yh,q[idx[i]].y),Vector3(q[idx[i+1]].x,KB+yh,q[idx[i+1]].y),Vector3(q[idx[i+2]].x,KB+yh,q[idx[i+2]].y),Vector3.UP)
+	koll_an=ak;boden_teil=bt
 	if not deko:return
 	var rand=Geometry2D.offset_polygon(q,-3.0)
 	if rand.is_empty():return
@@ -2706,7 +2710,7 @@ func _hof2(q:PackedVector2Array,deko:=true):
 		var rr=[2.2,1.4,2.6,1.5,1.2,2.4][art]
 		if not platz.call(p,rr):continue
 		belegt.append([p,rr])
-		var y=KB+0.012
+		var y=KB+0.025   # auf dem Hofbelag
 		match art:
 			0:_baum(Vector3(p.x,y,p.y))
 			1:_container(Vector3(p.x,y,p.y),rng.randf()*TAU,[Color(0.18,0.42,0.3),Color(0.2,0.3,0.55),Color(0.55,0.5,0.2)][rng.randi()%3])

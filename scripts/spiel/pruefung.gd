@@ -88,6 +88,10 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 			var th=G._tri_hg(m.x,m.z)
 			var dh=m.y-th
 			if abs(dh)<0.006 or dh>1.5 or dh<-0.6:continue
+			# keine Bodenfläche: aufgemalte Markierung, Bankett (taucht gewollt unter das Gelände), Sockel-Oberseiten,
+			# Teile unter dem Boden eines Bausatzes (verdeckt)
+			if name.begins_with("markierung") or name.begins_with("stein_d") or name.contains("sockel"):continue
+			if nur_waende and m.y<xf.origin.y+0.10:continue
 			# Bausätze: nur große, niedrige Flächen (Veranda, Terrasse, Einfahrt, Stufen) – keine Tische/Töpfe
 			if nur_waende and (sqrt(l2)*0.5<0.3 or dh>0.9 or name.begins_with("K_")):continue
 			var ti=BO.size();BT.append_array([a,b,c]);BO.append(oid)
@@ -183,8 +187,11 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					var e1=_top_o(x-d.x,z-d.y);var e2=_top_o(x+d.x,z+d.y)
 					var s2=abs(e1[0]+e2[0]-2.0*top)
 					if s2<=0.025 or s2>=0.10:continue
+					# Fehler: Stufe innerhalb derselben Fläche oder zwischen Stücken desselben Materials;
+					# zwischen verschiedenen Materialien (Bordstein, Hofbelag, Rasenkante) ist die Kante gewollt
 					var gleich=(e1[1]==ot and e2[1]==ot)
-					if gleich or s2<0.04:
+					var gleich_mat=e1[1]>=0 and e2[1]>=0 and _kurz(e1[1])==_kurz(ot) and _kurz(e2[1])==_kurz(ot)
+					if gleich or gleich_mat:
 						FUNDE.append(["Boden:"+_kurz(ot),"Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")]);break
 			else:
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
@@ -269,10 +276,14 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 
 # Unterkante einer senkrechten Fläche, die den Punkt (bis 0,3 m Abstand) überdeckt; sonst die Punkthöhe
 func _weiter_unten(P:Vector3)->float:
-	var k=Vector2i(int(floor(P.x/2.0)),int(floor(P.z/2.0)))
+	var k0=Vector2i(int(floor(P.x/2.0)),int(floor(P.z/2.0)))
 	var best=P.y+0.04
-	if not VG.has(k):return best
-	for vi in VG[k]:
+	var liste=[]
+	for dx in [-1,0,1]:
+		for dz in [-1,0,1]:
+			var kk=k0+Vector2i(dx,dz)
+			if VG.has(kk):liste.append_array(VG[kk])
+	for vi in liste:
 		var a=VT[vi*3];var b=VT[vi*3+1];var c=VT[vi*3+2]
 		var lo=min(a.y,min(b.y,c.y));var hi=max(a.y,max(b.y,c.y))
 		if P.y<lo or P.y>hi or lo>=best:continue

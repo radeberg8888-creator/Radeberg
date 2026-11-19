@@ -86,6 +86,7 @@ static func _mat(m:StandardMaterial3D)->Material:
 	if _shader==null:_shader=Shader.new();_shader.code=CODE
 	if _shader_b==null:_shader_b=Shader.new();_shader_b.code=CODE.replace("render_mode diffuse_toon,","render_mode cull_disabled,diffuse_toon,")
 	var s=ShaderMaterial.new();s.shader=_shader_b if beid else _shader
+	s.resource_name=m.resource_name   # Name bleibt (Prüfung nennt das Material)
 	s.set_shader_parameter("farbe",m.albedo_color)
 	s.set_shader_parameter("vfarbe",m.vertex_color_use_as_albedo)
 	for t in TEX:s.set_shader_parameter("t_"+t,_tex(t))
