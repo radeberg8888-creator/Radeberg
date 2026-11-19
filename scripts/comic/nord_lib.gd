@@ -152,6 +152,26 @@ func _rang(ri:int)->int:   # Vorfahrt beim Höhenangleich: kleinere Zahl = besti
 	if r.stadt:return 3
 	return 4 if r.get("belag","")=="schotter" else 5
 func _vor(rj:int,ri:int)->bool:return _rang(rj)<_rang(ri) or (_rang(rj)==_rang(ri) and rj<ri)
+# Fahrbahn-Vierecke vorrangiger Straßen, die das Viereck q berühren
+func _fremde_quads(q:PackedVector2Array,ri:int)->Array:
+	var bb=Rect2(q[0],Vector2.ZERO)
+	for v in q:bb=bb.expand(v)
+	var out=[];var gesehen={}
+	for x in range(int(floor(bb.position.x/20.0))-1,int(floor(bb.end.x/20.0))+2):
+		for z in range(int(floor(bb.position.y/20.0))-1,int(floor(bb.end.y/20.0))+2):
+			for sg in SEG.get(Vector2i(x,z),[]):
+				if sg.x==ri or not _vor(sg.x,ri) or gesehen.has(sg):continue
+				gesehen[sg]=true
+				var r=ROADS[sg.x];var P:PackedVector2Array=r.P;var n=P.size();var j=sg.y
+				if j+1>=n:continue
+				var d=(P[j+1]-P[j]).normalized();var nn=Vector2(-d.y,d.x)
+				var a=P[j]-(d*r.w*0.6 if j==0 else Vector2.ZERO);var b=P[j+1]+(d*r.w*0.6 if j+1==n-1 else Vector2.ZERO)
+				var f=PackedVector2Array([a+nn*r.w,b+nn*r.w,b-nn*r.w,a-nn*r.w])
+				if Geometry2D.is_polygon_clockwise(f):f.reverse()
+				var fb=Rect2(f[0],Vector2.ZERO)
+				for v in f:fb=fb.expand(v)
+				if fb.intersects(bb) and not Geometry2D.intersect_polygons(q,f).is_empty():out.append(f)
+	return out
 func _y_fremd(p:Vector2,ri:int,rand:float)->float:
 	# niedrigste Fahrbahnhöhe einer vorrangigen Straße, die den Punkt überdeckt (INF = keine)
 	var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)));var y=INF
@@ -1367,7 +1387,33 @@ func fahrbahnen():
 			a3.y=min(a3.y,_y_fremd(Vector2(a3.x,a3.z),ri,0.3)+0.03);b3.y=min(b3.y,_y_fremd(Vector2(b3.x,b3.z),ri,0.3)+0.03)
 			Ls.append(a3);Rs.append(b3)
 		for i in n-1:
-			L._tri(so,Ls[i],Ls[i+1],Rs[i+1],Vector3.UP);L._tri(so,Ls[i],Rs[i+1],Rs[i],Vector3.UP)
+			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
+			var q=PackedVector2Array([Vector2(Ls[i].x,Ls[i].z),Vector2(Ls[i+1].x,Ls[i+1].z),Vector2(Rs[i+1].x,Rs[i+1].z),Vector2(Rs[i].x,Rs[i].z)])
+			if Geometry2D.is_polygon_clockwise(q):q.reverse()
+			var fremd=_fremde_quads(q,ri)
+			if fremd.is_empty():
+				L._tri(so,Ls[i],Ls[i+1],Rs[i+1],Vector3.UP);L._tri(so,Ls[i],Rs[i+1],Rs[i],Vector3.UP)
+				continue
+			var teile=[q]
+			for f in fremd:
+				var t2=[]
+				for t in teile:
+					for y in Geometry2D.clip_polygons(t,f):
+						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+				teile=t2
+			for t in teile:
+				var idx=Geometry2D.triangulate_polygon(t)
+				for k in range(0,idx.size(),3):
+					var V=[]
+					for m in 3:
+						var pv:Vector2=t[idx[k+m]]
+						var a=P[i];var b=P[i+1]
+						var tt=clamp((pv-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
+						var yv=lerp(Y[i],Y[i+1],tt)+0.06
+						var yf=_y_fremd(pv,ri,0.3)
+						if yf<INF:yv=min(yv,yf+0.03)
+						V.append(Vector3(pv.x,yv,pv.y))
+					L._tri(so,V[0],V[1],V[2],Vector3.UP)
 		# Bankett: schräg vom Fahrbahnrand 2,6 m nach außen ins Gelände (statt senkrechter Kante)
 		if not r.stadt:
 			# Bankett in der Farbe der Umgebung (Wüste: Sand/Schotter statt grünem Streifen)
@@ -1454,6 +1500,8 @@ func _sackgassen_enden(so,sk,jr:Dictionary)->int:
 				if P[e].distance_to(kk[1])<kk[2]+r.w:frei=false;break
 			if not frei:continue
 			var d:Vector2=(P[0]-P[1]).normalized() if e==0 else (P[n-1]-P[n-2]).normalized()
+			# keine echte Sackgasse, wenn dort eine andere Straße weiterläuft oder anschließt
+			if auf_fahrbahn(P[e]+d*(r.w*0.6+1.0),ri,0.5) or auf_fahrbahn(P[e]+d*(r.w*0.6+r.sw*0.5),ri,0.5):continue
 			var nn=Vector2(-d.y,d.x);var y=Y[e]+0.11;var ex=r.w*0.6;var w=r.w;var sw=r.sw
 			var Q=func(a:Vector2,b:Vector2,c:Vector2,dd:Vector2):
 				L._tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)

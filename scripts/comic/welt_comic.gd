@@ -61,7 +61,7 @@ func aus_cache():
 	B=CB.new();B.rect=d.rect
 	A=CA.new();A.shops=d.shops
 	PARKEN=d.parken
-	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB),"baut":false,"weg_jetzt":false})
+	for v in d.get("viertel",[]):VIERTEL.append({"name":v.name,"datei":v.datei,"rect":v.rect,"node":null,"laed":false,"ab":v.get("ab",LADEN_AB),"weg":v.get("weg",ENTLADEN_AB),"baut":false,"weg_jetzt":false,"bau_id":0})
 	BAHN=d.get("bahn",[])
 	SUED_RECT=d.get("sued_rect",Rect2());IMMO=d.get("immo",[]);DIENSTE=d.get("dienste",[]);NATUR_ORTE=d.get("natur_orte",[]);WELT_ID=str(d.get("welt_id",""))
 
@@ -78,11 +78,12 @@ func _process(dt:float):
 			if st==ResourceLoader.THREAD_LOAD_LOADED:
 				# Szene im Hintergrund-Thread aufbauen, nur das Einhängen passiert im Hauptthread
 				var ps:PackedScene=ResourceLoader.load_threaded_get(v.datei);v.laed=false;v.baut=true
+				v.bau_id=v.get("bau_id",0)+1;var id=v.bau_id
 				WorkerThreadPool.add_task(func():
 					var n=ps.instantiate()
 					_stil_mx.lock();stil(n);_stil_mx.unlock()   # Materialumstellung im Hintergrund, nicht im Bild-Takt
 					n.set_meta("stil",true)
-					_eingesetzt.call_deferred(v,n))
+					_eingesetzt.call_deferred(v,n,id))
 				break
 			elif st!=ResourceLoader.THREAD_LOAD_IN_PROGRESS:v.laed=false
 	if _vt>0.0:return
@@ -104,7 +105,9 @@ static func puffer_setzen(n:Node):
 			var b:PackedFloat32Array=m.get_meta("puffer")
 			if m.multimesh.instance_count!=b.size()/12:m.multimesh.instance_count=b.size()/12
 			m.multimesh.buffer=b
-func _eingesetzt(v,n:Node):
+func _eingesetzt(v,n:Node,id:=0):
+	# nur der zuletzt gestartete Aufbau zählt; ältere oder überholte werden verworfen (sonst Kachel doppelt)
+	if id!=v.get("bau_id",0):n.queue_free();return
 	v.baut=false
 	if v.node!=null or v.get("weg_jetzt",false):
 		v.weg_jetzt=false;n.queue_free();return
@@ -115,7 +118,7 @@ func _eingesetzt(v,n:Node):
 func viertel_jetzt(p:Vector2):
 	for v in VIERTEL:
 		if v.node==null and _rect_abst(v.rect,p)<v.ab:
-			if v.baut:v.weg_jetzt=true   # Hintergrund-Aufbau verwerfen, jetzt direkt
+			if v.baut:v.bau_id+=1;v.baut=false   # Hintergrund-Aufbau verwerfen, jetzt direkt
 			if v.laed:
 				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()

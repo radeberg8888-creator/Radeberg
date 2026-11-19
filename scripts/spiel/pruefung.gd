@@ -84,7 +84,7 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 		var nv=-cr/sqrt(l2)
 		var m=(a+b+c)/3.0
 		if Vector2(m.x,m.z).distance_to(mitte)>radius:continue
-		if nv.y>0.9:
+		if nv.y>0.985:   # Boden ist fast eben (höchstens ~17 % Gefälle); Markisen/Dächer/Böschungen nicht
 			var th=G._tri_hg(m.x,m.z)
 			var dh=m.y-th
 			if abs(dh)<0.006 or dh>1.5 or dh<-0.6:continue
@@ -199,7 +199,9 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				for d in [Vector2(0.6,0),Vector2(0,0.6)]:
 					var h1=oben(x-d.x,z-d.y);var h2=oben(x+d.x,z+d.y)
 					if h1>th+0.05 and h2>th+0.05:
-						FUNDE.append(["Boden","Luecke",min(h1,h2)-th,Vector3(x,th,z),"zwischen Platten"]);break
+						var e1=hoehen(x-d.x,z-d.y);var e2=hoehen(x+d.x,z+d.y)
+						var nm1=_kurz(BO[e1[0][1]]) if e1.size()>0 else "?";var nm2=_kurz(BO[e2[0][1]]) if e2.size()>0 else "?"
+						FUNDE.append(["Boden:"+nm1+"|"+nm2,"Luecke",min(h1,h2)-th,Vector3(x,th,z),"zwischen "+nm1+" und "+nm2,Vector3(x+1.2,th+3.2,z+1.2)]);break
 			z+=1.0
 		x+=1.0
 	# a) Wände, Mauern, Hecken, Zäune: Unterkante alle 1 m gegen den Boden darunter
@@ -220,6 +222,11 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 			var r=G._strahl(Vector3(q.x,unten+0.3,q.z),Vector3(q.x,unten-40.0,q.z),true)
 			if r.is_empty():continue
 			var luft=unten-r.position.y
+			# Türen/Fenster/Sockel: trägt der Boden direkt davor (außen), ist von außen keine Lücke zu sehen
+			if luft>0.10:
+				var qa=p+nv*0.08
+				var ra=G._strahl(Vector3(qa.x,unten+0.3,qa.z),Vector3(qa.x,unten-40.0,qa.z),true)
+				if not ra.is_empty():luft=min(luft,unten-ra.position.y)
 			if luft>0.10 and luft<5.0:
 				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)+" Unterkante y:"+str(snapped(unten,0.01))+" Treffer y:"+str(snapped(r.position.y,0.01)),p+nv*7.0+Vector3(0,0.6,0)]);break
 	# e) offene Häuser: von den Straßen aus in 8 Richtungen schauen

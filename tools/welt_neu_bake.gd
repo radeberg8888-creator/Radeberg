@@ -1868,19 +1868,31 @@ func _deko_auf_boden():
 				var x=buf[m*12+3];var y=buf[m*12+7];var z=buf[m*12+11]
 				if not STADT.has_point(Vector2(x,z)+C):continue
 				n_gesamt+=1
-				var boden=-INF
-				var zelle=Vector2i(int(floor(x/Z)),int(floor(z/Z)))
-				if idx.has(zelle):
-					var T:PackedVector3Array=idx[zelle]
-					for t in range(0,T.size(),3):
-						var h=_tri_hoehe(T[t],T[t+1],T[t+2],x,z)
-						if is_nan(h):continue
-						if h<=y+0.25 and h>=y-1.5 and h>boden:boden=h
-				var hg=_stadt_gelaende(x+C.x,z+C.y)
-				if hg<=y+0.25 and hg>=y-1.5 and hg>boden:boden=hg
-				if boden>-INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
+				# Boden unter der Mitte und unter den Ecken der Standfläche: der tiefste trägt (am Hang
+				# steht sonst ein Pfosten/Bein in der Luft, der andere steckt minimal im Boden)
+				var pkt=[Vector2(x,z)]
+				if fu.size.x>0.5 or fu.size.y>0.5:
+					for cc in [fu.position,Vector2(fu.end.x,fu.position.y),fu.end,Vector2(fu.position.x,fu.end.y)]:
+						pkt.append(Vector2(buf[m*12]*cc.x+buf[m*12+2]*cc.y+x,buf[m*12+8]*cc.x+buf[m*12+10]*cc.y+z))
+				var boden=INF
+				for q in pkt:
+					var bq=_deko_boden(idx,Z,q.x,q.y,y)
+					if bq>-INF:boden=min(boden,bq)
+				if boden<INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
 			L.INSTG[key][tk]=buf
 	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt," | Stadtboden geteilt ",L.N_TEIL)
+func _deko_boden(idx:Dictionary,Z:float,x:float,z:float,y:float)->float:
+	var boden=-INF
+	var zelle=Vector2i(int(floor(x/Z)),int(floor(z/Z)))
+	if idx.has(zelle):
+		var T:PackedVector3Array=idx[zelle]
+		for t in range(0,T.size(),3):
+			var h=_tri_hoehe(T[t],T[t+1],T[t+2],x,z)
+			if is_nan(h):continue
+			if h<=y+0.25 and h>=y-1.5 and h>boden:boden=h
+	var hg=_stadt_gelaende(x+C.x,z+C.y)
+	if hg<=y+0.25 and hg>=y-1.5 and hg>boden:boden=hg
+	return boden
 func _tri_hoehe(a:Vector3,b:Vector3,c:Vector3,x:float,z:float)->float:
 	# Höhe des Dreiecks an (x,z), NAN wenn außerhalb
 	var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)

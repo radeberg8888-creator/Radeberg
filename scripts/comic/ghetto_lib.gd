@@ -159,8 +159,9 @@ func parzelle(i:int,sd:int,xa:float,xb:float):
 	var P=func(px,py,pz):return front+rechts*px+Vector3.UP*py-aussen*pz   # pz: von der Straße weg
 	# Boden: verdorrter Rasen / Dreck
 	var gras=[T(Color(0.52,0.53,0.3)),T(Color(0.47,0.45,0.27)),T(Color(0.56,0.5,0.32))][rng.randi()%3]
-	L.box(gras,Vector3(xm,kb+0.012,(zf+zb)*0.5),Vector3(w,0.02,tief),Basis(),0.0)
-	if rng.randf()<0.6:L.box(T(Color(0.42,0.33,0.22)),P.call(rng.randf_range(-2,2),0.03,rng.randf_range(1.5,3.0)),Vector3(rng.randf_range(2,5),0.02,rng.randf_range(1.2,2.4)),Y(yaw),0.0)
+	# Rasen/Dreck jeweils 3 cm übereinander (kein Z-Fighting mit dem Grundstücksboden)
+	L.box(gras,Vector3(xm,kb+0.03,(zf+zb)*0.5),Vector3(w,0.02,tief),Basis(),0.0)
+	if rng.randf()<0.6:L.box(T(Color(0.42,0.33,0.22)),P.call(rng.randf_range(-2,2),0.06,rng.randf_range(1.5,3.0)),Vector3(rng.randf_range(2,5),0.02,rng.randf_range(1.2,2.4)),Y(yaw),0.0)
 	var art=rng.randf()
 	var farben=[Color(0.55,0.62,0.64),Color(0.74,0.68,0.54),Color(0.6,0.64,0.52),Color(0.7,0.56,0.5),Color(0.62,0.58,0.66),Color(0.78,0.74,0.62),Color(0.5,0.55,0.6),Color(0.68,0.5,0.42)]
 	if art<0.82:
@@ -277,7 +278,7 @@ func ecke(i:int,j:int,sx:int,sd:int):
 	var zf=front_z(i,sd,(x_in+x_out)*0.5);var zb=back_z(i,sd,(x_in+x_out)*0.5) if hat_gasse else zf+sd*12.0
 	var xa=min(x_in,x_out);var xb=max(x_in,x_out);var xm=(xa+xb)*0.5;var w=xb-xa
 	var zm=(zf+zb)*0.5;var tief=abs(zb-zf)
-	L.box(T(Color(0.45,0.44,0.4)),Vector3(xm,L.KB+0.012,zm),Vector3(w,0.02,tief),Basis(),0.0)
+	L.box(T(Color(0.45,0.44,0.4)),Vector3(xm,L.KB+0.03,zm),Vector3(w,0.02,tief),Basis(),0.0)
 	var aussen=Vector3(0,0,-sd);var yaw=atan2(aussen.x,aussen.z)
 	if rng.randf()<0.6:
 		# Eckladen, Front zur Ost-West-Straße
