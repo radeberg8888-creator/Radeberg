@@ -8,6 +8,7 @@ const STEU=preload("res://scripts/spiel/steuerung.gd")
 const SPIELER=preload("res://scripts/spiel/spieler.gd")
 const KAM=preload("res://scripts/spiel/kamera.gd")
 const AUTO=preload("res://scripts/spiel/fahrzeug.gd")
+const STILK=preload("res://scripts/stil.gd")
 const HUD=preload("res://scripts/spiel/hud.gd")
 const MINI=preload("res://scripts/spiel/minimap.gd")
 const PE=preload("res://scripts/people.gd")
@@ -873,6 +874,7 @@ func _passant_neu():
 	var ap:AnimationPlayer=ps.get_meta("anim",null)
 	if ap:ap.callback_mode_process=AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	var vn=VisibleOnScreenNotifier3D.new();vn.aabb=AABB(Vector3(-0.5,0,-0.5),Vector3(1,2,1));ps.add_child(vn)
+	var fs=STILK.fleck(Vector2(0.9,0.9));fs.position.y=0.03;ps.add_child(fs)
 	vn.screen_entered.connect(func():e.sicht=true);vn.screen_exited.connect(func():e.sicht=false)
 	passanten.append(e)
 
