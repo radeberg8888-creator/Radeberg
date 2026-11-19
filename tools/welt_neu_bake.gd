@@ -783,7 +783,10 @@ func _ampeln(bl:Array):
 # ---------------- Bahn ----------------
 func _bahn_bauen():
 	var schotter=L._toon(Color(0.52,0.48,0.44));var schwelle=L._toon(Color(0.38,0.28,0.2));var schiene=L._toon(Color(0.55,0.56,0.6),0.3)
+	var schw_ort={}   # 2-m-Zelle -> [[Mitte, Gleis-Nr, s]] der schon gelegten Schwellen
+	var gnr=0
 	for b in BAHN:
+		gnr+=1
 		var P:PackedVector2Array=b.P;var S:PackedFloat32Array=b.S;var Lg=S[S.size()-1]
 		for bb in _baender(P,2.6):
 			var teile=[bb]
@@ -801,7 +804,16 @@ func _bahn_bauen():
 			var im=false
 			for u in UEBERGANG:
 				if u.p.distance_to(p)<u.r.w+1.6:im=true
-			if not im:L.box(schwelle,Vector3(p.x,0.16,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
+			# wo zwei Gleise sich überlagern (Weiche, Parallelstück), nur die Schwellen des ersten Gleises
+			var zk=Vector2i(int(floor(p.x/2.0)),int(floor(p.y/2.0)))
+			for dx in [-1,0,1]:
+				for dz in [-1,0,1]:
+					for o in schw_ort.get(zk+Vector2i(dx,dz),[]):
+						if o[0].distance_to(p)<2.6 and (o[1]!=gnr or abs(o[2]-s)>3.0):im=true
+			if not im:
+				L.box(schwelle,Vector3(p.x,0.16,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
+				if not schw_ort.has(zk):schw_ort[zk]=[]
+				schw_ort[zk].append([p,gnr,s])
 			s+=0.75
 		for sd in [-0.72,0.72]:
 			for i in P.size()-1:

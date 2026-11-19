@@ -894,6 +894,8 @@ func _k_scheune(i:int):
 	L._park(Transform3D(Basis(Vector3.UP,PI*0.8),_P(6,0,5)),"c_suv")
 func _k_feld(i:int):
 	var farben=[[Color(0.85,0.75,0.3),Color(0.75,0.65,0.25)],[Color(0.45,0.6,0.25),Color(0.38,0.5,0.2)],[Color(0.55,0.42,0.28),Color(0.45,0.35,0.22)]][i]
+	# Ackerboden unter den Reihen (sonst sieht man zwischen den Reihen den Platz-Belag)
+	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.3,14.65),Vector3(29.4,0.7,29.3),Basis(),0.0)
 	for k in 15:L.box(T(farben[k%2]),_P(0,0.0+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
 	L._zaun(_P(-15,0,0.2),_P(15,0,0.2),1.2)
 func _k_wasserturm():
@@ -1765,7 +1767,7 @@ func gelaende_ziel():
 				if Geometry2D.is_point_in_polygon(Vector2(GX0+i*MST,GZ0+k*MST),poly):TH[k*GNX+i]=h;LOT[k*GNX+i]=1
 	# Rand: das Gelände wird zwischen den 10-m-Punkten gemittelt – auch die Punkte um das Grundstück herum
 	# (bis eine Zelle diagonal) bekommen die Terrassenhöhe, sonst steigt der Hang ins Grundstück hinein und
-	# sticht durch Terrasse/Boden. Wo zwei Ränder sich treffen, gilt die tiefere Höhe.
+	# sticht durch Terrasse/Boden. Wo zwei Grundstücke sich nahekommen, gilt die tiefere Höhe.
 	var tpad=MST*1.45
 	for e in TERR:
 		var P:Array=e[0];var h:float=e[1]
@@ -1776,14 +1778,16 @@ func gelaende_ziel():
 			for i in range(_ix(mn.x-tpad),_ix(mx.x+tpad)+1):
 				if i<0 or k<0 or i>=GNX or k>=GNZ:continue
 				var jt=k*GNX+i
-				if LOT[jt]==1 or WASSER[jt]==1:continue
+				if WASSER[jt]==1:continue
 				var gp=Vector2(GX0+i*MST,GZ0+k*MST);var dmin=INF
 				for qi in poly.size():
 					var pa2:Vector2=poly[qi];var pb2:Vector2=poly[(qi+1)%poly.size()]
 					dmin=min(dmin,gp.distance_to(Geometry2D.get_closest_point_to_segment(gp,pa2,pb2)))
 				if dmin>tpad:continue
-				if LOT[jt]==2:TH[jt]=min(TH[jt],h)
-				else:TH[jt]=h;LOT[jt]=2
+				# auch Kernpunkte eines höheren Nachbargrundstücks werden abgesenkt: dessen Gartenmauern reichen
+				# 3 m tief (Stützmauer), sonst stiege dessen Terrasse in dieses Grundstück hinein
+				if LOT[jt]==0:TH[jt]=h;LOT[jt]=2
+				else:TH[jt]=min(TH[jt],h)
 	# 3) Straßen: Fahrbahn plus eine Rasterzelle Rand flach auf Profilhöhe (sonst sticht das Gelände
 	#    zwischen den 10-m-Punkten durch den Asphalt), danach Böschung – je größer der Höhenunterschied, desto breiter
 	var best={}   # j -> [abstand, zielhöhe, w, stadt, böschung]

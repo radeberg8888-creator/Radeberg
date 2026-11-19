@@ -18,6 +18,8 @@ var NAMEN:=[]                    # Mesh-Nummer -> Name
 var BEIDSEITIG:=[]               # Mesh-Nummer -> Material ohne Rückseiten-Ausblendung
 var KANTEN:=[]                   # Wand-Unterkanten [a,b,aussen_normal,oben_y,owner]
 var KXF:=[]                      # Mesh-Nummer -> Transform der Bausatz-Kopie (sonst null)
+var KINST:=[]                    # Mesh-Nummer -> Nummer der Bausatz-Kopie (0 = kein Bausatz)
+var KOPIE_N:=0
 var DOPPEL_KOPIEN:=[]            # [name, ort] zwei Kopien desselben Bausatzes am selben Platz
 const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","antenne","schornstein","turm","bruecke","autobahn","hochstr","k_b-","klima","schuessel","hoch","stilkontur"]
 
@@ -32,6 +34,15 @@ func _matname(mat)->String:
 		if f is Color:return "S#"+f.to_html(false)
 		if mat.shader:return "S:"+mat.shader.resource_path.get_file()
 	return "?"
+# Dreiecke einer Oberfläche (wie Mesh.get_faces, aber nur diese Oberfläche)
+func _flaechen(me:Mesh,sf:int)->PackedVector3Array:
+	var a=me.surface_get_arrays(sf);var v:PackedVector3Array=a[Mesh.ARRAY_VERTEX];var out=PackedVector3Array()
+	var ix=a[Mesh.ARRAY_INDEX]
+	if ix!=null and ix.size()>0:
+		out.resize(ix.size())
+		for k in ix.size():out[k]=v[ix[k]]
+	else:out=v
+	return out
 func _kurz(oid:int)->String:return String(NAMEN[oid]).split("@")[0]
 func _beidseitig(m)->bool:
 	if m is BaseMaterial3D:return m.cull_mode==BaseMaterial3D.CULL_DISABLED
@@ -43,7 +54,7 @@ func _ink(m)->bool:
 	return false
 
 func sammeln(mitte:Vector2,radius:float):
-	BT.clear();BO.clear();BG.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();DOPPEL_KOPIEN.clear()
+	BT.clear();BO.clear();BG.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();KINST.clear();KOPIE_N=0;DOPPEL_KOPIEN.clear()
 	var orte={}
 	var feld=Rect2(mitte-Vector2(radius,radius),Vector2(radius,radius)*2.0)
 	var welt=G.spiel.welt
@@ -67,24 +78,29 @@ func sammeln(mitte:Vector2,radius:float):
 		var nm:String=m.name
 		if nm.ends_with("ink") or nm.begins_with("NF_") or nm.begins_with("nt_"):continue
 		var me:Mesh=m.multimesh.mesh
-		var F=me.get_faces()
-		if F.size()>60000:continue
-		var mat=m.material_override
-		if mat==null and me.get_surface_count()>0:mat=me.surface_get_material(0)
-		var bs=_beidseitig(mat)
+		if me.get_faces().size()>60000:continue
+		# je Oberfläche (Material) eigene Fläche: Rasen–Einfahrt ist ein gewollter Übergang, keine Stufe in einer Fläche
+		var teile=[]
+		for sf in me.get_surface_count():
+			var mat=m.material_override if m.material_override!=null else me.surface_get_material(sf)
+			teile.append([_flaechen(me,sf),_matname(mat),_beidseitig(mat)])
 		for i in m.multimesh.instance_count:
 			var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 			if gx.basis.get_scale().x<0.01:continue
 			if Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>radius*0.6:continue
-			# dieselbe Bausatz-Kopie zweimal (z. B. von zwei Kacheln aufgestellt)?
-			var ok="%s|%d|%d"%[me.get_instance_id(),int(round(gx.origin.x*2.0)),int(round(gx.origin.z*2.0))]
+			# dieselbe Bausatz-Kopie zweimal mit gleicher Lage, Drehung und Größe (z. B. von zwei Kacheln aufgestellt)?
+			var b=gx.basis
+			var ok="%s|%d|%d|%d|%d|%d|%d|%d|%d|%d"%[me.get_instance_id(),int(round(gx.origin.x*50.0)),int(round(gx.origin.y*50.0)),int(round(gx.origin.z*50.0)),
+				int(round(b.x.x*100.0)),int(round(b.x.z*100.0)),int(round(b.y.y*100.0)),int(round(b.z.x*100.0)),int(round(b.z.z*100.0)),int(round(b.x.y*100.0))]
 			if orte.has(ok):DOPPEL_KOPIEN.append([nm,gx.origin]);continue
 			orte[ok]=true
-			_mesh_eintragen(F,gx,nm,bs,mitte,radius,true)
-			KXF[KXF.size()-1]=gx
+			KOPIE_N+=1
+			for t in teile:
+				_mesh_eintragen(t[0],gx,nm+"/"+t[1],t[2],mitte,radius,true)
+				KXF[KXF.size()-1]=gx;KINST[KINST.size()-1]=KOPIE_N
 
 func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,mitte:Vector2,radius:float,nur_waende:=false):
-	var oid=NAMEN.size();NAMEN.append(name);BEIDSEITIG.append(beid);KXF.append(null)
+	var oid=NAMEN.size();NAMEN.append(name);BEIDSEITIG.append(beid);KXF.append(null);KINST.append(0)
 	for i in range(0,F.size()-2,3):
 		var a=xf*F[i];var b=xf*F[i+1];var c=xf*F[i+2]
 		var cr=(b-a).cross(c-a);var l2=cr.length_squared()
@@ -98,14 +114,14 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 			if abs(dh)<0.006 or dh>1.5 or dh<-0.6:continue
 			# keine Bodenfläche: aufgemalte Markierung, Bankett (taucht gewollt unter das Gelände), Sockel-Oberseiten,
 			# Teile unter dem Boden eines Bausatzes (verdeckt)
-			if name.begins_with("markierung") or name.begins_with("stein_d") or name.contains("sockel"):continue
+			if name.begins_with("markierung") or name.contains("/markierung") or name.begins_with("stein_d") or name.contains("sockel"):continue
 			if nur_waende and m.y<xf.origin.y+0.10:continue
 			# Bausätze: nur große, niedrige Flächen (Veranda, Terrasse, Einfahrt, Stufen) – keine Tische/Töpfe
 			if nur_waende and (sqrt(l2)*0.5<0.3 or dh>0.9 or name.begins_with("K_")):continue
 			var ti=BO.size();BT.append_array([a,b,c]);BO.append(oid)
 			var x0=int(floor(min(a.x,min(b.x,c.x))));var x1=int(floor(max(a.x,max(b.x,c.x))))
 			var z0=int(floor(min(a.z,min(b.z,c.z))));var z1=int(floor(max(a.z,max(b.z,c.z))))
-			if (x1-x0+1)*(z1-z0+1)>4000:continue
+			if (x1-x0+1)*(z1-z0+1)>90000:continue   # nur riesige Flächen (Wasser) auslassen
 			for gx in range(x0,x1+1):
 				for gz in range(z0,z1+1):
 					var k=Vector2i(gx,gz)
@@ -157,7 +173,8 @@ func _breite(ti:int)->float:
 # Hinweis für Bausätze: gleiche/andere Kopie, Punkt und Höhen im Bausatz (lokal)
 func _diag(e1:Array,e2:Array,x:float,z:float)->String:
 	var o1=BO[e1[1]];var o2=BO[e2[1]]
-	var t=" | "+("gleiche Kopie" if o1==o2 else "andere Kopie")
+	var gleich=o1==o2 or (KINST[o1]>0 and KINST[o1]==KINST[o2])
+	var t=" | "+("gleiche Kopie" if gleich else "andere Kopie")
 	var xf=KXF[o1] if KXF[o1]!=null else KXF[o2]
 	if xf!=null:
 		var inv=xf.affine_inverse()

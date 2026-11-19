@@ -533,7 +533,7 @@ func container(p:Vector3,yaw:float,farbe:Color):
 		x+=0.8
 	for sd in [-1,1]:L.box(dk,p+b*Vector3(sd*6.12,1.3,0),Vector3(0.05,2.4,2.3),b,0.0)
 func _k_container(i:int):
-	L.box(L.M.hof,_P(0,-0.06,4.5),Vector3(14,0.14,9),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.01,4.5),Vector3(14,0.14,9),Basis(),0.0)
 	var farben=[Color(0.8,0.2,0.15),Color(0.15,0.4,0.75),Color(0.2,0.55,0.3),Color(0.9,0.6,0.1),Color(0.6,0.6,0.62),Color(0.55,0.25,0.5),Color(0.9,0.9,0.88)]
 	var hmax=0
 	for j in 3:
@@ -541,7 +541,7 @@ func _k_container(i:int):
 		for k in h:container(_P(0,k*2.6,1.5+j*2.6),0.0,farben[(i*3+j*5+k)%farben.size()])
 	K.haupt(_P(0,hmax*1.3,4.1),Vector3(12.2,hmax*2.6,7.8),Basis(),farben[i%farben.size()],Color(0,0,0,0),0,false)
 func _k_buero():
-	L.box(L.M.hof,_P(0,-0.06,5),Vector3(12,0.14,10),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.01,5),Vector3(12,0.14,10),Basis(),0.0)
 	for k in 2:container(_P(0,k*2.6,5),0.0,[Color(0.92,0.92,0.9),Color(0.3,0.5,0.75)][k])
 	K.haupt(_P(0,2.6,5),Vector3(12.2,5.2,2.44),Basis(),Color(0.92,0.92,0.9))
 	L.box(L.M.glas[1],_P(0,1.3,3.75),Vector3(8,1.0,0.05),Basis(),0.0)
