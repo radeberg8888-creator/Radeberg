@@ -555,8 +555,11 @@ func ki_schritt(dt:float,hindernisse:Array):
 	ki_s+=ki_speed*dt*ki_dir
 	if _ki_ton:_ki_ton.pitch_scale=clamp(1.0+ki_speed/14.0,0.8,3.0)
 	var L=S.length(ki_road)
+	# 30 m vor dem Ende Abbiegerichtung festlegen und blinken
+	if bis_ende<30.0 and not _wahl_ok:_wahl_treffen()
 	if ki_s<2.0 or ki_s>L-2.0:_ki_weiter()
 	_ki_place(dt)
+	if _blink!=0 or not _blinker.is_empty():_blinker_zeigen(dt)
 
 var _platz:=0.0;var _steh:=0.0;var _rechts:=0.0;var _ampel_j=null;var _ampel_a:=true
 # Phase je Kreuzung: Straße a hat 13 s grün, 2 s gelb, dann Straße b (gleich lang)
@@ -572,18 +575,56 @@ func _ampel_rot(L0:float)->bool:
 	var gruen_a=t<13.0
 	var gelb=(t>=13.0 and t<15.0) or t>=28.0
 	return gelb or (gruen_a!=_ampel_a)
-func _ki_weiter():
-	_ampel_j=null
-	# am Straßenende: an einer Kreuzung abbiegen, sonst wenden
-	var p=S.at(ki_road,clamp(ki_s,0.0,S.length(ki_road)))[0]
+# nächste Straße am Straßenende (vorab gewählt, damit vorher geblinkt werden kann); null = wenden
+func _wahl_treffen():
+	var Lr=S.length(ki_road)
+	var p=S.at(ki_road,Lr if ki_dir>0 else 0.0)[0]
 	var opts=[]
 	for j in S.junctions:
 		if j.p.distance_to(p)<14.0:
 			for ri in [j.a,j.b]:
 				var r=S.roads[ri]
 				if r!=ki_road and r.typ in ["strasse","allee","gasse","land","autobahn","rampe"]:opts.append(r)
-	if opts.size()>0:
-		var r=opts[randi()%opts.size()]
+	_wahl=opts[randi()%opts.size()] if opts.size()>0 else null
+	_wahl_ok=true
+	# Blinkrichtung: Winkel zwischen jetziger Fahrtrichtung und der neuen Straße am Knoten
+	_blink=0
+	if _wahl!=null:
+		var t:Vector2=S.at(ki_road,clamp(Lr-1.0 if ki_dir>0 else 1.0,0.0,Lr))[2]*ki_dir
+		var best=0;var bd=1e9
+		for i in _wahl.P.size():
+			var d=_wahl.P[i].distance_to(p)
+			if d<bd:bd=d;best=i
+		var nach=1 if best*S.DS<S.length(_wahl)*0.5 else -1
+		var t2:Vector2=S.at(_wahl,clamp(best*S.DS+nach*6.0,0.0,S.length(_wahl)))[0]-S.at(_wahl,best*S.DS)[0]
+		if t2.length()>0.5:
+			var kr=t.cross(t2.normalized())
+			if abs(kr)>0.35:_blink=1 if kr>0.0 else -1
+var _wahl=null;var _wahl_ok:=false;var _blink:=0;var _blink_t:=0.0;var _blinker:=[]
+func _blinker_zeigen(dt:float):
+	var an=_blink!=0
+	if an and _blinker.is_empty():
+		var m=StandardMaterial3D.new();m.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;m.albedo_color=Color(1.0,0.55,0.05)
+		var bm=BoxMesh.new();bm.size=Vector3(0.12,0.08,0.06);bm.material=m
+		for sx in [-1,1]:
+			for vz in [ab.end.z-0.05,ab.position.z+0.05]:
+				var mi=MeshInstance3D.new();mi.mesh=bm;add_child(mi)
+				mi.position=Vector3(ab.get_center().x+sx*(ab.size.x*0.5-0.08),ab.position.y+ab.size.y*0.45,vz)
+				mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;mi.visibility_range_end=70.0
+				mi.set_meta("seite",-sx)   # Fahrzeug blickt nach +z: +x ist links
+				_blinker.append(mi)
+	if _blinker.is_empty():return
+	_blink_t+=dt
+	var phase=fmod(_blink_t,0.8)<0.4
+	for mi in _blinker:mi.visible=an and phase and int(mi.get_meta("seite"))==_blink
+func _ki_weiter():
+	_ampel_j=null
+	# am Straßenende: an einer Kreuzung abbiegen, sonst wenden
+	var p=S.at(ki_road,clamp(ki_s,0.0,S.length(ki_road)))[0]
+	if not _wahl_ok:_wahl_treffen()
+	var r0=_wahl;_wahl=null;_wahl_ok=false;_blink=0
+	if r0!=null:
+		var r=r0
 		var best=0;var bd=1e9
 		for i in r.P.size():
 			var d=r.P[i].distance_to(p)
