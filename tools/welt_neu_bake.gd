@@ -525,6 +525,7 @@ func _stadt_bauen(faces:Array,d):
 	# Fahrbahnen + Bankett
 	L.strassen_modus=true
 	for r in NETZ:_fahrbahn(r)
+	_asphalt_ohne_ueberlappung()
 	L.strassen_modus=false
 	# Flächen einteilen
 	var fass=[];var kit=[];var rand=[]
@@ -644,12 +645,15 @@ func _stadt_bauen(faces:Array,d):
 	print("DURCHGAENGE gepflastert ",nsl)
 	_mark("fassaden")
 	# Bausatz-Viertel: Gehweg-Ring + Grün, Bausätze kommen von neu_sued
+	# Ring und Innenfläche liegen NEBENeinander auf gleicher Höhe (keine übereinanderliegenden Platten)
 	for e in kit:
 		var pc:PackedVector2Array=e[0]
-		L._platte(pc,-1.6,L.KB,L.M.pflaster,L.M.stein)
+		var innen=[]
 		for inn in Geometry2D.offset_polygon(pc,-2.6,Geometry2D.JOIN_MITER):
-			if Geometry2D.is_polygon_clockwise(inn):continue
-			L._platte(inn,L.KB,L.KB+0.017,L.M.gras if e[1]!="docks" and e[1]!="industrie" and e[1]!="flug" else L.M.hof,L.M.stein_d)
+			if not Geometry2D.is_polygon_clockwise(inn):innen.append(inn)
+		var mi=L.M.gras if e[1]!="docks" and e[1]!="industrie" and e[1]!="flug" else L.M.hof
+		for inn in innen:L._platte(inn,-1.6,L.KB,mi,L.M.stein)
+		for t in _ring_teile(pc,innen):L._platte(t,-1.6,L.KB,L.M.pflaster,L.M.stein)
 	L._fertig(false)
 	# Straßenausstattung über alle Stadtblöcke
 	var alle=fass.duplicate()
@@ -675,26 +679,74 @@ func _stadt_bauen(faces:Array,d):
 	_mark("bausaetze")
 
 func _fahrbahn(r):
+	# Asphalt selbst kommt aus _asphalt_ohne_ueberlappung (keine doppelten Flächen an Kreuzungen); hier nur Bankett
 	var P:PackedVector2Array=r.P;var w:float=r.w+0.05;var n=P.size()
-	var so=L._st(L.M.asphalt,true);var sb=L._st(L.M.stein_d,true);var a_k=L.koll_an;L.koll_an=true
+	var sb=L._st(L.M.stein_d,true);var a_k=L.koll_an;L.koll_an=true
 	var N=[]
 	for i in n:N.append(L._rn((P[min(i+1,n-1)]-P[max(i-1,0)]).normalized()))
-	for i in n-1:
-		var a=P[i]-N[i]*w;var b=P[i]+N[i]*w;var c=P[i+1]+N[i+1]*w;var dd=P[i+1]-N[i+1]*w
-		L._tri(so,Vector3(a.x,0.015,a.y),Vector3(b.x,0.015,b.y),Vector3(c.x,0.015,c.y),Vector3.UP);L._tri(so,Vector3(a.x,0.015,a.y),Vector3(c.x,0.015,c.y),Vector3(dd.x,0.015,dd.y),Vector3.UP)
 	# Bankett: schräg nach außen unter das Gelände (an Blöcken verdeckt die Gehwegplatte); mit Kollision,
 	# wo es sichtbar bleibt, sinkt sonst niemand ein
 	for i in n-1:
 		for sd in [-1.0,1.0]:
 			var a=P[i]+N[i]*w*sd;var b=P[i+1]+N[i+1]*w*sd;var a2=P[i]+N[i]*(w+2.2)*sd;var b2=P[i+1]+N[i+1]*(w+2.2)*sd
 			L._tri(sb,Vector3(a.x,0.015,a.y),Vector3(b.x,0.015,b.y),Vector3(b2.x,-0.55,b2.y),Vector3(N[i].x*sd,1,N[i].y*sd));L._tri(sb,Vector3(a.x,0.015,a.y),Vector3(b2.x,-0.55,b2.y),Vector3(a2.x,-0.55,a2.y),Vector3(N[i].x*sd,1,N[i].y*sd))
-	L.koll_an=true
-	for e in [0,n-1]:
-		var c0=P[e]
-		for k in 10:
-			var a0=TAU*k/10.0;var a1=TAU*(k+1)/10.0
-			L._tri(so,Vector3(c0.x,0.015,c0.y),Vector3(c0.x+cos(a0)*w,0.015,c0.y+sin(a0)*w),Vector3(c0.x+cos(a1)*w,0.015,c0.y+sin(a1)*w),Vector3.UP)
 	L.koll_an=a_k
+# Asphalt aller Stadtstraßen als Flächen: jede Straße (mit runden Enden) minus die schon gelegten Straßen.
+# So liegt an Kreuzungen und Einmündungen nur EINE Fläche (kein Z-Fighting, keine gestrichelten Linien).
+# Fläche minus innere Flächen, ohne Löcher: an einer senkrechten Linie durch jede Innenfläche halbieren
+func _ring_teile(pc:PackedVector2Array,innen:Array)->Array:
+	var teile=[pc]
+	for inn in innen:
+		var bb=L._bbox(inn);var cx=bb.get_center().x
+		var t2=[]
+		for t in teile:
+			var tb=L._bbox(t)
+			if not tb.intersects(bb):t2.append(t);continue
+			var links=PackedVector2Array([Vector2(tb.position.x-1,tb.position.y-1),Vector2(cx,tb.position.y-1),Vector2(cx,tb.end.y+1),Vector2(tb.position.x-1,tb.end.y+1)])
+			var rechts=PackedVector2Array([Vector2(cx,tb.position.y-1),Vector2(tb.end.x+1,tb.position.y-1),Vector2(tb.end.x+1,tb.end.y+1),Vector2(cx,tb.end.y+1)])
+			for h in [links,rechts]:
+				for x in Geometry2D.intersect_polygons(t,h):
+					if Geometry2D.is_polygon_clockwise(x):continue
+					for y in Geometry2D.clip_polygons(x,inn):
+						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+		teile=t2
+	return teile
+func _asphalt_ohne_ueberlappung():
+	var so=L._st(L.M.asphalt,true);var a_k=L.koll_an;L.koll_an=true
+	var bt=L.boden_teil;L.boden_teil=8.0
+	var gelegt=[];var n_st=0
+	for r in NETZ:
+		# in Stücken (max. 40 Punkte, bei Schleifen kleiner), damit kein Band ein Loch hat
+		var bands=[];var i0=0;var P:PackedVector2Array=r.P
+		while i0<P.size()-1:
+			var schritt=40
+			while true:
+				var j=min(i0+schritt,P.size()-1)
+				var o=Geometry2D.offset_polyline(P.slice(i0,j+1),r.w+0.05,Geometry2D.JOIN_ROUND,Geometry2D.END_ROUND)
+				if o.size()==1 or schritt<=2:
+					for x in o:
+						if not Geometry2D.is_polygon_clockwise(x):bands.append(x)
+					i0=j;break
+				schritt=max(2,schritt/2)
+		for bd in bands:
+			var teile=[bd];var bb=L._bbox(bd)
+			for g in gelegt:
+				if not bb.intersects(g[1]):continue
+				var t2=[]
+				for t in teile:
+					for y in Geometry2D.clip_polygons(t,g[0]):
+						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+				teile=t2
+				if teile.is_empty():break
+			for t in teile:
+				var idx=Geometry2D.triangulate_polygon(t)
+				for i in range(0,idx.size(),3):
+					var a=t[idx[i]];var b=t[idx[i+1]];var c=t[idx[i+2]]
+					L._tri(so,Vector3(a.x,0.015,a.y),Vector3(b.x,0.015,b.y),Vector3(c.x,0.015,c.y),Vector3.UP)
+				n_st+=1
+			gelegt.append([bd,bb])
+	L.boden_teil=bt;L.koll_an=a_k
+	print("ASPHALT Stücke ",n_st)
 # Ampeln: an Kreuzungen größerer Straßen, je Ecke des nächsten Blocks (Raumindex statt alle Blöcke)
 func _ampeln(bl:Array):
 	var idx={}

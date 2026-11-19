@@ -21,6 +21,15 @@ const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","anten
 
 func _init(galerie):G=galerie
 
+func _matname(mat)->String:
+	if mat==null:return "?"
+	if mat.resource_name!="":return mat.resource_name
+	if mat is BaseMaterial3D:return "#"+mat.albedo_color.to_html(false)
+	if mat is ShaderMaterial:
+		var f=mat.get_shader_parameter("farbe")
+		if f is Color:return "S#"+f.to_html(false)
+		if mat.shader:return "S:"+mat.shader.resource_path.get_file()
+	return "?"
 func _kurz(oid:int)->String:return String(NAMEN[oid]).split("@")[0]
 func _beidseitig(m)->bool:
 	if m is BaseMaterial3D:return m.cull_mode==BaseMaterial3D.CULL_DISABLED
@@ -47,7 +56,7 @@ func sammeln(mitte:Vector2,radius:float):
 		var gab:AABB=mi.global_transform*mi.mesh.get_aabb()
 		if not feld.intersects(Rect2(gab.position.x,gab.position.z,gab.size.x,gab.size.z)):continue
 		if gab.size.x>3000.0 or gab.size.z>3000.0:continue   # Wasser über die ganze Insel
-		var mn=mat.resource_name if mat!=null and mat.resource_name!="" else "?"
+		var mn=_matname(mat)
 		_mesh_eintragen(mi.mesh.get_faces(),mi.global_transform,mn+"@"+str(mi.get_parent().name),_beidseitig(mat),mitte,radius)
 	# 2) Bausätze (MultiMesh-Kopien) mit ihren Wänden, nur im halben Umkreis (teuer)
 	for m in welt.find_children("*","MultiMeshInstance3D",true,false):
@@ -75,10 +84,12 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 		var nv=-cr/sqrt(l2)
 		var m=(a+b+c)/3.0
 		if Vector2(m.x,m.z).distance_to(mitte)>radius:continue
-		if nv.y>0.9 and not nur_waende:
+		if nv.y>0.9:
 			var th=G._tri_hg(m.x,m.z)
 			var dh=m.y-th
 			if abs(dh)<0.006 or dh>1.5 or dh<-0.6:continue
+			# Bausätze: nur große, niedrige Flächen (Veranda, Terrasse, Einfahrt, Stufen) – keine Tische/Töpfe
+			if nur_waende and (sqrt(l2)*0.5<0.3 or dh>0.9 or name.begins_with("K_")):continue
 			var ti=BO.size();BT.append_array([a,b,c]);BO.append(oid)
 			var x0=int(floor(min(a.x,min(b.x,c.x))));var x1=int(floor(max(a.x,max(b.x,c.x))))
 			var z0=int(floor(min(a.z,min(b.z,c.z))));var z1=int(floor(max(a.z,max(b.z,c.z))))
@@ -190,7 +201,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 		var L=Vector2(a.x-b.x,a.z-b.z).length();var n=max(1,int(ceil(L)))
 		for s in n+1:
 			var p=a.lerp(b,float(s)/n)
-			var q=p-nv*0.06
+			var q=p-nv*0.25   # etwas hinter der Wandfläche (unter dem Haus), nicht knapp außerhalb der Platte
 			if Vector2(q.x-mitte.x,q.z-mitte.y).length_squared()>r2*0.36:continue   # dort sind auch die Kopien (Sockel) erfasst
 			if p.y-G._tri_hg(q.x,q.z)>2.0:continue   # Obergeschoss/Dachaufbau
 			# steht die Wand auf einem Sockel/einer Mauer darunter? dann deren Unterkante messen
@@ -203,7 +214,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 			if r.is_empty():continue
 			var luft=unten-r.position.y
 			if luft>0.10 and luft<5.0:
-				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)]);break
+				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)+" Unterkante y:"+str(snapped(unten,0.01))+" Treffer y:"+str(snapped(r.position.y,0.01)),p+nv*7.0+Vector3(0,0.6,0)]);break
 	# e) offene Häuser: von den Straßen aus in 8 Richtungen schauen
 	var gesehen={}
 	for rd in G.spiel.welt.S.roads:
@@ -218,11 +229,13 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var dir=Vector3(cos(k*PI/4.0+0.2),0.0,sin(k*PI/4.0+0.2))
 				var h=_wand_strahl(Vector3(p.x,y,p.y),dir,40.0)
 				if h.is_empty():continue
+				var hn:String=NAMEN[VO[h.ti]]
+				if hn.begins_with("K_baum") or hn.begins_with("nt_") or hn.begins_with("K_bus") or hn.begins_with("K_werbung"):continue
 				if h.rueck and not BEIDSEITIG[VO[h.ti]]:
 					var key=Vector2i(int(h.pos.x/4.0),int(h.pos.z/4.0))
 					if gesehen.has(key):continue
 					gesehen[key]=true
-					FUNDE.append([NAMEN[VO[h.ti]],"Haus_offen",h.dist,h.pos,"Blick von "+str(Vector3(p.x,y,p.y))])
+					FUNDE.append([NAMEN[VO[h.ti]],"Haus_offen",h.dist,h.pos,"Blick von "+str(Vector3(p.x,y,p.y)),Vector3(p.x,y,p.y)])
 	# f) Dinge im Himmel
 	for m in G.spiel.welt.find_children("*","GeometryInstance3D",true,false):
 		if not m.is_visible_in_tree():continue

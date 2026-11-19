@@ -602,6 +602,17 @@ func _schwebe_lauf():
 		_diag_gelaende(mitte,name)
 		_pruef_kopien(mitte,260.0)
 		_pruef_gehwege(mitte,260.0)
+		# Statistik (Abschnitt 6): wie viele verschiedene Häuser/Villen stehen im Viertel
+		var arten={};var n_h=0
+		for m in spiel.welt.find_children("*","MultiMeshInstance3D",true,false):
+			var nm:String=m.name
+			if nm.begins_with("K_") or nm.begins_with("nt_") or nm.contains("sockel") or nm.ends_with("ink") or m.multimesh==null:continue
+			var kn=nm
+			for i in m.multimesh.instance_count:
+				var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
+				if gx.basis.get_scale().x<0.01 or Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>260.0:continue
+				arten[kn]=true;n_h+=1
+		print("STATISTIK ",name," Bausatz-Arten ",arten.size()," Bausätze ",n_h)
 		var t0=Time.get_ticks_msec()
 		var PR=preload("res://scripts/spiel/pruefung.gd").new(self)
 		PR.sammeln(mitte,200.0)
@@ -632,6 +643,7 @@ func _schwebe_lauf():
 					if not bod.is_empty():kand.y=max(kand.y,bod.position.y+1.3)
 					var frei=_strahl(w+Vector3(0,0.4,0),kand,true).is_empty()
 					if frei:cp=kand;break
+				if f.size()>5 and f[5] is Vector3:cp=f[5]   # offenes Haus: vom Blickpunkt auf der Straße aus
 				cam.look_at_from_position(cp,w+Vector3(0,0.2,0));cam.current=true
 				for fr in 3:await get_tree().process_frame
 				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])

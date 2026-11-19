@@ -370,9 +370,13 @@ func _box_kopie(m:Material,xf:Transform3D,me:Mesh=null):
 		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,me.get_mesh_arrays());am.surface_set_material(0,m)
 		MODULE[key]=am;MODUL_SCHATTEN[key]=false;_MOD_PF[key]=[];_MOD_KF[key]=[]
 	_inst_add(key,xf)
+var auto_koll:=false
 func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()
 	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
+	# im Bausatz: flache, begehbare Kästen (Oberkante bis 1,6 m über dem Grundstück, mind. 0,6 × 0,6 m,
+	# waagerecht) erhalten Kollision – Veranden, Stufen, Terrassen, Einfahrten, Beete, Mauern
+	if auto_koll and m!=ink and c.y+s.y*0.5<=KB+1.6 and s.x>=0.6 and s.z>=0.6 and abs(b.y.normalized().y)>0.97:koll_box(c,s,b)
 	# Handy-Fassung: kleine Kästen (Fensterbänke, Gesimse, Konsolen …) als Kopien eines Einheitswürfels
 	if leicht and not _im_modul and not strassen_modus and not fest_modus and not koll_kasten and max(s.x,max(s.y,s.z))<2.2:
 		_box_kopie(m,Transform3D(b*Basis().scaled(s),c))
@@ -1105,7 +1109,7 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 		if lm>3.0:
 			var fa=FY(a.x,a.z);var fb=FY(b.x,b.z);var fc=FY(c.x,c.z)
 			for q in [[(a+b)*0.5,(fa+fb)*0.5],[(b+c)*0.5,(fb+fc)*0.5],[(c+a)*0.5,(fc+fa)*0.5],[(a+b+c)/3.0,(fa+fb+fc)/3.0]]:
-				if abs(FY(q[0].x,q[0].z)-q[1])>0.025:krumm=true;break
+				if abs(FY(q[0].x,q[0].z)-q[1])>0.012:krumm=true;break
 		if krumm:
 			N_TEIL+=1
 			if lm==lab:
@@ -2134,7 +2138,7 @@ func _rundrechteck(a:Vector2,b:Vector2,r:float)->PackedVector2Array:
 func _kante_teilen(p:Vector2,q:Vector2,tiefe:int)->PackedVector2Array:
 	# Kante an der Mitte teilen, solange das Höhenfeld dort von der Geraden abweicht (wie die Deckfläche)
 	var m=(p+q)*0.5
-	if tiefe<8 and p.distance_to(q)>3.0 and abs(FY(m.x,m.y)-(FY(p.x,p.y)+FY(q.x,q.y))*0.5)>0.025:
+	if tiefe<8 and p.distance_to(q)>3.0 and abs(FY(m.x,m.y)-(FY(p.x,p.y)+FY(q.x,q.y))*0.5)>0.012:
 		var r=_kante_teilen(p,m,tiefe+1);r.append_array(_kante_teilen(m,q,tiefe+1));return r
 	return PackedVector2Array([p])
 func _platte(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
@@ -2856,10 +2860,10 @@ func _strassenmoebel():
 				var pp=x+inn*0.5+t*1.5
 				if z2<0.18 and leicht and _innen(pc,pp,0.3):
 					_modul("parkuhr",Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(pp.x,KB,pp.y)),func():_parkuhr_roh(),false)
-				elif z2<0.21 and leicht and _innen(pc,x+inn*1.8,1.6):
+				elif z2<0.21 and leicht and _innen(pc,x+inn*1.8,2.4):
 					var bh=x+inn*1.8
 					_modul("bushalt",Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(bh.x,KB,bh.y)),func():_bushalt_roh(),false)
-				elif z2<0.235 and leicht and _innen(pc,x+inn*2.6,1.2):
+				elif z2<0.235 and leicht and _innen(pc,x+inn*2.6,1.7):
 					var wt=x+inn*2.6;var wi=rng.randi()%3
 					_modul("werbung%d"%wi,Transform3D(Basis(Vector3.UP,atan2(-inn.x,-inn.y)),Vector3(wt.x,KB,wt.y)),func():_werbetafel_roh(wi),false)
 				if nr[0].typ=="einbahn" and not schild_gesetzt:

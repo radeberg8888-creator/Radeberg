@@ -28,7 +28,10 @@ func kit(name:String,w:float,d:float,builder:Callable)->Dictionary:
 	L.welt=tmp;L.st={};L.mats={};L.zaehler={};L.kachel=0.0
 	var nKF=L.KOLL_F.size();var nPF=L.PFOSTEN.size();var nPK=L.PARKEN.size()
 	LOD=[]
+	# begehbare Kästen (Veranda, Stufen, Terrasse, Einfahrt, Rasen) bekommen automatisch Kollision
+	var ak=L.auto_koll;L.auto_koll=true
 	builder.call()
+	L.auto_koll=ak
 	# Flächen einsammeln (noch offene SurfaceTools + schon ausgegebene MeshInstances)
 	var teile=[]   # [arrays, material]
 	for k in L.st.keys():
