@@ -226,7 +226,9 @@ func _wachhuette():
 func _fern(nadel:bool):
 	if nadel:
 		var cm=CylinderMesh.new();cm.top_radius=0.0;cm.bottom_radius=2.8;cm.height=9.5;cm.radial_segments=6;cm.rings=1
-		L.mesh(T(Color(0.16,0.37,0.22)),cm,Transform3D(Basis(),Vector3(0,KB+5.5,0)),1.0)
+		# Kegel bis zum Boden mit kurzem Stamm (aus der Ferne kein schwebender Kegel)
+		L.mesh(T(Color(0.16,0.37,0.22)),cm,Transform3D(Basis(),Vector3(0,KB+5.55,0)),1.0)
+		L.box(T(Color(0.36,0.25,0.17)),Vector3(0,KB+0.45,0),Vector3(0.4,0.9,0.4),Basis(),0.0)
 	else:
 		var sm=SphereMesh.new();sm.radius=2.8;sm.height=4.6;sm.radial_segments=6;sm.rings=3
 		L.mesh(T(Color(0.3,0.55,0.23)),sm,Transform3D(Basis(),Vector3(0,KB+5.2,0)),1.0)

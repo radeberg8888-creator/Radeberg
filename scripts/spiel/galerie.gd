@@ -636,6 +636,8 @@ func _schwebe_lauf():
 				for fr in 3:await get_tree().process_frame
 				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])
 				nr+=1
+		# Beleg (Abschnitt 6): je Viertel ein Bild von der Straße und eines aus der Luft
+		await _ort("Viertel_"+name,mitte)
 	print("SCHWEBT GESAMT ",gesamt)
 	# Prototyp Villa-Mauern
 	var vp=Vector2(-1634,-8994);cam.global_position=Vector3(vp.x,G_h(vp)+20,vp.y);await _laden(vp)

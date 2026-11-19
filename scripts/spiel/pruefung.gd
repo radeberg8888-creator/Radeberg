@@ -21,6 +21,7 @@ const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","anten
 
 func _init(galerie):G=galerie
 
+func _kurz(oid:int)->String:return String(NAMEN[oid]).split("@")[0]
 func _beidseitig(m)->bool:
 	if m is BaseMaterial3D:return m.cull_mode==BaseMaterial3D.CULL_DISABLED
 	if m is ShaderMaterial and m.shader:return m.shader.code.contains("cull_disabled")
@@ -40,10 +41,14 @@ func sammeln(mitte:Vector2,radius:float):
 		var mat=mi.material_override
 		if mat==null and mi.mesh.get_surface_count()>0:mat=mi.mesh.surface_get_material(0)
 		if _ink(mat):continue
+		# Gelände-Netz (alle Detailstufen) nicht: das Gelände kommt exakt aus dem Höhenraster;
+		# Fern-Stellvertreter (erst ab Entfernung sichtbar) zählen nicht als Boden
+		if String(mi.name).begins_with("Gelaende") or mi.visibility_range_begin>0.0:continue
 		var gab:AABB=mi.global_transform*mi.mesh.get_aabb()
 		if not feld.intersects(Rect2(gab.position.x,gab.position.z,gab.size.x,gab.size.z)):continue
-		if gab.size.x>3000.0 or gab.size.z>3000.0:continue   # Gelände/Wasser über die ganze Insel
-		_mesh_eintragen(mi.mesh.get_faces(),mi.global_transform,str(mi.get_parent().name)+"/"+str(mi.name),_beidseitig(mat),mitte,radius)
+		if gab.size.x>3000.0 or gab.size.z>3000.0:continue   # Wasser über die ganze Insel
+		var mn=mat.resource_name if mat!=null and mat.resource_name!="" else "?"
+		_mesh_eintragen(mi.mesh.get_faces(),mi.global_transform,mn+"@"+str(mi.get_parent().name),_beidseitig(mat),mitte,radius)
 	# 2) Bausätze (MultiMesh-Kopien) mit ihren Wänden, nur im halben Umkreis (teuer)
 	for m in welt.find_children("*","MultiMeshInstance3D",true,false):
 		if m.multimesh==null or m.multimesh.mesh==null or not m.is_visible_in_tree():continue
@@ -148,15 +153,18 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					hs.sort_custom(func(p,q):return p[0]<q[0])
 					for i in hs.size()-1:
 						if hs[i+1][0]-hs[i][0]<0.015:
-							FUNDE.append(["Boden","doppelte_Flaeche",hs[i+1][0]-hs[i][0],Vector3(x,hs[i][0],z),NAMEN[BO[hs[i][1]]]+" & "+NAMEN[BO[hs[i+1][1]]]]);break
+							var n1=_kurz(BO[hs[i][1]]);var n2=_kurz(BO[hs[i+1][1]])
+							if n2<n1:
+								var tt=n1;n1=n2;n2=tt
+							FUNDE.append(["Boden:"+n1+"&"+n2,"doppelte_Flaeche",hs[i+1][0]-hs[i][0],Vector3(x,hs[i][0],z),NAMEN[BO[hs[i][1]]]+" & "+NAMEN[BO[hs[i+1][1]]]]);break
 				var th=G._tri_hg(x,z)
 				# d) Gelände sticht durch die Platte (Sägezahn am Hang)
-				if th>top+0.02:FUNDE.append(["Boden","Gelaende_durch",th-top,Vector3(x,top,z),NAMEN[BO[ti_top]]])
+				if th>top+0.02:FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Gelaende_durch",th-top,Vector3(x,top,z),NAMEN[BO[ti_top]]])
 				# b) Kollision alle 2 m
 				if int(floor(x))%2==0 and int(floor(z))%2==0:
 					var r=G._strahl(Vector3(x,top+0.25,z),Vector3(x,top-3.0,z),true)
-					if r.is_empty():FUNDE.append(["Boden","ohne_Kollision",3.0,Vector3(x,top,z),NAMEN[BO[ti_top]]])
-					elif r.position.y<top-0.03:FUNDE.append(["Boden","Kollision_tiefer",top-r.position.y,Vector3(x,top,z),NAMEN[BO[ti_top]]+" | "+str(r.collider.get_parent().name)])
+					if r.is_empty():FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"ohne_Kollision",3.0,Vector3(x,top,z),NAMEN[BO[ti_top]]])
+					elif r.position.y<top-0.03:FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Kollision_tiefer",top-r.position.y,Vector3(x,top,z),NAMEN[BO[ti_top]]+" | "+str(r.collider.get_parent().name)])
 				# d) kleine Stufen (2. Ableitung über 0,2 m, Gefälle hebt sich auf)
 				# gewollt: Bordstein (Stufe ≥ 4 cm zwischen zwei verschiedenen Flächen, z. B. Fahrbahn–Gehweg)
 				var ot=BO[ti_top]
@@ -166,7 +174,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					if s2<=0.025 or s2>=0.10:continue
 					var gleich=(e1[1]==ot and e2[1]==ot)
 					if gleich or s2<0.04:
-						FUNDE.append(["Boden","Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")]);break
+						FUNDE.append(["Boden:"+_kurz(ot),"Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")]);break
 			else:
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
 				var th=G._tri_hg(x,z)
@@ -183,11 +191,17 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 		for s in n+1:
 			var p=a.lerp(b,float(s)/n)
 			var q=p-nv*0.06
-			if Vector2(q.x-mitte.x,q.z-mitte.y).length_squared()>r2:continue
+			if Vector2(q.x-mitte.x,q.z-mitte.y).length_squared()>r2*0.36:continue   # dort sind auch die Kopien (Sockel) erfasst
 			if p.y-G._tri_hg(q.x,q.z)>2.0:continue   # Obergeschoss/Dachaufbau
-			var r=G._strahl(Vector3(q.x,p.y+0.3,q.z),Vector3(q.x,p.y-40.0,q.z),true)
+			# steht die Wand auf einem Sockel/einer Mauer darunter? dann deren Unterkante messen
+			var unten=p.y
+			for _k in 6:
+				var u2=_weiter_unten(Vector3(q.x,unten-0.04,q.z))
+				if u2>=unten-0.01:break
+				unten=u2
+			var r=G._strahl(Vector3(q.x,unten+0.3,q.z),Vector3(q.x,unten-40.0,q.z),true)
 			if r.is_empty():continue
-			var luft=p.y-r.position.y
+			var luft=unten-r.position.y
 			if luft>0.10 and luft<5.0:
 				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)]);break
 	# e) offene Häuser: von den Straßen aus in 8 Richtungen schauen
@@ -228,6 +242,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var boden=G._tri_hg(c.x,c.z)
 				if unten-boden>15.0:FUNDE.append([m.name,"im_Himmel",unten-boden,c,"Kopie"]);break
 		elif m is MeshInstance3D and m.mesh:
+			if nm.begins_with("m_") or nm.begins_with("gelaende"):continue   # zusammengefasste Kachel-Meshes (Hausteile)
 			var gab:AABB=m.global_transform*m.mesh.get_aabb()
 			if gab.size.x>40.0 or gab.size.z>40.0:continue
 			var c=gab.get_center()
@@ -239,6 +254,29 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 			if Vector2(c.x,c.z).distance_squared_to(mitte)>r2:continue
 			if c.y-G._tri_hg(c.x,c.z)>15.0:FUNDE.append(["Schild "+m.text,"im_Himmel",c.y-G._tri_hg(c.x,c.z),c,"Label"])
 
+# Unterkante einer senkrechten Fläche, die den Punkt (bis 0,3 m Abstand) überdeckt; sonst die Punkthöhe
+func _weiter_unten(P:Vector3)->float:
+	var k=Vector2i(int(floor(P.x/2.0)),int(floor(P.z/2.0)))
+	var best=P.y+0.04
+	if not VG.has(k):return best
+	for vi in VG[k]:
+		var a=VT[vi*3];var b=VT[vi*3+1];var c=VT[vi*3+2]
+		var lo=min(a.y,min(b.y,c.y));var hi=max(a.y,max(b.y,c.y))
+		if P.y<lo or P.y>hi or lo>=best:continue
+		var n=(b-a).cross(c-a)
+		if n.length_squared()<1e-10:continue
+		n=n.normalized()
+		var dd=(P-a).dot(n)
+		if abs(dd)>0.3:continue
+		var Q=P-n*dd
+		# Punkt im Dreieck (Baryzentrisch in 3D)
+		var v0=c-a;var v1=b-a;var v2=Q-a
+		var d00=v0.dot(v0);var d01=v0.dot(v1);var d11=v1.dot(v1);var d20=v2.dot(v0);var d21=v2.dot(v1)
+		var den=d00*d11-d01*d01
+		if abs(den)<1e-10:continue
+		var u=(d11*d20-d01*d21)/den;var v=(d00*d21-d01*d20)/den
+		if u>=-0.02 and v>=-0.02 and u+v<=1.02:best=min(best,lo)
+	return best
 # Strahl gegen die gesammelten Wanddreiecke (2-m-Raster), erster Treffer
 func _wand_strahl(o:Vector3,dir:Vector3,maxd:float)->Dictionary:
 	var best={};var bd=maxd;var t=0.0;var gepr={}

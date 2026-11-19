@@ -331,6 +331,16 @@ func _materialien():
 	M.fenster=_shader(FENSTER,{});M.gitter=_shader(GITTER,{});M.eck=_shader(ECK,{})
 	SPH_L=SphereMesh.new();SPH_L.radial_segments=7;SPH_L.rings=3
 	M.blume=[_toon(Color(0.95,0.3,0.4)),_toon(Color(0.98,0.85,0.2)),_toon(Color(0.8,0.4,0.9))]
+	# Namen für die Prüfung (Fundstellen nennen das Material statt einer Nummer)
+	for k in M:
+		var v=M[k]
+		if v is Material and v.resource_name=="":v.resource_name=k
+		elif v is Array:
+			for i in v.size():
+				if v[i] is Material and v[i].resource_name=="":v[i].resource_name="%s%d"%[k,i]
+				elif v[i] is Array:
+					for j in v[i].size():
+						if v[i][j] is Material and v[i][j].resource_name=="":v[i][j].resource_name="%s%d_%d"%[k,i,j]
 
 # ---------------- Geometrie-Sammler ----------------
 func _st(m:Material,eigen:=false)->SurfaceTool:
