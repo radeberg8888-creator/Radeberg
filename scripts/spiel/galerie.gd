@@ -605,7 +605,7 @@ func _schwebe_lauf():
 		_pruef_kopien(mitte,260.0)
 		_pruef_gehwege(mitte,260.0)
 		# Statistik (Abschnitt 6): wie viele verschiedene Häuser/Villen stehen im Viertel
-		var arten={};var n_h=0
+		var kitarten={};var n_h=0
 		for m in spiel.welt.find_children("*","MultiMeshInstance3D",true,false):
 			var nm:String=m.name
 			if nm.begins_with("K_") or nm.begins_with("nt_") or nm.contains("sockel") or nm.ends_with("ink") or m.multimesh==null:continue
@@ -613,8 +613,8 @@ func _schwebe_lauf():
 			for i in m.multimesh.instance_count:
 				var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 				if gx.basis.get_scale().x<0.01 or Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>260.0:continue
-				arten[kn]=true;n_h+=1
-		print("STATISTIK ",name," Bausatz-Arten ",arten.size()," Bausätze ",n_h)
+				kitarten[kn]=true;n_h+=1
+		print("STATISTIK ",name," Bausatz-Arten ",kitarten.size()," Bausätze ",n_h)
 		var t0=Time.get_ticks_msec()
 		var PR=preload("res://scripts/spiel/pruefung.gd").new(self)
 		PR.sammeln(mitte,200.0)
