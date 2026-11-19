@@ -251,12 +251,12 @@ func randreihe(i:int,sd:int,j:int):
 			if rng.randf()<0.85:graffiti(c+Vector3(rng.randf_range(-1.5,1.5),1.5,0.27),Vector3(0,0,1),rng.randf_range(0.8,1.1))
 			x+=lg
 		# hinter der Mauer: Gras bis zur Viertelgrenze
-		L.box(T(Color(0.47,0.5,0.28)),Vector3((xa+xb)*0.5,L.KB+0.012,(Z0+zf)*0.5-0.5),Vector3(xb-xa,0.02,abs(zf-Z0)-1.0),Basis(),0.0)
+		L.box(T(Color(0.47,0.5,0.28)),Vector3((xa+xb)*0.5,L.KB+0.018,(Z0+zf)*0.5-0.5),Vector3(xb-xa,0.02,abs(zf-Z0)-1.0),Basis(),0.0)
 	else:
 		# Schrottplatz hinter Maschendraht
 		L._zaun(Vector3(xa,L.KB,zf),Vector3(xb,L.KB,zf),2.4)
 		L.koll_box(Vector3((xa+xb)*0.5,L.KB+1.2,zf),Vector3(xb-xa,2.4,0.12))
-		L.box(T(Color(0.42,0.34,0.24)),Vector3((xa+xb)*0.5,L.KB+0.012,(zf+Z1)*0.5),Vector3(xb-xa,0.02,abs(Z1-zf)-0.5),Basis(),0.0)
+		L.box(T(Color(0.42,0.34,0.24)),Vector3((xa+xb)*0.5,L.KB+0.018,(zf+Z1)*0.5),Vector3(xb-xa,0.02,abs(Z1-zf)-0.5),Basis(),0.0)
 		var x=xa+5.0
 		while x<xb-5.0:
 			var c=Vector3(x,L.KB,zf+rng.randf_range(5,12))

@@ -1365,11 +1365,62 @@ func belag_mat(art:String)->Material:
 	ResourceSaver.save(m,pfad);m=load(pfad)
 	_belag_m[art]=m;L.kein_schatten[m]=true
 	return m
+func _gelegt_bei(g:Dictionary,q:PackedVector2Array)->Array:
+	var bb=Rect2(q[0],Vector2.ZERO)
+	for v in q:bb=bb.expand(v)
+	var out=[];var ges={}
+	for x in range(int(floor(bb.position.x/20.0)),int(floor(bb.end.x/20.0))+1):
+		for z in range(int(floor(bb.position.y/20.0)),int(floor(bb.end.y/20.0))+1):
+			for e in g.get(Vector2i(x,z),[]):
+				if ges.has(e[2]):continue
+				ges[e[2]]=true
+				if e[1].intersects(bb.grow(-0.001)) and not Geometry2D.intersect_polygons(q,e[0]).is_empty():out.append(e[0])
+	return out
+var _gelegt_n:=0
+var GW:={}   # schon gelegte Gehwegflächen (20-m-Zellen)
+# Dreieck legen, aber nur dort, wo noch keine Fläche derselben Art liegt (Höhe aus der Ebene des Dreiecks)
+func _tri_frei(so,A:Vector3,B:Vector3,C:Vector3,g:Dictionary):
+	var q=PackedVector2Array([Vector2(A.x,A.z),Vector2(B.x,B.z),Vector2(C.x,C.z)])
+	var d=(B.z-C.z)*(A.x-C.x)+(C.x-B.x)*(A.z-C.z)
+	if abs(d)<1e-6:return
+	var fremd=_gelegt_bei(g,q)
+	_gelegt_dazu(g,q)
+	if fremd.is_empty():L._tri(so,A,B,C,Vector3.UP);return
+	if Geometry2D.is_polygon_clockwise(q):q.reverse()
+	var teile=[q]
+	for f in fremd:
+		var t2=[]
+		for t in teile:
+			for y in Geometry2D.clip_polygons(t,f):
+				if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+		teile=t2
+	var hy=func(p:Vector2)->float:
+		var l1=((B.z-C.z)*(p.x-C.x)+(C.x-B.x)*(p.y-C.z))/d
+		var l2=((C.z-A.z)*(p.x-C.x)+(A.x-C.x)*(p.y-C.z))/d
+		return l1*A.y+l2*B.y+(1.0-l1-l2)*C.y
+	for t in teile:
+		var idx=Geometry2D.triangulate_polygon(t)
+		for k in range(0,idx.size(),3):
+			var a:Vector2=t[idx[k]];var b:Vector2=t[idx[k+1]];var c:Vector2=t[idx[k+2]]
+			L._tri(so,Vector3(a.x,hy.call(a),a.y),Vector3(b.x,hy.call(b),b.y),Vector3(c.x,hy.call(c),c.y),Vector3.UP)
+func _gelegt_dazu(g:Dictionary,q:PackedVector2Array):
+	var bb=Rect2(q[0],Vector2.ZERO)
+	for v in q:bb=bb.expand(v)
+	_gelegt_n+=1;var e=[q,bb,_gelegt_n]
+	for x in range(int(floor(bb.position.x/20.0)),int(floor(bb.end.x/20.0))+1):
+		for z in range(int(floor(bb.position.y/20.0)),int(floor(bb.end.y/20.0))+1):
+			var k=Vector2i(x,z)
+			if not g.has(k):g[k]=[]
+			g[k].append(e)
 func fahrbahnen():
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
 	var bank=T(Color(0.47,0.6,0.33));var bank_sand=T(Color(0.72,0.62,0.45));L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
-	for ri in ROADS.size():
+	# Reihenfolge nach Vorfahrt: vorrangige Straßen zuerst; jede spätere Fläche spart alles aus, was schon
+	# liegt (auch eigene Stücke an engen Kurven) -> nirgends zwei Fahrbahnen übereinander
+	var folge=range(ROADS.size());folge.sort_custom(func(a,b):return _vor(a,b))
+	var gelegt={}   # 20-m-Zelle -> [Vierecke]
+	for ri in folge:
 		var r=ROADS[ri];var belag=r.get("belag","asphalt")
 		var so=L._st(L.M.asphalt if belag=="asphalt" else belag_mat(belag),true)
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
@@ -1390,7 +1441,8 @@ func fahrbahnen():
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
 			var q=PackedVector2Array([Vector2(Ls[i].x,Ls[i].z),Vector2(Ls[i+1].x,Ls[i+1].z),Vector2(Rs[i+1].x,Rs[i+1].z),Vector2(Rs[i].x,Rs[i].z)])
 			if Geometry2D.is_polygon_clockwise(q):q.reverse()
-			var fremd=_fremde_quads(q,ri)
+			var fremd=_gelegt_bei(gelegt,q)
+			_gelegt_dazu(gelegt,q)
 			if fremd.is_empty():
 				L._tri(so,Ls[i],Ls[i+1],Rs[i+1],Vector3.UP);L._tri(so,Ls[i],Rs[i+1],Rs[i],Vector3.UP)
 				continue
@@ -1448,8 +1500,8 @@ func fahrbahnen():
 				var ya=Y[i]+oben;var yb=Y[i+1]+oben
 				var A=Vector3(a.x,ya,a.y);var B=Vector3(b.x,yb,b.y);var A2=Vector3(a.x,ya-6.0,a.y);var B2=Vector3(b.x,yb-6.0,b.y)
 				var nrm=Vector3(nn.x*sd,0,nn.y*sd)
-				if sd>0:L._tri(ss,A,A2,B2,nrm);L._tri(ss,A,B2,B,nrm)
-				else:L._tri(ss,A,B2,A2,nrm);L._tri(ss,A,B,B2,nrm)
+				# beidseitig: von unten/hinten gesehen keine unsichtbare Rückseite
+				L._tri(ss,A,A2,B2,nrm);L._tri(ss,A,B2,B,nrm);L._tri(ss,A,B2,A2,-nrm);L._tri(ss,A,B,B2,-nrm)
 	L.koll_an=alt
 	for ri in ROADS.size():
 		var r=ROADS[ri];var s=4.0;var Lg:float=r.S[-1]
@@ -1504,8 +1556,8 @@ func _sackgassen_enden(so,sk,jr:Dictionary)->int:
 			if auf_fahrbahn(P[e]+d*(r.w*0.6+1.0),ri,0.5) or auf_fahrbahn(P[e]+d*(r.w*0.6+r.sw*0.5),ri,0.5):continue
 			var nn=Vector2(-d.y,d.x);var y=Y[e]+0.11;var ex=r.w*0.6;var w=r.w;var sw=r.sw
 			var Q=func(a:Vector2,b:Vector2,c:Vector2,dd:Vector2):
-				L._tri(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),Vector3.UP)
-				L._tri(so,Vector3(a.x,y,a.y),Vector3(c.x,y,c.y),Vector3(dd.x,y,dd.y),Vector3.UP)
+				_tri_frei(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),GW)
+				_tri_frei(so,Vector3(a.x,y,a.y),Vector3(c.x,y,c.y),Vector3(dd.x,y,dd.y),GW)
 			var p0=P[e]
 			for sd in [1.0,-1.0]:
 				Q.call(p0+nn*sd*w,p0+nn*sd*(w+sw),p0+nn*sd*(w+sw)+d*ex,p0+nn*sd*w+d*ex)
@@ -1528,7 +1580,7 @@ func platten():
 	# diese Schnittkanten an (keine zwei Flächen übereinander, kein Spalt). Außenkante: Böschungsmauer.
 	var alt=L.koll_an;L.koll_an=true
 	var so=L._st(L.M.pflaster,true);var n_ok=0;var sk=L._st(L.M.stein,true)
-	ENDEN={}
+	ENDEN={};GW={}
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji];var R=float(j.r)+3.0
@@ -1561,8 +1613,8 @@ func platten():
 				var a0:Vector2=q0+n0*r.w;var a1:Vector2=q0+n0*(r.w+r.sw);var c0:Vector2=q1+n1*r.w;var c1:Vector2=q1+n1*(r.w+r.sw)
 				var mid=(a0+a1+c0+c1)*0.25
 				if auf_fahrbahn(mid,ri,0.3):continue
-				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),Vector3.UP)
-				L._tri(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),Vector3.UP)
+				_tri_frei(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),GW)
+				_tri_frei(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),GW)
 				# Außenkante bis ins Gelände nur dort, wo die Straßen-Schürze fehlt (nahe Kreuzungen) – sonst doppelte Wand
 				var mo=(a1+c1)*0.5
 				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):
@@ -1635,7 +1687,7 @@ func _gehweg_ecken(so)->int:
 			var m3=Vector3(mid.x,ym,mid.y)
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
-				L._tri(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),Vector3.UP)
+				_tri_frei(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),GW)
 			# Böschungsmauer unter der Außenkante
 			var aus=[[3,4],[4,5]] if poly.size()==6 else [[2,3]]
 			for e in aus:
@@ -1711,6 +1763,27 @@ func gelaende_ziel():
 			for i in range(_ix(mn.x),_ix(mx.x)+1):
 				if i<0 or k<0 or i>=GNX or k>=GNZ:continue
 				if Geometry2D.is_point_in_polygon(Vector2(GX0+i*MST,GZ0+k*MST),poly):TH[k*GNX+i]=h;LOT[k*GNX+i]=1
+	# Rand: das Gelände wird zwischen den 10-m-Punkten gemittelt – auch die Punkte um das Grundstück herum
+	# (bis eine Zelle diagonal) bekommen die Terrassenhöhe, sonst steigt der Hang ins Grundstück hinein und
+	# sticht durch Terrasse/Boden. Wo zwei Ränder sich treffen, gilt die tiefere Höhe.
+	var pad=MST*1.45
+	for e in TERR:
+		var P:Array=e[0];var h:float=e[1]
+		var mn=Vector2(INF,INF);var mx=-mn
+		for p in P:mn=Vector2(min(mn.x,p.x+C.x),min(mn.y,p.y+C.y));mx=Vector2(max(mx.x,p.x+C.x),max(mx.y,p.y+C.y))
+		var poly=PackedVector2Array();for p in P:poly.append(p+C)
+		for k in range(_kz(mn.y-pad),_kz(mx.y+pad)+1):
+			for i in range(_ix(mn.x-pad),_ix(mx.x+pad)+1):
+				if i<0 or k<0 or i>=GNX or k>=GNZ:continue
+				var j=k*GNX+i
+				if LOT[j]==1 or WASSER[j]==1:continue
+				var g=Vector2(GX0+i*MST,GZ0+k*MST);var dmin=INF
+				for q in poly.size():
+					var a:Vector2=poly[q];var b:Vector2=poly[(q+1)%poly.size()]
+					dmin=min(dmin,g.distance_to(Geometry2D.get_closest_point_to_segment(g,a,b)))
+				if dmin>pad:continue
+				if LOT[j]==2:TH[j]=min(TH[j],h)
+				else:TH[j]=h;LOT[j]=2
 	# 3) Straßen: Fahrbahn plus eine Rasterzelle Rand flach auf Profilhöhe (sonst sticht das Gelände
 	#    zwischen den 10-m-Punkten durch den Asphalt), danach Böschung – je größer der Höhenunterschied, desto breiter
 	var best={}   # j -> [abstand, zielhöhe, w, stadt, böschung]

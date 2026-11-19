@@ -576,10 +576,14 @@ func _stadt_bauen(faces:Array,d):
 	var nh=0;var nb=0
 	var wk_poly=RESERVIERT[0] if not SU.WERKSTATT.is_empty() else PackedVector2Array()
 	for pc in fass:
+		# Pflaster mit Loch für den Hof (der Hofbelag ist eine eigene Platte, nichts liegt doppelt)
+		var hoefe=L.hoefe_von(pc)
 		if wk_poly.size()>0 and L._bbox(pc).intersects(L._bbox(wk_poly)):
 			for teil in Geometry2D.clip_polygons(pc,wk_poly):
-				if not Geometry2D.is_polygon_clockwise(teil):L._platte(teil,-1.6,L.KB,L.M.pflaster,L.M.stein)
-		else:L._platte(pc,-1.6,L.KB,L.M.pflaster,L.M.stein)
+				if not Geometry2D.is_polygon_clockwise(teil):
+					for t in _ring_teile(teil,hoefe):L._platte(t,-1.6,L.KB,L.M.pflaster,L.M.stein)
+		else:
+			for t in _ring_teile(pc,hoefe):L._platte(t,-1.6,L.KB,L.M.pflaster,L.M.stein)
 		if abs(L._flaeche2(pc))<150:continue
 		nb+=1;nh+=L._block(pc)
 		if nb%10==0:L._fertig(false)
@@ -1332,7 +1336,7 @@ func _norden()->Dictionary:
 		KK[key].append_array(K.kollision(PL[key]))
 	var viertel=_kacheln_speichern(T,KK,PK,"nord")
 	var fern=Node3D.new();fern.name="NordFern";W.add_child(fern);fern.position=Vector3(CX,H0,CZ)
-	K.fern(fern,NL.PLATZ,600.0,2200.0)
+	K.fern(fern,NL.PLATZ,600.0,2200.0,130.0)
 	var immo=[];var zn={"lager":0,"autohandel":0}
 	for im in NL.IMMO:
 		var xf:Transform3D=im.xf;var zp=xf*Vector3(0,0,1.2);zn[im.art]+=1
@@ -1455,7 +1459,7 @@ func _gelaende_und_daten(ND:Dictionary):
 		if not KK.has(key):KK[key]=PackedVector3Array()
 		KK[key].append_array(K.kollision(PL[key]))
 	var fern=Node3D.new();fern.name="StadtFern";W.add_child(fern);fern.position=Vector3(CX,0,CZ)
-	K.fern(fern,SU.PLATZ,600.0,2200.0)
+	K.fern(fern,SU.PLATZ,600.0,2200.0,150.0)
 	print("FERN Häuser-Felder ",L.fern_haeuser(fern,600.0,300.0,2400.0))
 	# Materialien der Stadt extern (alle Kacheln teilen sie)
 	var mats={}

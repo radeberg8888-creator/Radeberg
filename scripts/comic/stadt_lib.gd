@@ -376,6 +376,15 @@ func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 	if s.x<0.001 or s.y<0.001 or s.z<0.001:return
 	# im Bausatz: flache, begehbare Kästen (Oberkante bis 1,6 m über dem Grundstück, mind. 0,6 × 0,6 m,
 	# waagerecht) erhalten Kollision – Veranden, Stufen, Terrassen, Einfahrten, Beete, Mauern
+	# im Bausatz: dünne Beläge (Einfahrt, Terrasse, Weg) knapp über dem Grundstücksrasen (KB+0.01) liegen sonst
+	# nur 1 cm darüber -> Z-Fighting. Oberkante mindestens auf KB+0.04, Markierungen darüber auf KB+0.06
+	if auto_koll and s.y<=0.06 and abs(b.y.normalized().y)>0.97:
+		var top=c.y+s.y*0.5
+		# kleinere Beläge liegen höher als größere (Weg auf Einfahrt auf Platz), damit auch zwei dünne Beläge
+		# übereinander mindestens 1,5 cm Abstand haben
+		var fl=s.x*s.z
+		if m==M.markierung and top<KB+0.10:c.y+=KB+0.10-top
+		elif top>KB-0.005 and top<KB+0.035:c.y+=KB+(0.04 if fl>=120.0 else (0.06 if fl>=25.0 else 0.08))-top
 	if auto_koll and m!=ink and c.y+s.y*0.5<=KB+1.6 and s.x>=0.6 and s.z>=0.6 and abs(b.y.normalized().y)>0.97:koll_box(c,s,b)
 	# Handy-Fassung: kleine Kästen (Fensterbänke, Gesimse, Konsolen …) als Kopien eines Einheitswürfels
 	if leicht and not _im_modul and not strassen_modus and not fest_modus and not koll_kasten and max(s.x,max(s.y,s.z))<2.2:
@@ -2169,6 +2178,8 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 		var p=P2[i];var q=P2[(i+1)%P2.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
 		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
+		# Rückseite auch (am Hang sieht man sonst durch eine fehlende Nachbarkante ins Innere der Platte)
+		_tri(ss,A,C,B,-o);_tri(ss,A,D,C,-o)
 		if schraeg:
 			# Schräge nur am Bordstein zur Fahrbahn; sonst senkrechte Kante mit Kollision (kein Spalt unter der Platte)
 			var nr=_naechste((p+q)*0.5,12.0)
@@ -2680,16 +2691,22 @@ func _fenster_klein(o:Vector3,r:Vector3,a:Vector3,w:float,y:float,stil:Dictionar
 	box(M.stein,o+r*(w*0.5)+Vector3(0,y-0.05,0)+a*0.12,Vector3(fw+0.3,0.1,0.24),b,0.02)
 
 var _hofbelag:Material
+# Hofflächen, die _block(pc) mit Belag belegt (gleiche Rechnung) – dort bekommt das Blockpflaster ein Loch
+func hoefe_von(pc:PackedVector2Array)->Array:
+	var out=[]
+	if abs(_flaeche2(pc))<150:return out
+	for aussen in Geometry2D.offset_polygon(pc,-SWB,Geometry2D.JOIN_MITER):
+		if Geometry2D.is_polygon_clockwise(aussen) or abs(_flaeche2(aussen))<70:continue
+		aussen=_vereinf(aussen)
+		for q in Geometry2D.offset_polygon(aussen,-TIEFE_B,Geometry2D.JOIN_MITER):
+			if not Geometry2D.is_polygon_clockwise(q) and abs(_flaeche2(q))>30:out.append(q)
+	return out
 func _hof2(q:PackedVector2Array,deko:=true,yh:=0.025):
 	# Hofbelag 2,5 cm über dem Gehwegpflaster (gewollte Kante, kein Z-Fighting), begehbar; yh<0: nur Deko
 	# (Höhe bleibt unter KB+0.03, sonst folgt die Fläche nicht dem Gelände)
 	if _hofbelag==null:_hofbelag=_shader(ASPHALT,{"farbe":Color(0.42,0.41,0.4)});_hofbelag.resource_name="hofbelag"
-	var s=_st(_hofbelag,true)
-	var idx=Geometry2D.triangulate_polygon(q) if yh>=0.0 else PackedInt32Array()
-	var ak=koll_an;koll_an=true;var bt=boden_teil;boden_teil=8.0 if hoehen_an else 0.0
-	for i in range(0,idx.size(),3):
-		_tri(s,Vector3(q[idx[i]].x,KB+yh,q[idx[i]].y),Vector3(q[idx[i+1]].x,KB+yh,q[idx[i+1]].y),Vector3(q[idx[i+2]].x,KB+yh,q[idx[i+2]].y),Vector3.UP)
-	koll_an=ak;boden_teil=bt
+	# Hof als eigene Platte mit Kante (das Blockpflaster hat an dieser Stelle ein Loch, siehe hoefe_von)
+	if yh>=0.0:_platte(q,-0.3,KB+yh,_hofbelag,M.stein)
 	if not deko:return
 	var rand=Geometry2D.offset_polygon(q,-3.0)
 	if rand.is_empty():return

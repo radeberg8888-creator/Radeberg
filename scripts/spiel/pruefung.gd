@@ -17,6 +17,8 @@ var VG:={}                       # 2-m-Zelle -> PackedInt32Array
 var NAMEN:=[]                    # Mesh-Nummer -> Name
 var BEIDSEITIG:=[]               # Mesh-Nummer -> Material ohne Rückseiten-Ausblendung
 var KANTEN:=[]                   # Wand-Unterkanten [a,b,aussen_normal,oben_y,owner]
+var KXF:=[]                      # Mesh-Nummer -> Transform der Bausatz-Kopie (sonst null)
+var DOPPEL_KOPIEN:=[]            # [name, ort] zwei Kopien desselben Bausatzes am selben Platz
 const BEKANNT_HIMMEL:=["heli","flug","wolke","kran","mast","jet","ballon","antenne","schornstein","turm","bruecke","autobahn","hochstr","k_b-","klima","schuessel","hoch","stilkontur"]
 
 func _init(galerie):G=galerie
@@ -41,7 +43,8 @@ func _ink(m)->bool:
 	return false
 
 func sammeln(mitte:Vector2,radius:float):
-	BT.clear();BO.clear();BG.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear()
+	BT.clear();BO.clear();BG.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();DOPPEL_KOPIEN.clear()
+	var orte={}
 	var feld=Rect2(mitte-Vector2(radius,radius),Vector2(radius,radius)*2.0)
 	var welt=G.spiel.welt
 	# 1) Meshes (Stadt-/Nord-Kacheln, Gelände-Zubehör)
@@ -73,10 +76,15 @@ func sammeln(mitte:Vector2,radius:float):
 			var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 			if gx.basis.get_scale().x<0.01:continue
 			if Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>radius*0.6:continue
+			# dieselbe Bausatz-Kopie zweimal (z. B. von zwei Kacheln aufgestellt)?
+			var ok="%s|%d|%d"%[me.get_instance_id(),int(round(gx.origin.x*2.0)),int(round(gx.origin.z*2.0))]
+			if orte.has(ok):DOPPEL_KOPIEN.append([nm,gx.origin]);continue
+			orte[ok]=true
 			_mesh_eintragen(F,gx,nm,bs,mitte,radius,true)
+			KXF[KXF.size()-1]=gx
 
 func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,mitte:Vector2,radius:float,nur_waende:=false):
-	var oid=NAMEN.size();NAMEN.append(name);BEIDSEITIG.append(beid)
+	var oid=NAMEN.size();NAMEN.append(name);BEIDSEITIG.append(beid);KXF.append(null)
 	for i in range(0,F.size()-2,3):
 		var a=xf*F[i];var b=xf*F[i+1];var c=xf*F[i+2]
 		var cr=(b-a).cross(c-a);var l2=cr.length_squared()
@@ -123,7 +131,8 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 					KANTEN.append([P[0],P[1],nv,hi,oid])
 
 # Höhen aller sichtbaren Bodendreiecke an (x,z): Array von [h, dreieck]
-func hoehen(x:float,z:float)->Array:
+# tol: Abstand zur Dreieckskante in m (positiv = Punkt muss so weit innen liegen, negativ = Kante zählt mit)
+func hoehen(x:float,z:float,tol:=0.0005)->Array:
 	var out=[]
 	var k=Vector2i(int(floor(x)),int(floor(z)))
 	if not BG.has(k):return out
@@ -134,9 +143,27 @@ func hoehen(x:float,z:float)->Array:
 		var l1=((b.z-c.z)*(x-c.x)+(c.x-b.x)*(z-c.z))/d
 		var l2=((c.z-a.z)*(x-c.x)+(a.x-c.x)*(z-c.z))/d
 		var l3=1.0-l1-l2
-		if l1<0.0005 or l2<0.0005 or l3<0.0005:continue   # Kantenpunkte zählen nicht doppelt
+		# Abstand zur Kante = l * Höhe des Dreiecks über dieser Kante
+		var ad=abs(d)
+		if l1*ad<tol*Vector2(b.x-c.x,b.z-c.z).length() or l2*ad<tol*Vector2(c.x-a.x,c.z-a.z).length() or l3*ad<tol*Vector2(a.x-b.x,a.z-b.z).length():continue
 		out.append([l1*a.y+l2*b.y+l3*c.y,ti])
 	return out
+# kleinste Breite eines Bodendreiecks (Höhe über der längsten Kante, waagerecht gemessen)
+func _breite(ti:int)->float:
+	var a=BT[ti*3];var b=BT[ti*3+1];var c=BT[ti*3+2]
+	var A2=abs((b.x-a.x)*(c.z-a.z)-(c.x-a.x)*(b.z-a.z))
+	var L=max(Vector2(b.x-a.x,b.z-a.z).length(),max(Vector2(c.x-b.x,c.z-b.z).length(),Vector2(a.x-c.x,a.z-c.z).length()))
+	return A2/max(L,0.0001)
+# Hinweis für Bausätze: gleiche/andere Kopie, Punkt und Höhen im Bausatz (lokal)
+func _diag(e1:Array,e2:Array,x:float,z:float)->String:
+	var o1=BO[e1[1]];var o2=BO[e2[1]]
+	var t=" | "+("gleiche Kopie" if o1==o2 else "andere Kopie")
+	var xf=KXF[o1] if KXF[o1]!=null else KXF[o2]
+	if xf!=null:
+		var inv=xf.affine_inverse()
+		var p1=inv*Vector3(x,e1[0],z);var p2=inv*Vector3(x,e2[0],z)
+		t+=" lokal (%.2f, %.3f/%.3f, %.2f)"%[p1.x,p1.y,p2.y,p1.z]
+	return t
 func oben(x:float,z:float)->float:
 	var hs=hoehen(x,z);var m=-INF
 	for e in hs:m=max(m,e[0])
@@ -153,6 +180,7 @@ func sicht(x:float,z:float)->float:
 
 func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 	var r2=radius*radius
+	for e in DOPPEL_KOPIEN:FUNDE.append([e[0],"Kopie_doppelt",1.0,e[1],"zwei gleiche Bausätze am selben Platz",e[1]+Vector3(6,8,6)])
 	var x=mitte.x-radius+0.37
 	while x<mitte.x+radius:
 		var z=mitte.y-radius+0.41
@@ -171,12 +199,13 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 							var n1=_kurz(BO[hs[i][1]]);var n2=_kurz(BO[hs[i+1][1]])
 							if n2<n1:
 								var tt=n1;n1=n2;n2=tt
-							FUNDE.append(["Boden:"+n1+"&"+n2,"doppelte_Flaeche",hs[i+1][0]-hs[i][0],Vector3(x,hs[i][0],z),NAMEN[BO[hs[i][1]]]+" & "+NAMEN[BO[hs[i+1][1]]]]);break
+							FUNDE.append(["Boden:"+n1+"&"+n2,"doppelte_Flaeche",hs[i+1][0]-hs[i][0],Vector3(x,hs[i][0],z),NAMEN[BO[hs[i][1]]]+" & "+NAMEN[BO[hs[i+1][1]]]+_diag(hs[i],hs[i+1],x,z)]);break
 				var th=G._tri_hg(x,z)
 				# d) Gelände sticht durch die Platte (Sägezahn am Hang)
 				if th>top+0.02:FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Gelaende_durch",th-top,Vector3(x,top,z),NAMEN[BO[ti_top]]])
 				# b) Kollision alle 2 m
-				if int(floor(x))%2==0 and int(floor(z))%2==0:
+				# (nur begehbare Flächen: mindestens 35 cm breit – Fensterbänke, Gesimse und Leisten betritt niemand)
+				if int(floor(x))%2==0 and int(floor(z))%2==0 and _breite(ti_top)>=0.35:
 					var r=G._strahl(Vector3(x,top+0.25,z),Vector3(x,top-3.0,z),true)
 					if r.is_empty():FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"ohne_Kollision",3.0,Vector3(x,top,z),NAMEN[BO[ti_top]]])
 					elif r.position.y<top-0.03:FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Kollision_tiefer",top-r.position.y,Vector3(x,top,z),NAMEN[BO[ti_top]]+" | "+str(r.collider.get_parent().name)])
@@ -195,6 +224,8 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 						FUNDE.append(["Boden:"+_kurz(ot),"Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")]);break
 			else:
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
+				# Punkt genau auf einer gemeinsamen Kante zweier Dreiecke ist keine Lücke (Spalt unter 2 mm)
+				if hoehen(x,z,-0.002).size()>0:z+=1.0;continue
 				var th=G._tri_hg(x,z)
 				for d in [Vector2(0.6,0),Vector2(0,0.6)]:
 					var h1=oben(x-d.x,z-d.y);var h2=oben(x+d.x,z+d.y)
@@ -227,6 +258,11 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var qa=p+nv*0.08
 				var ra=G._strahl(Vector3(qa.x,unten+0.3,qa.z),Vector3(qa.x,unten-40.0,qa.z),true)
 				if not ra.is_empty():luft=min(luft,unten-ra.position.y)
+			# verdeckt etwas direkt vor der Wand den Bereich unter der Kante (Sockel, Pfeiler, Stufe)? dann sieht man nichts
+			if luft>0.10 and luft<5.0:
+				var vo=p+nv*0.5-Vector3(0,0.05,0)
+				var hit=_wand_strahl(vo,-nv,0.5)
+				if not hit.is_empty() and hit.dist<0.46:luft=0.0
 			if luft>0.10 and luft<5.0:
 				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)+" Unterkante y:"+str(snapped(unten,0.01))+" Treffer y:"+str(snapped(r.position.y,0.01)),p+nv*7.0+Vector3(0,0.6,0)]);break
 	# e) offene Häuser: von den Straßen aus in 8 Richtungen schauen

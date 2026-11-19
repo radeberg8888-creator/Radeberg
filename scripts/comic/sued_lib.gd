@@ -407,7 +407,7 @@ func _k_holz(w:float,d:float,farbe:Color,i:int,lang:bool):
 	if rng.randf()<0.5:L._sofa(_P(hx-2.0,0.69,3.5),0.0)
 	for q in rng.randi_range(0,2):GL.muellsack(_P(hx+rng.randf_range(-3,3),0,rng.randf_range(1.2,3.2)))
 	var ex=(w-3.4)*0.5
-	L.box(T(Color(0.42,0.4,0.37)),_P(ex,0.012,min(d,22.0)*0.5),Vector3(3.2,0.02,min(d,22.0)),Basis(),0.0)
+	L.box(T(Color(0.42,0.4,0.37)),_P(ex,0.03,min(d,22.0)*0.5),Vector3(3.2,0.02,min(d,22.0)),Basis(),0.0)   # Einfahrt 3 cm über dem Rasen
 	if lang:
 		if i%3!=2:GL.garage(_P(ex,0,20.5),0.0)
 		else:GL.huette(_P(ex,0,20.5),3.4,4.0,2.3,0.0,[Color(0.55,0.58,0.6),Color(0.6,0.5,0.4)][i%2])

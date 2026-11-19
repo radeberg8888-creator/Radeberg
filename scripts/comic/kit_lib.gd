@@ -199,7 +199,7 @@ func _fern_eintrag(e:Array,t:Transform3D,s:Vector3,wand:Color,dach:Color,giebel:
 			for sx in [-1,1]:
 				var a=P.call(sx*h.x,h.y,-h.z);var b=P.call(sx*h.x,h.y,h.z);var c=P.call(sx*h.x,h.y+fh-0.2,0)
 				for v in [a,b,c]:e[0].append(v);e[1].append(nb*Vector3(sx,0,0));e[2].append(W)
-func fern(ziel:Node3D,platz:Array,feld:=600.0,sicht:=1800.0):
+func fern(ziel:Node3D,platz:Array,feld:=600.0,sicht:=1800.0,von:=0.0):
 	if _fern_mat==null:
 		_fern_mat=_vc_mat.duplicate();_fern_mat.cull_mode=BaseMaterial3D.CULL_DISABLED
 	var G={}
@@ -220,6 +220,8 @@ func fern(ziel:Node3D,platz:Array,feld:=600.0,sicht:=1800.0):
 			var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,a);am.surface_set_material(0,_fern_mat)
 			var mi=MeshInstance3D.new();mi.mesh=am;mi.name="Fern%s_%d_%d"%[teil[2],key.x,key.y];ziel.add_child(mi)
 			mi.visibility_range_end=teil[1];mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# erst dort, wo die echten Bausätze ausgeblendet werden (sonst steckt der Fernkasten nah im Haus)
+			if von>0.0:mi.visibility_range_begin=von;mi.visibility_range_begin_margin=15.0
 	return G.size()
 
 # Kollision und Beschriftung der Platzierungen in einen Knoten (Kachel)
