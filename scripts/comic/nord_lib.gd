@@ -1766,24 +1766,24 @@ func gelaende_ziel():
 	# Rand: das Gelände wird zwischen den 10-m-Punkten gemittelt – auch die Punkte um das Grundstück herum
 	# (bis eine Zelle diagonal) bekommen die Terrassenhöhe, sonst steigt der Hang ins Grundstück hinein und
 	# sticht durch Terrasse/Boden. Wo zwei Ränder sich treffen, gilt die tiefere Höhe.
-	var pad=MST*1.45
+	var tpad=MST*1.45
 	for e in TERR:
 		var P:Array=e[0];var h:float=e[1]
 		var mn=Vector2(INF,INF);var mx=-mn
 		for p in P:mn=Vector2(min(mn.x,p.x+C.x),min(mn.y,p.y+C.y));mx=Vector2(max(mx.x,p.x+C.x),max(mx.y,p.y+C.y))
 		var poly=PackedVector2Array();for p in P:poly.append(p+C)
-		for k in range(_kz(mn.y-pad),_kz(mx.y+pad)+1):
-			for i in range(_ix(mn.x-pad),_ix(mx.x+pad)+1):
+		for k in range(_kz(mn.y-tpad),_kz(mx.y+tpad)+1):
+			for i in range(_ix(mn.x-tpad),_ix(mx.x+tpad)+1):
 				if i<0 or k<0 or i>=GNX or k>=GNZ:continue
-				var j=k*GNX+i
-				if LOT[j]==1 or WASSER[j]==1:continue
-				var g=Vector2(GX0+i*MST,GZ0+k*MST);var dmin=INF
-				for q in poly.size():
-					var a:Vector2=poly[q];var b:Vector2=poly[(q+1)%poly.size()]
-					dmin=min(dmin,g.distance_to(Geometry2D.get_closest_point_to_segment(g,a,b)))
-				if dmin>pad:continue
-				if LOT[j]==2:TH[j]=min(TH[j],h)
-				else:TH[j]=h;LOT[j]=2
+				var jt=k*GNX+i
+				if LOT[jt]==1 or WASSER[jt]==1:continue
+				var gp=Vector2(GX0+i*MST,GZ0+k*MST);var dmin=INF
+				for qi in poly.size():
+					var pa2:Vector2=poly[qi];var pb2:Vector2=poly[(qi+1)%poly.size()]
+					dmin=min(dmin,gp.distance_to(Geometry2D.get_closest_point_to_segment(gp,pa2,pb2)))
+				if dmin>tpad:continue
+				if LOT[jt]==2:TH[jt]=min(TH[jt],h)
+				else:TH[jt]=h;LOT[jt]=2
 	# 3) Straßen: Fahrbahn plus eine Rasterzelle Rand flach auf Profilhöhe (sonst sticht das Gelände
 	#    zwischen den 10-m-Punkten durch den Asphalt), danach Böschung – je größer der Höhenunterschied, desto breiter
 	var best={}   # j -> [abstand, zielhöhe, w, stadt, böschung]

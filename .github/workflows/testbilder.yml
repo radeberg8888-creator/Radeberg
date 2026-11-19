@@ -61,6 +61,8 @@ jobs:
           export GALERIE_OUT=$PWD/build/testbilder/
           mkdir -p $GALERIE_OUT
           NUR="${{ github.event.inputs.nur }}"; [ -z "$NUR" ] && NUR=$(cat .github/test_nur 2>/dev/null || echo nord)
+          # Bake mit Skriptfehler: Galerie gar nicht erst starten (sie liefe sonst mit der alten Ersatzwelt)
+          if grep -q "Parse Error\|Failed to load script" build/bake.log; then echo "BAKE-SKRIPTFEHLER" | tee build/galerie.log; cp build/galerie.log build/bake.log $GALERIE_OUT/; exit 0; fi
           timeout 10800 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 &
           GP=$!
           # Wächter: bei einem Skriptfehler (Parse Error) sofort abbrechen statt bis zum Zeitlimit zu warten
