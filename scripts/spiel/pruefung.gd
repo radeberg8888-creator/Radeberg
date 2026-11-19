@@ -43,6 +43,21 @@ func _flaechen(me:Mesh,sf:int)->PackedVector3Array:
 		for k in ix.size():out[k]=v[ix[k]]
 	else:out=v
 	return out
+func _flaechen_farbig(me:Mesh,sf:int)->Dictionary:
+	var a=me.surface_get_arrays(sf);var v:PackedVector3Array=a[Mesh.ARRAY_VERTEX];var col=a[Mesh.ARRAY_COLOR]
+	var ix=a[Mesh.ARRAY_INDEX];var hat_ix=ix!=null and ix.size()>0
+	var n=ix.size() if hat_ix else v.size()
+	var out={}
+	for t in range(0,n-2,3):
+		var i0=ix[t] if hat_ix else t
+		var fk=""
+		if col!=null and col.size()>i0:fk="~"+Color(col[i0]).to_html(false)
+		if not out.has(fk):out[fk]=[]
+		var o:Array=out[fk]
+		for q in 3:o.append(v[ix[t+q]] if hat_ix else v[t+q])
+	var fertig={}
+	for fk in out:fertig[fk]=PackedVector3Array(out[fk])
+	return fertig
 func _kurz(oid:int)->String:return String(NAMEN[oid]).split("@")[0]
 func _beidseitig(m)->bool:
 	if m is BaseMaterial3D:return m.cull_mode==BaseMaterial3D.CULL_DISABLED
@@ -83,7 +98,9 @@ func sammeln(mitte:Vector2,radius:float):
 		var teile=[]
 		for sf in me.get_surface_count():
 			var mat=m.material_override if m.material_override!=null else me.surface_get_material(sf)
-			teile.append([_flaechen(me,sf),_matname(mat),_beidseitig(mat)])
+			# Bausätze färben über Eckfarben (ein Material für alles): je Farbe eine eigene Fläche
+			var nach=_flaechen_farbig(me,sf)
+			for fk in nach:teile.append([nach[fk],_matname(mat)+fk,_beidseitig(mat)])
 		for i in m.multimesh.instance_count:
 			var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 			if gx.basis.get_scale().x<0.01:continue

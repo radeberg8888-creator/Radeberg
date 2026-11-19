@@ -919,7 +919,7 @@ func _laden(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary,mit_schild:=true
 	var schild:Material=mk[0]
 	# Pfeiler + große Schaufenster
 	var n=max(1,int(w/3.2))
-	box(M.dunkel,P.call(w*0.5,1.65,0.0),Vector3(w-0.4,2.5,0.04),b,0.0)
+	box(M.dunkel,P.call(w*0.5,1.225,0.0),Vector3(w-0.4,3.35,0.04),b,0.0)
 	for k in n+1:
 		var x=0.2+k*(w-0.4)/n
 		box(stil.trim if not stil.ziegel else M.stein,P.call(x,1.6,0.1),Vector3(0.35,2.6,0.22),b,0.03)
@@ -956,7 +956,7 @@ func _laden(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary,mit_schild:=true
 func _eingang(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary):
 	var x=w*0.5 if w<9.0 else w*0.3
 	# Haustür mit Oberlicht, Rahmen, Stufen, Lampe, Klingelschild
-	box(M.dunkel,P.call(x,1.55,0.0),Vector3(1.5,3.0,0.04),b,0.0)
+	box(M.dunkel,P.call(x,1.3,0.0),Vector3(1.5,3.5,0.04),b,0.0)   # bis unter den Gehweg (am Hang sonst Spalt unter der Tür)
 	box(stil.tuer,P.call(x,1.3,0.04),Vector3(1.25,2.4,0.06),b,0.02)
 	for q in 2:box(stil.tuer,P.call(x,0.75+q*1.05,0.08),Vector3(0.95,0.85,0.03),b,0.0)
 	box(M.glas[2],P.call(x,2.8,0.04),Vector3(1.25,0.5,0.03),b,0.0)
@@ -1102,6 +1102,22 @@ func _litfass(p:Vector3):
 	mesh(M.laub[2],ConeHelper.kegel(0.6,0.5),Transform3D(Basis(),p+Vector3(0,3.25,0)),1.06)
 
 # ================= Geometrie: Loft (Ringe) und Rohre =================
+var _im_raster:=false
+# Polygon (Liste Vector2) an einer achsparallelen Geraden abschneiden: achse 0 = x, 1 = z; behalten wird
+# die Seite, auf der seite*(wert-grenze) >= 0
+func _clip_achse(P:Array,achse:int,grenze:float,seite:float)->Array:
+	var out=[]
+	var n=P.size()
+	if n==0:return out
+	for i in n:
+		var p:Vector2=P[i];var q:Vector2=P[(i+1)%n]
+		var dp=seite*(p[achse]-grenze);var dq=seite*(q[achse]-grenze)
+		if dp>=0.0:out.append(p)
+		if (dp>=0.0)!=(dq>=0.0):
+			var t=dp/(dp-dq)
+			var r=p.lerp(q,t);r[achse]=grenze   # genau auf der Linie (beide Nachbarn rechnen denselben Punkt)
+			out.append(r)
+	return out
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)
 	if cr.length()<1e-9:return
@@ -1109,27 +1125,32 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
 		cr=(b-a).cross(c-a)
 	var fn=-cr.normalized()
-	if boden_teil>0.0 and not fest_modus and abs(fn.y)>0.95:
-		# große waagerechte Fläche in Stücke teilen, damit Sicht und Kollision dem Höhenfeld folgen
-		var lab=Vector2(a.x-b.x,a.z-b.z).length();var lbc=Vector2(b.x-c.x,b.z-c.z).length();var lca=Vector2(c.x-a.x,c.z-a.z).length()
-		var lm=max(lab,max(lbc,lca))
-		# nur teilen, wo das Höhenfeld wirklich gewölbt ist (Abweichung von der Ebene durch die Ecken > 4 cm)
-		var krumm=false
-		if lm>3.0:
-			var fa=FY(a.x,a.z);var fb=FY(b.x,b.z);var fc=FY(c.x,c.z)
-			for q in [[(a+b)*0.5,(fa+fb)*0.5],[(b+c)*0.5,(fb+fc)*0.5],[(c+a)*0.5,(fc+fa)*0.5],[(a+b+c)/3.0,(fa+fb+fc)/3.0]]:
-				if abs(FY(q[0].x,q[0].z)-q[1])>0.012:krumm=true;break
-		if krumm:
+	if boden_teil>0.0 and not fest_modus and abs(fn.y)>0.95 and HF_N>0 and not _im_raster:
+		# waagerechte Fläche an den Linien des 4-m-Höhenrasters zerlegen: jede gemeinsame Kante zweier Flächen
+		# bekommt dieselben Teilpunkte (keine T-Stöße -> keine Haarrisse/Punktlinien) und folgt dem Gelände
+		var cx=HF_C
+		var x0=int(floor((min(a.x,min(b.x,c.x))-HF_X0)/cx));var x1=int(floor((max(a.x,max(b.x,c.x))-HF_X0)/cx))
+		var z0=int(floor((min(a.z,min(b.z,c.z))-HF_Z0)/cx));var z1=int(floor((max(a.z,max(b.z,c.z))-HF_Z0)/cx))
+		if (x1>x0 or z1>z0) and (x1-x0+1)*(z1-z0+1)<6000:
 			N_TEIL+=1
-			if lm==lab:
-				var m1=(a+b)*0.5
-				_tri(s,a,m1,c,aussen);_tri(s,m1,b,c,aussen)
-			elif lm==lbc:
-				var m2=(b+c)*0.5
-				_tri(s,a,b,m2,aussen);_tri(s,a,m2,c,aussen)
-			else:
-				var m3=(c+a)*0.5
-				_tri(s,a,b,m3,aussen);_tri(s,m3,b,c,aussen)
+			var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
+			var tri=[Vector2(a.x,a.z),Vector2(b.x,b.z),Vector2(c.x,c.z)]
+			_im_raster=true
+			for gi in range(x0,x1+1):
+				var streif=_clip_achse(tri,0,HF_X0+gi*cx,1.0)
+				streif=_clip_achse(streif,0,HF_X0+(gi+1)*cx,-1.0)
+				if streif.size()<3:continue
+				for gk in range(z0,z1+1):
+					var zelle=_clip_achse(streif,1,HF_Z0+gk*cx,1.0)
+					zelle=_clip_achse(zelle,1,HF_Z0+(gk+1)*cx,-1.0)
+					if zelle.size()<3:continue
+					var V=[]
+					for q2 in zelle:
+						var l1=((b.z-c.z)*(q2.x-c.x)+(c.x-b.x)*(q2.y-c.z))/d
+						var l2=((c.z-a.z)*(q2.x-c.x)+(a.x-c.x)*(q2.y-c.z))/d
+						V.append(Vector3(q2.x,l1*a.y+l2*b.y+(1.0-l1-l2)*c.y,q2.y))
+					for t in range(1,V.size()-1):_tri(s,V[0],V[t],V[t+1],aussen)
+			_im_raster=false
 			return
 	if koll_an:
 		if fest_modus:KOLL_N.append_array([a,b,c])
@@ -2145,17 +2166,50 @@ func _rundrechteck(a:Vector2,b:Vector2,r:float)->PackedVector2Array:
 	return out
 # Fläche als Platte extrudieren (y0..y1), Deckel mit Material oben, Seiten mit Material seite
 func _kante_teilen(p:Vector2,q:Vector2,tiefe:int)->PackedVector2Array:
-	# Kante an der Mitte teilen, solange das Höhenfeld dort von der Geraden abweicht (wie die Deckfläche)
-	var m=(p+q)*0.5
-	if tiefe<8 and p.distance_to(q)>3.0 and abs(FY(m.x,m.y)-(FY(p.x,p.y)+FY(q.x,q.y))*0.5)>0.012:
-		var r=_kante_teilen(p,m,tiefe+1);r.append_array(_kante_teilen(m,q,tiefe+1));return r
-	return PackedVector2Array([p])
+	# Kante an den Linien des 4-m-Höhenrasters teilen (dieselben Punkte wie die Deckfläche, siehe _tri)
+	if HF_N<=0:return PackedVector2Array([p])
+	var ts=[]
+	for ax in 2:
+		var o=HF_X0 if ax==0 else HF_Z0
+		var u0=p[ax];var u1=q[ax]
+		if abs(u1-u0)<1e-6:continue
+		var g0=int(floor((min(u0,u1)-o)/HF_C))+1;var g1=int(ceil((max(u0,u1)-o)/HF_C))-1
+		for g in range(g0,g1+1):
+			var t=(o+g*HF_C-u0)/(u1-u0)
+			if t>1e-6 and t<1.0-1e-6:ts.append([t,ax,o+g*HF_C])
+	ts.sort_custom(func(x,y):return x[0]<y[0])
+	var r=PackedVector2Array([p])
+	for e in ts:
+		var m=p.lerp(q,e[0]);m[e[1]]=e[2];r.append(m)
+	return r
 func _platte(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
 	var alt_k=koll_an;koll_an=true
 	_platte_k(poly,y0,y1,oben,seite)
 	koll_an=alt_k
-func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
+# Dreiecksliste eines Polygons, auch wenn Godots Ohrschneider aufgibt (doppelte/fast gerade Punkte nach dem
+# Ausschneiden) – sonst fehlt das ganze Stück und man schaut durch ein Loch auf das Gelände
+static func dreiecke(poly:PackedVector2Array)->PackedInt32Array:
 	var idx=Geometry2D.triangulate_polygon(poly)
+	if not idx.is_empty() or poly.size()<3:return idx
+	# 1) doppelte Punkte entfernen, Index merken
+	var keep=PackedInt32Array()
+	for i in poly.size():
+		if keep.is_empty() or poly[i].distance_to(poly[keep[keep.size()-1]])>0.0005:keep.append(i)
+	if keep.size()>3 and poly[keep[0]].distance_to(poly[keep[keep.size()-1]])<=0.0005:keep.remove_at(keep.size()-1)
+	var p2=PackedVector2Array()
+	for i in keep:p2.append(poly[i])
+	var i2=Geometry2D.triangulate_polygon(p2)
+	if i2.is_empty():
+		# 2) Delaunay über alle Punkte, nur Dreiecke im Polygon
+		var dl=Geometry2D.triangulate_delaunay(p2)
+		for t in range(0,dl.size(),3):
+			var c=(p2[dl[t]]+p2[dl[t+1]]+p2[dl[t+2]])/3.0
+			if Geometry2D.is_point_in_polygon(c,p2):i2.append_array([dl[t],dl[t+1],dl[t+2]])
+	var out=PackedInt32Array()
+	for v in i2:out.append(keep[v])
+	return out
+func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
+	var idx=dreiecke(poly)
 	if idx.is_empty():return
 	var so=_st(oben,true)
 	var bt0=boden_teil
@@ -3404,7 +3458,7 @@ func _band(poly:PackedVector2Array):
 	koll_an=alt_k
 func _band_k(poly:PackedVector2Array):
 	if Geometry2D.is_polygon_clockwise(poly):return   # Innenrand eines Rings ist ein Loch, keine Fläche
-	var idx=Geometry2D.triangulate_polygon(poly)
+	var idx=dreiecke(poly)
 	if idx.is_empty():return
 	var so=_st(M.asphalt,true)
 	for i in range(0,idx.size(),3):

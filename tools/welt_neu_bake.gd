@@ -743,7 +743,7 @@ func _asphalt_ohne_ueberlappung():
 				teile=t2
 				if teile.is_empty():break
 			for t in teile:
-				var idx=Geometry2D.triangulate_polygon(t)
+				var idx=L.dreiecke(t)
 				for i in range(0,idx.size(),3):
 					var a=t[idx[i]];var b=t[idx[i+1]];var c=t[idx[i+2]]
 					L._tri(so,Vector3(a.x,0.015,a.y),Vector3(b.x,0.015,b.y),Vector3(c.x,0.015,c.y),Vector3.UP)
@@ -1757,7 +1757,10 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 		var h:float=t[1]-0.06
 		# 6 m Rand voll auf Grundstückshöhe (das 10-m-Raster hängt sonst zwischen den Punkten durch), 14 m weich.
 		# Grenzen sich zwei Grundstücke auf verschiedener Höhe, gewinnt je Rasterpunkt das nähere (nicht das erste)
-		var gross=Geometry2D.offset_polygon(poly,6.0)
+		# voller Rand = eine ganze Rasterzelle diagonal (14,5 m): alle vier Gitterpunkte jeder Zelle, die das
+		# Grundstück berührt, liegen auf Grundstückshöhe – sonst steigt der Hang zwischen den Punkten durch den Boden
+		var VOLL=ST*1.45
+		var gross=Geometry2D.offset_polygon(poly,VOLL)
 		if gross.is_empty():continue
 		var pg:PackedVector2Array=gross[0]
 		var bb=Rect2(pg[0],Vector2.ZERO)
@@ -1771,9 +1774,19 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 				if not Geometry2D.is_point_in_polygon(w,poly):
 					d0=1e9
 					for a in poly.size():d0=min(d0,Geometry2D.get_closest_point_to_segment(w,poly[a],poly[(a+1)%poly.size()]).distance_to(w))
-				var g=1.0-smoothstep(6.0,20.0,d0)
+				var g=1.0-smoothstep(VOLL,VOLL+14.0,d0)
 				if g<=0.0:continue
-				if d0<dmin[j]:dmin[j]=d0;gew[j]=g;ziel[j]=h
+				if d0<=VOLL:
+					# im Grundstück selbst gilt seine Höhe; im vollen Rand mehrerer Grundstücke die tiefere
+					# (nichts sticht durch, das höhere hat Gartenmauer/Sockel nach unten)
+					if d0==0.0:
+						if dmin[j]==0.0:ziel[j]=min(ziel[j],h)
+						else:ziel[j]=h
+					elif dmin[j]>0.0:
+						if dmin[j]<=VOLL:ziel[j]=min(ziel[j],h)
+						else:ziel[j]=h
+					dmin[j]=min(dmin[j],d0);gew[j]=1.0
+				elif d0<dmin[j]:dmin[j]=d0;gew[j]=g;ziel[j]=h
 		n+=1
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
@@ -1820,7 +1833,10 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 		if NO.WASSER[j]==1 and H[j]<0.0 and d>e[2]-ST:continue   # Brücken: kein Damm im Wasser
 		# Fahrbahn/Gehweg: Gelände knapp unter dem Belag. Hinter dem Gehweg: Gelände fast bündig mit der
 		# Gehweg-Oberkante (+0,11) statt 26 cm tiefer – sonst sieht man überall eine Erdkante als Naht
-		if d<=e[2]:H[j]=min(y,e[4]-0.15) if d<=e[5]+1.0 else min(e[1],e[4])+0.04
+		if d<=e[2]:
+			H[j]=min(y,e[4]-0.15) if d<=e[5]+1.0 else min(e[1],e[4])+0.04
+			# hinter dem Gehweg im vollen Grundstücksrand nie höher als das Grundstück (sonst Hang durch die Terrasse)
+			if d>e[5]+1.0 and NO.LOT[j]!=0 and GARTEN.size()>j and GARTEN[j]>0.99:H[j]=min(H[j],LOTZIEL[j])
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)

@@ -896,7 +896,7 @@ func _k_feld(i:int):
 	var farben=[[Color(0.85,0.75,0.3),Color(0.75,0.65,0.25)],[Color(0.45,0.6,0.25),Color(0.38,0.5,0.2)],[Color(0.55,0.42,0.28),Color(0.45,0.35,0.22)]][i]
 	# Ackerboden unter den Reihen (sonst sieht man zwischen den Reihen den Platz-Belag)
 	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.3,14.65),Vector3(29.4,0.7,29.3),Basis(),0.0)
-	for k in 15:L.box(T(farben[k%2]),_P(0,0.0+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
+	for k in 15:L.box(T(farben[k%2]),_P(0,0.05+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
 	L._zaun(_P(-15,0,0.2),_P(15,0,0.2),1.2)
 func _k_wasserturm():
 	var c=_P(0,0,5)
@@ -1401,7 +1401,7 @@ func _tri_frei(so,A:Vector3,B:Vector3,C:Vector3,g:Dictionary):
 		var l2=((C.z-A.z)*(p.x-C.x)+(A.x-C.x)*(p.y-C.z))/d
 		return l1*A.y+l2*B.y+(1.0-l1-l2)*C.y
 	for t in teile:
-		var idx=Geometry2D.triangulate_polygon(t)
+		var idx=L.dreiecke(t)
 		for k in range(0,idx.size(),3):
 			var a:Vector2=t[idx[k]];var b:Vector2=t[idx[k+1]];var c:Vector2=t[idx[k+2]]
 			L._tri(so,Vector3(a.x,hy.call(a),a.y),Vector3(b.x,hy.call(b),b.y),Vector3(c.x,hy.call(c),c.y),Vector3.UP)
@@ -1436,8 +1436,8 @@ func fahrbahnen():
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
 			for v in [a3,b3]:
 				var yf=_y_fremd(Vector2(v.x,v.z),ri,0.3)
-				if yf<INF:v.y=min(v.y,yf+0.03)
-			a3.y=min(a3.y,_y_fremd(Vector2(a3.x,a3.z),ri,0.3)+0.03);b3.y=min(b3.y,_y_fremd(Vector2(b3.x,b3.z),ri,0.3)+0.03)
+				if yf<INF:v.y=min(v.y,yf+0.06)
+			a3.y=min(a3.y,_y_fremd(Vector2(a3.x,a3.z),ri,0.3)+0.06);b3.y=min(b3.y,_y_fremd(Vector2(b3.x,b3.z),ri,0.3)+0.06)
 			Ls.append(a3);Rs.append(b3)
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
@@ -1456,7 +1456,7 @@ func fahrbahnen():
 						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 				teile=t2
 			for t in teile:
-				var idx=Geometry2D.triangulate_polygon(t)
+				var idx=L.dreiecke(t)
 				for k in range(0,idx.size(),3):
 					var V=[]
 					for m in 3:
@@ -1465,7 +1465,7 @@ func fahrbahnen():
 						var tt=clamp((pv-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
 						var yv=lerp(Y[i],Y[i+1],tt)+0.06
 						var yf=_y_fremd(pv,ri,0.3)
-						if yf<INF:yv=min(yv,yf+0.03)
+						if yf<INF:yv=min(yv,yf+0.06)
 						V.append(Vector3(pv.x,yv,pv.y))
 					L._tri(so,V[0],V[1],V[2],Vector3.UP)
 		# Bankett: schräg vom Fahrbahnrand 2,6 m nach außen ins Gelände (statt senkrechter Kante)
