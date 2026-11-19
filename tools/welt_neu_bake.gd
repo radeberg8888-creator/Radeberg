@@ -43,7 +43,7 @@ func _init():
 	STN=Node3D.new();STN.name="Stadt";W.add_child(STN);STN.position=Vector3(CX,0,CZ)
 	L=load("res://scripts/comic/stadt_lib.gd").new();L.init_lib(STN,11)
 	L.spiel_modus=true;L.SPH.radial_segments=9;L.SPH.rings=5;L.CYL.radial_segments=8
-	L.kompakt=true;L.kachel=150.0;L.kachel_modul=250.0;L.weit_detail=330.0;L.weit_ink=170.0;L.weit_modul=200.0;L.mat_cache=true
+	L.kompakt=true;L.kachel=150.0;L.kachel_modul=250.0;L.weit_detail=290.0;L.weit_ink=140.0;L.weit_modul=160.0;L.mat_cache=true
 	GL=load("res://scripts/comic/ghetto_lib.gd").new(L);K=load("res://scripts/comic/kit_lib.gd").new(L)
 	G0=load("res://scripts/welt_gelaende.gd").new()
 	NAT0=G0._nh.duplicate()
