@@ -61,7 +61,14 @@ jobs:
           export GALERIE_OUT=$PWD/build/testbilder/
           mkdir -p $GALERIE_OUT
           NUR="${{ github.event.inputs.nur }}"; [ -z "$NUR" ] && NUR=$(cat .github/test_nur 2>/dev/null || echo nord)
-          timeout 10800 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 || true
+          timeout 10800 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=$NUR > build/galerie.log 2>&1 &
+          GP=$!
+          # Wächter: bei einem Skriptfehler (Parse Error) sofort abbrechen statt bis zum Zeitlimit zu warten
+          while kill -0 $GP 2>/dev/null; do
+            sleep 20
+            if grep -q "Parse Error\|Nonexistent function 'new' in base 'GDScript'" build/galerie.log; then echo "SKRIPTFEHLER – Abbruch"; pkill -f "Godot_v" || true; sleep 5; break; fi
+          done
+          wait $GP || true
           grep -E "MESS|NORD Orte|SCRIPT ERROR" build/galerie.log | head -80
           cp build/galerie.log build/bake.log $GALERIE_OUT/ || true
           ls $GALERIE_OUT | wc -l
