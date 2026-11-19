@@ -1182,11 +1182,36 @@ func _kachel(R:Rect2,tiefe:int)->int:
 			if Geometry2D.is_polygon_clockwise(g):continue
 			for e in Geometry2D.intersect_polygons(g,T4):
 				if Geometry2D.is_polygon_clockwise(e) or abs(L._flaeche2(e))<1.0:continue
-				L._platte(e,-0.6,KB,mat,L.M.stein);c+=1
+				c+=1
+				# Gehweg und Grün NEBENeinander auf gleicher Höhe (keine übereinanderliegenden Flächen)
+				var weg=[];var gr=[e];var loch2=false
 				for band in geh:
 					for f in Geometry2D.intersect_polygons(e,band):
-						if Geometry2D.is_polygon_clockwise(f) or abs(L._flaeche2(f))<0.5:continue
-						_flaeche(f,KB+0.016,gw)
+						if Geometry2D.is_polygon_clockwise(f):continue
+						var teile2=[f]
+						for w0 in weg:
+							var t2=[]
+							for t in teile2:
+								for y in Geometry2D.clip_polygons(t,w0):
+									if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+							teile2=t2
+						weg.append_array(teile2)
+					var g2=[]
+					for g0 in gr:
+						for y in Geometry2D.clip_polygons(g0,band):
+							if Geometry2D.is_polygon_clockwise(y):loch2=true
+							elif y.size()>=3:g2.append(y)
+					gr=g2
+				if loch2:
+					# selten: Band ganz innen -> alte Art (Belag knapp darüber)
+					L._platte(e,-0.6,KB,mat,L.M.stein)
+					for w0 in weg:
+						if abs(L._flaeche2(w0))>=0.5:_flaeche(w0,KB+0.016,gw)
+					continue
+				for g0 in gr:
+					if abs(L._flaeche2(g0))>=0.05:L._platte(g0,-0.6,KB,mat,L.M.stein)
+				for w0 in weg:
+					if abs(L._flaeche2(w0))>=0.05:L._platte(w0,-0.6,KB,gw,L.M.stein)
 	return c
 
 # Strommasten (Ghetto/Süd), Laternen (Strand/Süd)

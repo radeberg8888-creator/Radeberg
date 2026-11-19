@@ -108,9 +108,11 @@ func _ort(name:String,ziel:Vector2):
 	cam.look_at_from_position(Vector3(a.x,_boden(a)+1.8,a.y),Vector3(z.x,_boden(z)+3.0,z.y));cam.current=true
 	spiel.env.fog_enabled=true
 	await _foto(name+"_1_strasse")
+	print("LEISTUNG ",name," Straße: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 	var h=Vector3(p.x,_boden(p),p.y)
 	cam.look_at_from_position(h+Vector3(-t.x*90+n.x*60,95,-t.y*90+n.y*60),h);spiel.env.fog_enabled=false
 	await _foto(name+"_2_luft")
+	print("LEISTUNG ",name," Luft: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 
 func _bahn():
 	var z=spiel.zug
