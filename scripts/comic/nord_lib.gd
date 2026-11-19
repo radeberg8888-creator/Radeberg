@@ -570,8 +570,10 @@ func _villa_modern(i:int):
 	K.haupt(c+Vector3(0,3.5,0),Vector3(16,7,11),Basis(),Color(0.95,0.94,0.9),Color(0.25,0.25,0.28))
 	# Pool, Terrasse, Palmen, Garage
 	L.box(L.M.pflaster,_P(-2,0.02,8.5),Vector3(14,0.04,5),Basis(),0.0)
-	L.box(T(Color(0.2,0.6,0.85)),_P(-4,0.03,8.0),Vector3(8,0.03,3.6),Basis(),0.0)
-	L.box(L.M.weiss,_P(-4,0.05,8.0),Vector3(8.6,0.1,4.2),Basis(),0.0)
+	# Becken: weißer Rand als Rahmen, Wasser 3 cm darunter (nichts liegt doppelt)
+	L.box(T(Color(0.2,0.6,0.85)),_P(-4,0.095,8.0),Vector3(8.0,0.03,3.6),Basis(),0.0)
+	for e in [[Vector3(0,0,1.95),Vector3(8.6,0.14,0.3)],[Vector3(0,0,-1.95),Vector3(8.6,0.14,0.3)],[Vector3(4.15,0,0),Vector3(0.3,0.14,3.6)],[Vector3(-4.15,0,0),Vector3(0.3,0.14,3.6)]]:
+		L.box(L.M.weiss,_P(-4,0.07,8.0)+e[0]*Vector3(1,1,-1),e[1],Basis(),0.0)
 	for k in 2:_mb(Color(0.95,0.95,0.95),_P(1.2+k*1.4,0.25,7.2),Vector3(0.7,0.3,1.9),Basis(),0.0)   # Liegen
 	palme(_P(7,0,7),8.0+float(i%3));palme(_P(-11,0,10),9.0)
 	_cypresse(_P(-12.5,0,4.0),5.5)
@@ -1416,7 +1418,7 @@ func _gelegt_dazu(g:Dictionary,q:PackedVector2Array):
 			g[k].append(e)
 func fahrbahnen():
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
-	var bank=T(Color(0.47,0.6,0.33));var bank_sand=T(Color(0.72,0.62,0.45));L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
+	var bank=T(Color(0.47,0.6,0.33)).duplicate();var bank_sand=T(Color(0.72,0.62,0.45)).duplicate();bank.resource_name="bankett";bank_sand.resource_name="bankett_sand";L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
 	# Reihenfolge nach Vorfahrt: vorrangige Straßen zuerst; jede spätere Fläche spart alles aus, was schon
 	# liegt (auch eigene Stücke an engen Kurven) -> nirgends zwei Fahrbahnen übereinander

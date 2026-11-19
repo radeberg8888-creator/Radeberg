@@ -781,6 +781,16 @@ func _ampeln(bl:Array):
 	BER["ampeln"]=n
 
 # ---------------- Bahn ----------------
+# zwei Schwellen (2,5 x 0,24 m quer zur Fahrtrichtung t) überschneiden sich? (Eckpunkt-in-Rechteck-Test)
+func _schwellen_ueberlapp(p1:Vector2,t1:Vector2,p2:Vector2,t2:Vector2)->bool:
+	for paar in [[p1,t1,p2,t2],[p2,t2,p1,t1]]:
+		var a:Vector2=paar[0];var ta:Vector2=paar[1].normalized();var b:Vector2=paar[2];var tb:Vector2=paar[3].normalized()
+		var qa=Vector2(-ta.y,ta.x);var qb=Vector2(-tb.y,tb.x)
+		for sx in [-1.25,1.25]:
+			for sz in [-0.12,0.12]:
+				var e=a+qa*sx+ta*sz-b
+				if abs(e.dot(qb))<1.25 and abs(e.dot(tb))<0.12:return true
+	return false
 func _bahn_bauen():
 	var schotter=L._toon(Color(0.52,0.48,0.44));var schwelle=L._toon(Color(0.38,0.28,0.2));var schiene=L._toon(Color(0.55,0.56,0.6),0.3)
 	var schw_ort={}   # 2-m-Zelle -> [[Mitte, Gleis-Nr, s]] der schon gelegten Schwellen
@@ -810,10 +820,12 @@ func _bahn_bauen():
 				for dz in [-1,0,1]:
 					for o in schw_ort.get(zk+Vector2i(dx,dz),[]):
 						if o[0].distance_to(p)<2.6 and (o[1]!=gnr or abs(o[2]-s)>3.0):im=true
+						# auch im selben Gleis: an Knicken (Weichen) überlappen Nachbarschwellen an den Enden
+						elif o[0].distance_to(p)<2.6 and _schwellen_ueberlapp(p,t,o[0],o[3]):im=true
 			if not im:
 				L.box(schwelle,Vector3(p.x,0.16,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
 				if not schw_ort.has(zk):schw_ort[zk]=[]
-				schw_ort[zk].append([p,gnr,s])
+				schw_ort[zk].append([p,gnr,s,t])
 			s+=0.75
 		for sd in [-0.72,0.72]:
 			for i in P.size()-1:
@@ -1308,6 +1320,15 @@ func _norden()->Dictionary:
 				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
 				hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
 			if kn.begins_with("nt_"):hy-=0.15
+		else:
+			# große Bausätze (Villa, Hof, Laden): auf den höchsten Geländepunkt der Grundfläche (höchstens 30 cm
+			# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
+			# die Ränder reichen mit Sockel/Gartenmauer nach unten
+			var h0=hy;var hw2=kk.w*0.5;var dd2=kk.d
+			for q in [Vector3(-hw2,0,0),Vector3(hw2,0,0),Vector3(-hw2,0,-dd2),Vector3(hw2,0,-dd2),Vector3(0,0,-dd2*0.5),Vector3(-hw2,0,-dd2*0.5),Vector3(hw2,0,-dd2*0.5),Vector3(0,0,-dd2)]:
+				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
+				hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
+			hy=min(hy,h0+0.3)
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
 			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn

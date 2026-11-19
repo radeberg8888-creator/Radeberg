@@ -383,8 +383,8 @@ func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 		# kleinere Beläge liegen höher als größere (Weg auf Einfahrt auf Platz), damit auch zwei dünne Beläge
 		# übereinander mindestens 1,5 cm Abstand haben
 		var fl=s.x*s.z
-		if m==M.markierung and top<KB+0.10:c.y+=KB+0.10-top
-		elif top>KB-0.005 and top<KB+0.035:c.y+=KB+(0.04 if fl>=120.0 else (0.06 if fl>=25.0 else 0.08))-top
+		if m==M.markierung and top<KB+0.12:c.y+=KB+0.12-top
+		elif top>KB-0.005 and top<KB+0.05:c.y+=KB+(0.06 if fl>=120.0 else (0.08 if fl>=25.0 else 0.10))-top
 	if auto_koll and m!=ink and c.y+s.y*0.5<=KB+1.6 and s.x>=0.6 and s.z>=0.6 and abs(b.y.normalized().y)>0.97:koll_box(c,s,b)
 	# Handy-Fassung: kleine Kästen (Fensterbänke, Gesimse, Konsolen …) als Kopien eines Einheitswürfels
 	if leicht and not _im_modul and not strassen_modus and not fest_modus and not koll_kasten and max(s.x,max(s.y,s.z))<2.2:

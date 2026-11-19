@@ -128,10 +128,10 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 		if nv.y>0.985:   # Boden ist fast eben (höchstens ~17 % Gefälle); Markisen/Dächer/Böschungen nicht
 			var th=G._tri_hg(m.x,m.z)
 			var dh=m.y-th
-			if abs(dh)<0.006 or dh>1.5 or dh<-0.6:continue
+			if dh>1.5 or dh<-0.6:continue
 			# keine Bodenfläche: aufgemalte Markierung, Bankett (taucht gewollt unter das Gelände), Sockel-Oberseiten,
 			# Teile unter dem Boden eines Bausatzes (verdeckt)
-			if name.begins_with("markierung") or name.contains("/markierung") or name.begins_with("stein_d") or name.contains("sockel"):continue
+			if name.begins_with("markierung") or name.contains("/markierung") or name.begins_with("stein_d") or name.contains("sockel") or name.begins_with("bankett"):continue
 			if nur_waende and m.y<xf.origin.y+0.10:continue
 			# Bausätze: nur große, niedrige Flächen (Veranda, Terrasse, Einfahrt, Stufen) – keine Tische/Töpfe
 			if nur_waende and (sqrt(l2)*0.5<0.3 or dh>0.9 or name.begins_with("K_")):continue
