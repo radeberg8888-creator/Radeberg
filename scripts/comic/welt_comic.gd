@@ -115,7 +115,13 @@ func _eingesetzt(v,n:Node,id:=0):
 		v.weg_jetzt=false;n.queue_free();return
 	puffer_setzen(n)
 	if not n.has_meta("stil"):stil(n)
-	v.node=n;add_child(n)
+	v.node=_einhaengen(n)
+# Kachel einhängen – hängt dieselbe Kachel (gleicher Name) schon im Baum, die vorhandene behalten
+func _einhaengen(n:Node)->Node:
+	var da=get_node_or_null(NodePath(String(n.name)))
+	if da!=null and da!=n and not da.is_queued_for_deletion():
+		n.queue_free();return da
+	add_child(n);return n
 # Sofort laden (Spielstart/Teleport), blockierend
 func viertel_jetzt(p:Vector2):
 	for v in VIERTEL:
@@ -125,7 +131,7 @@ func viertel_jetzt(p:Vector2):
 				v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()
 			puffer_setzen(v.node);stil(v.node)
-			add_child(v.node)
+			v.node=_einhaengen(v.node)
 # Ist der Boden an dieser Stelle schon da? (Verkehr/Parker nur dann aufstellen)
 var _vgitter:={}   # 300-m-Zelle -> Viertel (schnelle Abfrage)
 func bereit(p:Vector2)->bool:

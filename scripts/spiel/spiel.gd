@@ -153,7 +153,7 @@ func _ready():
 			await get_tree().process_frame
 			if v.laed:v.node=ResourceLoader.load_threaded_get(v.datei).instantiate();v.laed=false
 			else:v.node=load(v.datei).instantiate()
-			welt.puffer_setzen(v.node);welt.add_child(v.node)
+			welt.puffer_setzen(v.node);v.node=welt._einhaengen(v.node)
 		_log("viertel ok %d"%nah.size())
 		# ein paar Bilder hinter dem Ladebildschirm zeichnen: Shader werden jetzt übersetzt, nicht im Spiel
 		_lade("Gleich geht's los …",0.99)
