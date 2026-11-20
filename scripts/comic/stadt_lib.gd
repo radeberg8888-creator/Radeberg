@@ -1046,6 +1046,7 @@ func _baum_roh(p:Vector3):
 	PFOSTEN.append([p,0.25,3.0])
 	# runder Erdfleck mit Steinring
 	zyl(M.erde,p+Vector3(0,0.0,0),p+Vector3(0,0.03,0),0.9)
+	koll_box(p+Vector3(0,-0.08,0),Vector3(1.9,0.2,1.9))   # Baumscheibe begehbar (Gehweg hat dort ein Loch)
 	for k in 12:
 		var a=TAU*k/12.0
 		box(M.stein,p+Vector3(cos(a)*0.98,0.06,sin(a)*0.98),Vector3(0.18,0.12,0.5),Basis(Vector3.UP,-a),0.015)
