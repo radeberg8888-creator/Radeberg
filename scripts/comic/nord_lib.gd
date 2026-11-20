@@ -678,7 +678,7 @@ func _villa_garten(i:int):
 	var stein=T([Color(0.62,0.6,0.56),Color(0.66,0.55,0.45),Color(0.58,0.56,0.54)][i%3]);var deck=T(Color(0.5,0.48,0.45))
 	for sx in [-1,1]:
 		var x=sx*(15-0.15)
-		L.box(putz,_P(x,-1.9,16),Vector3(0.3,8.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
+		L.box(putz,_P(x,-5.9,16),Vector3(0.3,16.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
 		L.box(deck,_P(x,2.26,16),Vector3(0.46,0.12,32.1),Basis(),0.0)
 		L.box(stein,_P(x,0.2,16),Vector3(0.34,0.4,32.02),Basis(),0.0)
 		for k in 9:L.box(stein,_P(x,1.1,0.3+k*3.9),Vector3(0.5,2.3,0.5),Basis(),0.0)
@@ -687,7 +687,7 @@ func _villa_garten(i:int):
 		var x0:float=seg[0];var x1:float=seg[1];var lg=x1-x0
 		if lg<0.6:continue
 		var xm=(x0+x1)*0.5
-		L.box(putz,_P(xm,-1.9,0.2),Vector3(lg,8.2,0.3),Basis(),0.02);L.koll_box(_P(xm,1.1,0.2),Vector3(lg,2.2,0.3))
+		L.box(putz,_P(xm,-5.9,0.2),Vector3(lg,16.2,0.3),Basis(),0.02);L.koll_box(_P(xm,1.1,0.2),Vector3(lg,2.2,0.3))
 		L.box(deck,_P(xm,2.26,0.2),Vector3(lg+0.1,0.12,0.46),Basis(),0.0)
 		L.box(stein,_P(xm,0.2,0.2),Vector3(lg+0.02,0.4,0.34),Basis(),0.0)
 		var k=0.0

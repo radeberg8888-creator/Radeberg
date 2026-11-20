@@ -218,10 +218,13 @@ func hoehen(x:float,z:float,tol:=0.0005)->Array:
 	return out
 # in allen vier Richtungen innerhalb von 3 m eine Wand: Punkt liegt in einem Gebäude/einer Mauer
 func _umschlossen(p:Vector3)->bool:
+	var d=[]
 	for dir in [Vector3(1,0,0),Vector3(-1,0,0),Vector3(0,0,1),Vector3(0,0,-1)]:
 		var h=_wand_strahl(p-dir*0.06,dir,3.0)
-		if h.is_empty():return false
-	return true
+		d.append(9.0 if h.is_empty() else h.dist)
+	# in einer Mauer (beide Gegenrichtungen nah) oder ringsum Wände
+	if (d[0]<0.7 and d[1]<0.7) or (d[2]<0.7 and d[3]<0.7):return true
+	return d.max()<9.0
 # senkrecht unter dem Punkt (bis 30 cm) eine schräge oder abwärts zeigende Fläche?
 func _schraeg_unter(p:Vector3,y:float)->bool:
 	var k=Vector2i(int(floor(p.x)),int(floor(p.z)))
