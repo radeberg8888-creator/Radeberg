@@ -353,7 +353,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				# Punkt genau auf einer gemeinsamen Kante zweier Dreiecke ist keine Lücke (Spalt unter 2 mm)
 				if hoehen(x,z,-0.002).size()>0 or _abstand_flaeche(x,z)<0.002:z+=1.0;continue
 				# liegt der Punkt innerhalb einer Mauer/eines Hauses (ringsum Wände)? dann sieht man dort nicht hin
-				if _umschlossen(Vector3(x,G._tri_hg(x,z)+0.45,z)):z+=1.0;continue
+				if _umschlossen(Vector3(x,G._tri_hg(x,z)+1.2,z)):z+=1.0;continue
 				var th=G._tri_hg(x,z)
 				for d in [Vector2(0.6,0),Vector2(0,0.6)]:
 					var h1=oben(x-d.x,z-d.y);var h2=oben(x+d.x,z+d.y)

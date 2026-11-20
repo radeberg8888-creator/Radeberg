@@ -369,7 +369,14 @@ func _box_kopie(m:Material,xf:Transform3D,me:Mesh=null):
 	if not MODULE.has(key):
 		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,me.get_mesh_arrays());am.surface_set_material(0,m)
 		MODULE[key]=am;MODUL_SCHATTEN[key]=false;_MOD_PF[key]=[];_MOD_KF[key]=[]
+	# derselbe Kasten (Material, Lage, Größe) zweimal -> nur einmal (sonst flimmern zwei deckungsgleiche Kästen)
+	var o=xf.origin;var bx=xf.basis
+	var dk="%s|%d|%d|%d|%d|%d|%d|%d|%d|%d"%[key,roundi(o.x*100),roundi(o.y*100),roundi(o.z*100),roundi(bx.x.x*100),roundi(bx.x.z*100),roundi(bx.y.y*100),roundi(bx.z.x*100),roundi(bx.z.z*100),roundi(bx.x.y*100)]
+	var hk=dk.hash()
+	if _KASTEN_DA.has(hk):return
+	_KASTEN_DA[hk]=true
 	_inst_add(key,xf)
+var _KASTEN_DA:={}
 var auto_koll:=false
 func box(m:Material,c:Vector3,s:Vector3,b:=Basis(),kontur:=0.035):
 	if BOX_FACES.is_empty():BOX_FACES=BOX.get_faces()

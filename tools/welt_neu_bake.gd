@@ -1789,7 +1789,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	for t in NO.TERR:
 		var poly=PackedVector2Array()
 		for e in t[0]:poly.append(e+NO.C)
-		var h:float=t[1]-0.06
+		var h:float=t[1]-0.12   # Gelände 12 cm unter der Terrassenhöhe (Rasen liegt sicher darüber)
 		# 6 m Rand voll auf Grundstückshöhe (das 10-m-Raster hängt sonst zwischen den Punkten durch), 14 m weich.
 		# Grenzen sich zwei Grundstücke auf verschiedener Höhe, gewinnt je Rasterpunkt das nähere (nicht das erste)
 		# voller Rand = eine ganze Rasterzelle diagonal (14,5 m): alle vier Gitterpunkte jeder Zelle, die das
