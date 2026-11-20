@@ -1785,6 +1785,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	var n=0;var gew=PackedFloat32Array();gew.resize(nx*nz);gew.fill(0.0)
 	var ziel=PackedFloat32Array();ziel.resize(nx*nz)
 	var dmin=PackedFloat32Array();dmin.resize(nx*nz);dmin.fill(1e9)
+	var kern=PackedFloat32Array();kern.resize(nx*nz);kern.fill(-1e9)
 	for t in NO.TERR:
 		var poly=PackedVector2Array()
 		for e in t[0]:poly.append(e+NO.C)
@@ -1817,9 +1818,14 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 					# Hang über die Rückseite des tieferen Grundstücks)
 					if dmin[j]<=VOLL:ziel[j]=min(ziel[j],h)
 					else:ziel[j]=h
+					if d0==0.0:kern[j]=max(kern[j],h)
 					dmin[j]=min(dmin[j],d0);gew[j]=1.0
 				elif d0<dmin[j]:dmin[j]=d0;gew[j]=g;ziel[j]=h
 		n+=1
+	# im eigenen Grundstück höchstens 2,5 m unter dessen Höhe (Gartenmauern/Tröge reichen 3 m tief; bei
+	# steilerem Hang bleibt der Rest als Böschung zum tieferen Nachbarn)
+	for j in nx*nz:
+		if kern[j]>-1e8:ziel[j]=max(ziel[j],kern[j]-2.5)
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
 	LOTZIEL=ziel

@@ -13,6 +13,8 @@ var BO:=PackedInt32Array()       # Besitzer (Mesh-Nummer) je Dreieck
 var BG:={}                       # 1-m-Zelle -> PackedInt32Array Dreiecke
 var CG:={}                       # 1-m-Zelle -> alle nach oben zeigenden sichtbaren Dreiecke (Abdeckung)
 var CT:=PackedVector3Array()
+var SG:={}                       # 1-m-Zelle -> schräge/abwärts zeigende Dreiecke
+var SGT:=PackedVector3Array()
 var VT:=PackedVector3Array()     # senkrechte Dreiecke (Wände)
 var VO:=PackedInt32Array()
 var VG:={}                       # 2-m-Zelle -> PackedInt32Array
@@ -71,7 +73,7 @@ func _ink(m)->bool:
 	return false
 
 func sammeln(mitte:Vector2,radius:float):
-	BT.clear();BO.clear();BG.clear();CG.clear();CT.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();KINST.clear();KOPIE_N=0;DOPPEL_KOPIEN.clear()
+	BT.clear();BO.clear();BG.clear();CG.clear();CT.clear();SG.clear();SGT.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();KINST.clear();KOPIE_N=0;DOPPEL_KOPIEN.clear()
 	var orte={}
 	var feld=Rect2(mitte-Vector2(radius,radius),Vector2(radius,radius)*2.0)
 	var welt=G.spiel.welt
@@ -165,7 +167,19 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 					var k=Vector2i(gx,gz)
 					if not BG.has(k):BG[k]=PackedInt32Array()
 					BG[k].append(ti)
-		elif abs(nv.y)<0.15:
+		if abs(nv.y)>=0.15 and nv.y<=0.985:
+			# schräge und nach unten zeigende Flächen (Kugelkronen, Dachunterseiten, Böschungen): für die Frage,
+			# ob unter einer Wandkante die Form geschlossen weitergeht
+			var si=SGT.size()/3;SGT.append_array([a,b,c])
+			var sx0=int(floor(min(a.x,min(b.x,c.x))));var sx1=int(floor(max(a.x,max(b.x,c.x))))
+			var sz0=int(floor(min(a.z,min(b.z,c.z))));var sz1=int(floor(max(a.z,max(b.z,c.z))))
+			if (sx1-sx0+1)*(sz1-sz0+1)<=400:
+				for gx in range(sx0,sx1+1):
+					for gz in range(sz0,sz1+1):
+						var k=Vector2i(gx,gz)
+						if not SG.has(k):SG[k]=PackedInt32Array()
+						SG[k].append(si)
+		if abs(nv.y)<0.15:
 			var lo=min(a.y,min(b.y,c.y));var hi=max(a.y,max(b.y,c.y))
 			var th=G._tri_hg(m.x,m.z)
 			if lo-th>3.0:continue
@@ -202,6 +216,20 @@ func hoehen(x:float,z:float,tol:=0.0005)->Array:
 		if l1*ad<tol*Vector2(b.x-c.x,b.z-c.z).length() or l2*ad<tol*Vector2(c.x-a.x,c.z-a.z).length() or l3*ad<tol*Vector2(a.x-b.x,a.z-b.z).length():continue
 		out.append([l1*a.y+l2*b.y+l3*c.y,ti])
 	return out
+# senkrecht unter dem Punkt (bis 30 cm) eine schräge oder abwärts zeigende Fläche?
+func _schraeg_unter(p:Vector3,y:float)->bool:
+	var k=Vector2i(int(floor(p.x)),int(floor(p.z)))
+	if not SG.has(k):return false
+	for si in SG[k]:
+		var a=SGT[si*3];var b=SGT[si*3+1];var c=SGT[si*3+2]
+		var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
+		if abs(d)<1e-9:continue
+		var l1=((b.z-c.z)*(p.x-c.x)+(c.x-b.x)*(p.z-c.z))/d
+		var l2=((c.z-a.z)*(p.x-c.x)+(a.x-c.x)*(p.z-c.z))/d
+		if l1<-0.01 or l2<-0.01 or l1+l2>1.01:continue
+		var h=l1*a.y+l2*b.y+(1.0-l1-l2)*c.y
+		if h<=y+0.02 and h>=y-0.3:return true
+	return false
 # höchste sichtbare nach oben zeigende Fläche bei (x,z) bis knapp über y (sonst -INF)
 func _boden_unter(x:float,z:float,y:float)->float:
 	var best=-INF
@@ -347,6 +375,8 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var qa=p+nv*0.08
 				var ra=G._strahl(Vector3(qa.x,unten+0.3,qa.z),Vector3(qa.x,unten-40.0,qa.z),true)
 				if not ra.is_empty():luft=min(luft,unten-ra.position.y)
+			# geht die Form unter der Kante schräg weiter (Kugelkrone, Böschung, Dachuntersicht)? dann keine Lücke
+			if luft>0.10 and _schraeg_unter(p-nv*0.03,unten):luft=0.0
 			# sichtbarer Boden direkt unter der Kante (auch Bausatz-Boden ohne geladene Kollision)
 			if luft>0.10:
 				var bu=max(_boden_unter(q.x,q.z,unten),_boden_unter(p.x+nv.x*0.08,p.z+nv.z*0.08,unten))
