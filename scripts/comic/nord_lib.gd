@@ -716,7 +716,7 @@ func _villa_garten(i:int):
 func _boden(w:float,d:float,farbe:Color):
 	super._boden(w,d,farbe)
 	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
-	L.box(T(farbe),_P(0,-0.8,d*0.5),Vector3(w-0.02,1.4,d-0.02),Basis(),0.0)
+	L.box(T(farbe),_P(0,-2.1,d*0.5),Vector3(w-0.02,4.0,d-0.02),Basis(),0.0)
 	# flache Rasen-Schräge an Seiten und Rückseite: keine 6-cm-Stufe zum Gelände -> keine gestrichelte Konturlinie
 	var so=L._st(T(farbe),true);var b:=1.2;var o:=0.01;var u:=-0.3
 	var A=_P(-w*0.5,o,0);var B=_P(-w*0.5,o,d);var C2=_P(w*0.5,o,d);var D=_P(w*0.5,o,0)

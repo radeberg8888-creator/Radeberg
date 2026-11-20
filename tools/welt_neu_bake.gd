@@ -789,7 +789,7 @@ func _schwellen_ueberlapp(p1:Vector2,t1:Vector2,p2:Vector2,t2:Vector2)->bool:
 		for sx in [-1.25,1.25]:
 			for sz in [-0.12,0.12]:
 				var e=a+qa*sx+ta*sz-b
-				if abs(e.dot(qb))<1.25 and abs(e.dot(tb))<0.12:return true
+				if abs(e.dot(qb))<1.26 and abs(e.dot(tb))<0.13:return true
 	return false
 func _bahn_bauen():
 	var schotter=L._toon(Color(0.52,0.48,0.44));var schwelle=L._toon(Color(0.38,0.28,0.2));var schiene=L._toon(Color(0.55,0.56,0.6),0.3)
@@ -821,7 +821,7 @@ func _bahn_bauen():
 					for o in schw_ort.get(zk+Vector2i(dx,dz),[]):
 						if o[0].distance_to(p)<2.6 and (o[1]!=gnr or abs(o[2]-s)>3.0):im=true
 						# auch im selben Gleis: an Knicken (Weichen) überlappen Nachbarschwellen an den Enden
-						elif o[0].distance_to(p)<2.6 and _schwellen_ueberlapp(p,t,o[0],o[3]):im=true
+						elif o[0].distance_to(p)<0.3 or (o[0].distance_to(p)<2.6 and _schwellen_ueberlapp(p,t,o[0],o[3])):im=true
 			if not im:
 				L.box(schwelle,Vector3(p.x,0.16,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
 				if not schw_ort.has(zk):schw_ort[zk]=[]
@@ -1803,12 +1803,10 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 				if d0<=VOLL:
 					# im Grundstück selbst gilt seine Höhe; im vollen Rand mehrerer Grundstücke die tiefere
 					# (nichts sticht durch, das höhere hat Gartenmauer/Sockel nach unten)
-					if d0==0.0:
-						if dmin[j]==0.0:ziel[j]=min(ziel[j],h)
-						else:ziel[j]=h
-					elif dmin[j]>0.0:
-						if dmin[j]<=VOLL:ziel[j]=min(ziel[j],h)
-						else:ziel[j]=h
+					# (auch im Kern des höheren Grundstücks: dessen Boden-Sockel reicht 4 m tief, sonst stiege der
+					# Hang über die Rückseite des tieferen Grundstücks)
+					if dmin[j]<=VOLL:ziel[j]=min(ziel[j],h)
+					else:ziel[j]=h
 					dmin[j]=min(dmin[j],d0);gew[j]=1.0
 				elif d0<dmin[j]:dmin[j]=d0;gew[j]=g;ziel[j]=h
 		n+=1
