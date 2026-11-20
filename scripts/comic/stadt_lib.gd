@@ -729,7 +729,7 @@ func _fassade(o:Vector3,r:Vector3,a:Vector3,w:float,H:float,stock:int,eg:float,o
 	var P=func(x:float,y:float,z:float)->Vector3:return o+r*x+Vector3.UP*y+a*z
 	var trim:Material=stil.trim
 	# Sockel
-	box(M.stein_d,P.call(w*0.5,0.35,0.05),Vector3(w,0.7,0.12),b,0.03)
+	box(M.stein_d,P.call(w*0.5,-0.15,0.05),Vector3(w,1.7,0.12),b,0.03)   # 1 m in den Boden (am Hang sonst Spalt unter der Fassade)
 	# Ecksteine (Putzbauten): echte 3D-Quader, abwechselnd lang/kurz
 	if not stil.ziegel and leicht:
 		var tc:Color=stil.trim.albedo_color if stil.trim is StandardMaterial3D else Color(0.86,0.83,0.76)

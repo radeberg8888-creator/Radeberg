@@ -1339,7 +1339,7 @@ func _norden()->Dictionary:
 				for gk in 6:
 					var qw=xf*Vector3(-hw2+kk.w*gi/5.0,0,-dd2*gk/5.0);var qq=Vector2(qw.x,qw.z)+C
 					hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
-			hy=min(hy,h0+0.9)
+			hy=min(hy,h0+(1.8 if kn.begins_with("nd_") else 0.9))   # Nord-Bausätze haben 10 m Sockel
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
 			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn
@@ -1348,7 +1348,7 @@ func _norden()->Dictionary:
 			if abs(dh)>abs(dbg[pre][1]):dbg[pre][1]=dh;dbg[pre][2]=w
 		if klein and abs(dh)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
 		# große Bausätze nur anheben (Gelände höher als der Boden), höchstens 90 cm – Boden/Sockel reichen 1,4 m tief
-		elif not klein and dh<-0.02 and dh>-0.95:xf.origin.y=hy;p[1]=xf;n_nat+=1
+		elif not klein and dh<-0.02 and dh>(-1.85 if kn.begins_with("nd_") else -0.95):xf.origin.y=hy;p[1]=xf;n_nat+=1
 	print("HOEHE abweichend (vor Korrektur) ",dbg)
 	for i in NATUR_FERN.size():
 		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)

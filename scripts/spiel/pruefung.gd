@@ -115,7 +115,7 @@ func sammeln(mitte:Vector2,radius:float):
 		for i in m.multimesh.instance_count:
 			var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 			if gx.basis.get_scale().x<0.01:continue
-			if Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>radius*0.6:continue
+			if Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)>radius+30.0:continue   # ganzer Prüfkreis: sonst fehlen am Rand Bausatz-Böden und -Mauern (Schein-Lücken)
 			# dieselbe Bausatz-Kopie zweimal mit gleicher Lage, Drehung und Größe (z. B. von zwei Kacheln aufgestellt)?
 			var b=gx.basis
 			var ok="%s|%d|%d|%d|%d|%d|%d|%d|%d|%d"%[me.get_instance_id(),int(round(gx.origin.x*50.0)),int(round(gx.origin.y*50.0)),int(round(gx.origin.z*50.0)),
