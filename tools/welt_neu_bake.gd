@@ -793,6 +793,7 @@ func _schwellen_ueberlapp(p1:Vector2,t1:Vector2,p2:Vector2,t2:Vector2)->bool:
 	return false
 func _bahn_bauen():
 	var schotter=L._toon(Color(0.52,0.48,0.44));var schwelle=L._toon(Color(0.38,0.28,0.2));var schiene=L._toon(Color(0.55,0.56,0.6),0.3)
+	var sch_gelegt=[]   # [Polygon, Rechteck] schon gelegter Schotterbänder
 	var schw_ort={}   # 2-m-Zelle -> [[Mitte, Gleis-Nr, s]] der schon gelegten Schwellen
 	var gnr=0
 	for b in BAHN:
@@ -807,7 +808,16 @@ func _bahn_bauen():
 					for x in Geometry2D.clip_polygons(t,Geometry2D.offset_polyline(r.P,r.w+0.3)[0]):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
 				teile=t2
-			for pc in teile:L._platte(pc,-0.4,0.12,schotter,schotter)
+			# schon gelegtes Schotterbett anderer Gleise/Bänder aussparen (Weichen, Parallelgleise)
+			for g in sch_gelegt:
+				if not g[1].intersects(L._bbox(bb)):continue
+				var t3=[]
+				for t in teile:
+					for x in Geometry2D.clip_polygons(t,g[0]):
+						if not Geometry2D.is_polygon_clockwise(x) and x.size()>=3:t3.append(x)
+				teile=t3
+			for pc in teile:L._platte(pc,-0.4,0.11,schotter,schotter)
+			sch_gelegt.append([bb,L._bbox(bb)])
 		var s=0.0
 		while s<Lg:
 			var e=L._bei_s(P,S,s);var p:Vector2=e[0];var t:Vector2=e[1]
@@ -823,7 +833,7 @@ func _bahn_bauen():
 						# auch im selben Gleis: an Knicken (Weichen) überlappen Nachbarschwellen an den Enden
 						elif o[0].distance_to(p)<0.3 or (o[0].distance_to(p)<2.6 and _schwellen_ueberlapp(p,t,o[0],o[3])):im=true
 			if not im:
-				L.box(schwelle,Vector3(p.x,0.16,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
+				L.box(schwelle,Vector3(p.x,0.155,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
 				if not schw_ort.has(zk):schw_ort[zk]=[]
 				schw_ort[zk].append([p,gnr,s,t])
 			s+=0.75
@@ -832,7 +842,7 @@ func _bahn_bauen():
 				var a=P[i];var c=P[i+1];var t=(c-a).normalized();var m=(a+c)*0.5+L._rn(t)*sd;var im=false
 				for u in UEBERGANG:
 					if u.p.distance_to(m)<u.r.w+1.6:im=true
-				L.box(schiene,Vector3(m.x,0.045 if im else 0.27,m.y),Vector3(0.09,0.12,a.distance_to(c)+0.02),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
+				L.box(schiene,Vector3(m.x,0.045 if im else 0.26,m.y),Vector3(0.09,0.12,a.distance_to(c)+0.02),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
 		# Zaun
 		for sd in [-4.8,4.8]:
 			var s2=0.0

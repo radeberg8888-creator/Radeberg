@@ -80,15 +80,22 @@ func sammeln(mitte:Vector2,radius:float):
 		if mi.mesh==null or not mi.is_visible_in_tree():continue
 		var mat=mi.material_override
 		if mat==null and mi.mesh.get_surface_count()>0:mat=mi.mesh.surface_get_material(0)
-		if _ink(mat):continue
+		if mi.material_override!=null and _ink(mat):continue
 		# Gelände-Netz (alle Detailstufen) nicht: das Gelände kommt exakt aus dem Höhenraster;
 		# Fern-Stellvertreter (erst ab Entfernung sichtbar) zählen nicht als Boden
 		if String(mi.name).begins_with("Gelaende") or mi.visibility_range_begin>0.0:continue
 		var gab:AABB=mi.global_transform*mi.mesh.get_aabb()
 		if not feld.intersects(Rect2(gab.position.x,gab.position.z,gab.size.x,gab.size.z)):continue
 		if gab.size.x>3000.0 or gab.size.z>3000.0:continue   # Wasser über die ganze Insel
-		var mn=_matname(mat)
-		_mesh_eintragen(mi.mesh.get_faces(),mi.global_transform,mn+"@"+str(mi.get_parent().name),_beidseitig(mat),mitte,radius)
+		# je Oberfläche mit ihrem eigenen Material (Kontur-Oberflächen überspringen, der Rest zählt)
+		if mi.material_override!=null or mi.mesh.get_surface_count()<=1:
+			if _ink(mat):continue
+			_mesh_eintragen(mi.mesh.get_faces(),mi.global_transform,_matname(mat)+"@"+str(mi.get_parent().name),_beidseitig(mat),mitte,radius)
+		else:
+			for sf in mi.mesh.get_surface_count():
+				var sm=mi.get_active_material(sf)
+				if _ink(sm):continue
+				_mesh_eintragen(_flaechen(mi.mesh,sf),mi.global_transform,_matname(sm)+"@"+str(mi.get_parent().name),_beidseitig(sm),mitte,radius)
 	# 2) Bausätze (MultiMesh-Kopien) mit ihren Wänden, nur im halben Umkreis (teuer)
 	for m in welt.find_children("*","MultiMeshInstance3D",true,false):
 		if m.multimesh==null or m.multimesh.mesh==null or not m.is_visible_in_tree():continue
@@ -195,6 +202,21 @@ func hoehen(x:float,z:float,tol:=0.0005)->Array:
 		if l1*ad<tol*Vector2(b.x-c.x,b.z-c.z).length() or l2*ad<tol*Vector2(c.x-a.x,c.z-a.z).length() or l3*ad<tol*Vector2(a.x-b.x,a.z-b.z).length():continue
 		out.append([l1*a.y+l2*b.y+l3*c.y,ti])
 	return out
+# höchste sichtbare nach oben zeigende Fläche bei (x,z) bis knapp über y (sonst -INF)
+func _boden_unter(x:float,z:float,y:float)->float:
+	var best=-INF
+	var k=Vector2i(int(floor(x)),int(floor(z)))
+	if not CG.has(k):return best
+	for ti in CG[k]:
+		var a=CT[ti*3];var b=CT[ti*3+1];var c=CT[ti*3+2]
+		var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
+		if abs(d)<1e-9:continue
+		var l1=((b.z-c.z)*(x-c.x)+(c.x-b.x)*(z-c.z))/d
+		var l2=((c.z-a.z)*(x-c.x)+(a.x-c.x)*(z-c.z))/d
+		if l1<-0.001 or l2<-0.001 or l1+l2>1.001:continue
+		var h=l1*a.y+l2*b.y+(1.0-l1-l2)*c.y
+		if h<=y+0.02 and h>best:best=h
+	return best
 # waagerechter Abstand des Punkts zum nächsten Bodendreieck (Zellen ringsum), 9.99 = keins in 1 m
 func _abstand_flaeche(x:float,z:float)->float:
 	var best=9.99;var p=Vector2(x,z)
@@ -325,6 +347,10 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var qa=p+nv*0.08
 				var ra=G._strahl(Vector3(qa.x,unten+0.3,qa.z),Vector3(qa.x,unten-40.0,qa.z),true)
 				if not ra.is_empty():luft=min(luft,unten-ra.position.y)
+			# sichtbarer Boden direkt unter der Kante (auch Bausatz-Boden ohne geladene Kollision)
+			if luft>0.10:
+				var bu=max(_boden_unter(q.x,q.z,unten),_boden_unter(p.x+nv.x*0.08,p.z+nv.z*0.08,unten))
+				luft=min(luft,unten-bu)
 			# verdeckt etwas direkt vor der Wand den Bereich unter der Kante (Sockel, Pfeiler, Stufe)? dann sieht man nichts
 			if luft>0.10 and luft<5.0:
 				var vo=p+nv*0.5-Vector3(0,0.05,0)
