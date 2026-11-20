@@ -181,6 +181,20 @@ func hoehen(x:float,z:float,tol:=0.0005)->Array:
 		if l1*ad<tol*Vector2(b.x-c.x,b.z-c.z).length() or l2*ad<tol*Vector2(c.x-a.x,c.z-a.z).length() or l3*ad<tol*Vector2(a.x-b.x,a.z-b.z).length():continue
 		out.append([l1*a.y+l2*b.y+l3*c.y,ti])
 	return out
+# waagerechter Abstand des Punkts zum nächsten Bodendreieck (Zellen ringsum), 9.99 = keins in 1 m
+func _abstand_flaeche(x:float,z:float)->float:
+	var best=9.99;var p=Vector2(x,z)
+	for dx in [-1,0,1]:
+		for dz in [-1,0,1]:
+			var k=Vector2i(int(floor(x))+dx,int(floor(z))+dz)
+			if not BG.has(k):continue
+			for ti in BG[k]:
+				var a=BT[ti*3];var b=BT[ti*3+1];var c=BT[ti*3+2]
+				var A=Vector2(a.x,a.z);var B=Vector2(b.x,b.z);var Cc=Vector2(c.x,c.z)
+				if Geometry2D.point_is_inside_triangle(p,A,B,Cc):return 0.0
+				for e in [[A,B],[B,Cc],[Cc,A]]:
+					best=min(best,p.distance_to(Geometry2D.get_closest_point_to_segment(p,e[0],e[1])))
+	return best
 # kleinste Breite eines Bodendreiecks (Höhe über der längsten Kante, waagerecht gemessen)
 func _breite(ti:int)->float:
 	var a=BT[ti*3];var b=BT[ti*3+1];var c=BT[ti*3+2]
@@ -266,7 +280,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					if h1>th+0.05 and h2>th+0.05:
 						var e1=hoehen(x-d.x,z-d.y);var e2=hoehen(x+d.x,z+d.y)
 						var nm1=_kurz(BO[e1[0][1]]) if e1.size()>0 else "?";var nm2=_kurz(BO[e2[0][1]]) if e2.size()>0 else "?"
-						FUNDE.append(["Boden:"+nm1+"|"+nm2,"Luecke",min(h1,h2)-th,Vector3(x,th,z),"zwischen "+nm1+" und "+nm2,Vector3(x+1.2,th+3.2,z+1.2)]);break
+						FUNDE.append(["Boden:"+nm1+"|"+nm2,"Luecke",min(h1,h2)-th,Vector3(x,th,z),"zwischen "+nm1+" und "+nm2+" | nächste Fläche %.1f cm"%(_abstand_flaeche(x,z)*100.0),Vector3(x+1.2,th+3.2,z+1.2)]);break
 			z+=1.0
 		x+=1.0
 	# a) Wände, Mauern, Hecken, Zäune: Unterkante alle 1 m gegen den Boden darunter

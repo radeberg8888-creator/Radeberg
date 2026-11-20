@@ -716,7 +716,7 @@ func _villa_garten(i:int):
 func _boden(w:float,d:float,farbe:Color):
 	super._boden(w,d,farbe)
 	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
-	L.box(T(farbe),_P(0,-0.5,d*0.5),Vector3(w-0.02,0.8,d-0.02),Basis(),0.0)
+	L.box(T(farbe),_P(0,-0.8,d*0.5),Vector3(w-0.02,1.4,d-0.02),Basis(),0.0)
 	# flache Rasen-Schräge an Seiten und Rückseite: keine 6-cm-Stufe zum Gelände -> keine gestrichelte Konturlinie
 	var so=L._st(T(farbe),true);var b:=1.2;var o:=0.01;var u:=-0.3
 	var A=_P(-w*0.5,o,0);var B=_P(-w*0.5,o,d);var C2=_P(w*0.5,o,d);var D=_P(w*0.5,o,0)
@@ -897,7 +897,7 @@ func _k_scheune(i:int):
 func _k_feld(i:int):
 	var farben=[[Color(0.85,0.75,0.3),Color(0.75,0.65,0.25)],[Color(0.45,0.6,0.25),Color(0.38,0.5,0.2)],[Color(0.55,0.42,0.28),Color(0.45,0.35,0.22)]][i]
 	# Ackerboden unter den Reihen (sonst sieht man zwischen den Reihen den Platz-Belag)
-	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.3,14.65),Vector3(29.4,0.7,29.3),Basis(),0.0)
+	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.65,14.65),Vector3(29.4,1.4,29.3),Basis(),0.0)
 	for k in 15:L.box(T(farben[k%2]),_P(0,0.05+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
 	L._zaun(_P(-15,0,0.2),_P(15,0,0.2),1.2)
 func _k_wasserturm():

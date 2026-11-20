@@ -376,6 +376,8 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 
 func _boden(w:float,d:float,farbe:Color):
 	L.box(T(farbe),_P(0,-0.07,d*0.5),Vector3(w,0.16,d),Basis(),0.0)
+	# Sockelblock nach unten: am Hang (Bausatz auf den höchsten Geländepunkt gesetzt) keine offene Kante
+	L.box(T(farbe.darkened(0.15)),_P(0,-0.86,d*0.5),Vector3(w-0.02,1.4,d-0.02),Basis(),0.0)
 func _zaeune(w:float,d:float,vorn:bool,ex:float):
 	var farben=[Color(0.62,0.5,0.36),Color(0.8,0.78,0.72),Color(0.5,0.42,0.34)]
 	if vorn:
