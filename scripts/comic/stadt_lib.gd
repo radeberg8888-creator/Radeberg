@@ -926,7 +926,7 @@ func _laden(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary,mit_schild:=true
 	for k in n:
 		var x=0.2+(k+0.5)*(w-0.4)/n;var bw=(w-0.4)/n-0.4
 		if k==n/2 and w>6.0 and mit_schild:
-			box(stil.tuer,P.call(x,1.25,0.03),Vector3(1.2,2.3,0.06),b,0.02)
+			box(stil.tuer,P.call(x,1.0,0.03),Vector3(1.2,2.8,0.06),b,0.02)   # bis unter den Gehweg
 			box(M.glas[2],P.call(x,1.6,0.07),Vector3(0.8,1.2,0.03),b,0.0)
 			box(M.chrom,P.call(x+0.4,1.2,0.12),Vector3(0.05,0.4,0.05),b,0.0)
 			box(M.stein,P.call(x,0.07,0.35),Vector3(1.5,0.14,0.7),b,0.02)
@@ -957,7 +957,7 @@ func _eingang(P:Callable,b:Basis,w:float,eg:float,stil:Dictionary):
 	var x=w*0.5 if w<9.0 else w*0.3
 	# Haustür mit Oberlicht, Rahmen, Stufen, Lampe, Klingelschild
 	box(M.dunkel,P.call(x,1.3,0.0),Vector3(1.5,3.5,0.04),b,0.0)   # bis unter den Gehweg (am Hang sonst Spalt unter der Tür)
-	box(stil.tuer,P.call(x,1.3,0.04),Vector3(1.25,2.4,0.06),b,0.02)
+	box(stil.tuer,P.call(x,1.05,0.04),Vector3(1.25,2.9,0.06),b,0.02)   # bis unter den Gehweg
 	for q in 2:box(stil.tuer,P.call(x,0.75+q*1.05,0.08),Vector3(0.95,0.85,0.03),b,0.0)
 	box(M.glas[2],P.call(x,2.8,0.04),Vector3(1.25,0.5,0.03),b,0.0)
 	box(stil.trim,P.call(x,1.55,0.1),Vector3(1.75,3.2,0.08),b,0.03) if false else null

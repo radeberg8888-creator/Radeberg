@@ -357,7 +357,10 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var hit=_wand_strahl(vo,-nv,0.5)
 				if not hit.is_empty() and hit.dist<0.46:luft=0.0
 			if luft>0.10 and luft<5.0:
-				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)+" Unterkante y:"+str(snapped(unten,0.01))+" Treffer y:"+str(snapped(r.position.y,0.01)),p+nv*7.0+Vector3(0,0.6,0)]);break
+				var lk=""
+				if KXF[e[4]]!=null:
+					var lp=KXF[e[4]].affine_inverse()*Vector3(p.x,unten,p.z);lk=" | lokal Unterkante (%.2f, %.2f, %.2f) Kante oben y %.2f"%[lp.x,lp.y,lp.z,(KXF[e[4]].affine_inverse()*p).y]
+				FUNDE.append([NAMEN[e[4]],"Wand_schwebt",luft,p,str(r.collider.get_parent().name)+" Unterkante y:"+str(snapped(unten,0.01))+" Treffer y:"+str(snapped(r.position.y,0.01))+lk,p+nv*7.0+Vector3(0,0.6,0)]);break
 	# e) offene Häuser: von den Straßen aus in 8 Richtungen schauen
 	var gesehen={}
 	for rd in G.spiel.welt.S.roads:

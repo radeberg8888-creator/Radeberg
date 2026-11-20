@@ -631,9 +631,16 @@ func _schwebe_lauf():
 		print("SCHWEBT ",name," Funde ",FUNDE.size()," Arten ",arten.size())
 		var nr=0
 		var ks=arten.keys();ks.sort_custom(func(a,b):return abs(arten[a][1][2])>abs(arten[b][1][2]))
+		# Nahbilder: zuerst je Fundart die schlimmste Gruppe, dann nach Größe auffüllen (höchstens 12)
+		var foto={};var art_da={}
+		for k in ks:
+			if not art_da.has(arten[k][1][1]):art_da[arten[k][1][1]]=true;foto[k]=true
+		for k in ks:
+			if foto.size()>=12:break
+			foto[k]=true
 		for k in ks:
 			var f=arten[k][1];print("  FUND ",name," | ",k," | ",arten[k][0],"x | max ",snapped(f[2],0.01)," m bei ",f[3]," | Boden: ",f[4] if f.size()>4 else "-")
-			if nr<8:
+			if foto.has(k) and nr<12:
 				var w:Vector3=f[3]
 				# Nahbild von seitlich unten: freie Position im Kreis suchen (nicht in Hang oder Haus)
 				var cp=w+Vector3(5.5,0.9,5.5)
@@ -648,7 +655,7 @@ func _schwebe_lauf():
 				if f.size()>5 and f[5] is Vector3:cp=f[5]   # offenes Haus: vom Blickpunkt auf der Straße aus
 				cam.look_at_from_position(cp,w+Vector3(0,0.2,0));cam.current=true
 				for fr in 3:await get_tree().process_frame
-				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_")])
+				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_").replace("/","-")])
 				nr+=1
 		# Beleg (Abschnitt 6): je Viertel ein Bild von der Straße und eines aus der Luft
 		await _ort("Viertel_"+name,mitte)
