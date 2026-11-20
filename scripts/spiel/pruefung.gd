@@ -216,6 +216,12 @@ func hoehen(x:float,z:float,tol:=0.0005)->Array:
 		if l1*ad<tol*Vector2(b.x-c.x,b.z-c.z).length() or l2*ad<tol*Vector2(c.x-a.x,c.z-a.z).length() or l3*ad<tol*Vector2(a.x-b.x,a.z-b.z).length():continue
 		out.append([l1*a.y+l2*b.y+l3*c.y,ti])
 	return out
+# in allen vier Richtungen innerhalb von 3 m eine Wand: Punkt liegt in einem Gebäude/einer Mauer
+func _umschlossen(p:Vector3)->bool:
+	for dir in [Vector3(1,0,0),Vector3(-1,0,0),Vector3(0,0,1),Vector3(0,0,-1)]:
+		var h=_wand_strahl(p-dir*0.06,dir,3.0)
+		if h.is_empty():return false
+	return true
 # senkrecht unter dem Punkt (bis 30 cm) eine schräge oder abwärts zeigende Fläche?
 func _schraeg_unter(p:Vector3,y:float)->bool:
 	var k=Vector2i(int(floor(p.x)),int(floor(p.z)))
@@ -343,6 +349,8 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
 				# Punkt genau auf einer gemeinsamen Kante zweier Dreiecke ist keine Lücke (Spalt unter 2 mm)
 				if hoehen(x,z,-0.002).size()>0 or _abstand_flaeche(x,z)<0.002:z+=1.0;continue
+				# liegt der Punkt innerhalb einer Mauer/eines Hauses (ringsum Wände)? dann sieht man dort nicht hin
+				if _umschlossen(Vector3(x,G._tri_hg(x,z)+0.45,z)):z+=1.0;continue
 				var th=G._tri_hg(x,z)
 				for d in [Vector2(0.6,0),Vector2(0,0.6)]:
 					var h1=oben(x-d.x,z-d.y);var h2=oben(x+d.x,z+d.y)
@@ -488,9 +496,14 @@ func _wand_strahl(o:Vector3,dir:Vector3,maxd:float)->Dictionary:
 				var qv=tv.cross(e1);var v=dir.dot(qv)*inv
 				if v<0.0 or u+v>1.0:continue
 				var dd=e2.dot(qv)*inv
-				if dd>0.05 and dd<bd:
-					bd=dd;var cr=e1.cross(e2)
+				var cr=e1.cross(e2);var rk=cr.dot(dir)<0.0
+				# beidseitig gebaute Flächen (Vorder- und Rückseite deckungsgleich): die Vorderseite zählt
+				var gleich=not best.is_empty() and abs(dd-bd)<=0.002 and best.rueck and not rk
+				if dd>0.05 and (dd<bd-0.002 or gleich or (dd<bd and best.is_empty())):
+					bd=dd
 					# Vorderseite: Kreuzprodukt zeigt vom Betrachter weg (Godot: im Uhrzeigersinn)
-					best={"ti":vi,"dist":dd,"pos":o+dir*dd,"rueck":cr.dot(dir)<0.0}
+					best={"ti":vi,"dist":dd,"pos":o+dir*dd,"rueck":rk}
+				elif dd>0.05 and dd<bd and not (best.rueck==false and rk and abs(dd-bd)<=0.002):
+					bd=dd;best={"ti":vi,"dist":dd,"pos":o+dir*dd,"rueck":rk}
 		t+=1.0
 	return best
