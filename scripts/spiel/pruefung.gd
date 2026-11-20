@@ -264,7 +264,12 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 							FUNDE.append(["Boden:"+n1+"&"+n2,"doppelte_Flaeche",hs[i+1][0]-hs[i][0],Vector3(x,hs[i][0],z),NAMEN[BO[hs[i][1]]]+" & "+NAMEN[BO[hs[i+1][1]]]+_diag(hs[i],hs[i+1],x,z)]);break
 				var th=G._tri_hg(x,z)
 				# d) Gelände sticht durch die Platte (Sägezahn am Hang)
-				if th>top+0.02:FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Gelaende_durch",th-top,Vector3(x,top,z),NAMEN[BO[ti_top]]])
+				if th>top+0.02:
+					var lk=""
+					var kx=KXF[BO[ti_top]]
+					if kx!=null:
+						var lp=kx.affine_inverse()*Vector3(x,top,z);lk=" | lokal (%.2f, %.3f, %.2f) Gelände lokal %.3f"%[lp.x,lp.y,lp.z,(kx.affine_inverse()*Vector3(x,th,z)).y]
+					FUNDE.append(["Boden:"+_kurz(BO[ti_top]),"Gelaende_durch",th-top,Vector3(x,top,z),NAMEN[BO[ti_top]]+lk])
 				# b) Kollision alle 2 m
 				# (nur begehbare Flächen: mindestens 35 cm breit – Fensterbänke, Gesimse und Leisten betritt niemand)
 				if int(floor(x))%2==0 and int(floor(z))%2==0 and _breite(ti_top)>=0.35:

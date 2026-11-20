@@ -96,7 +96,9 @@ func _process(dt:float):
 		if v.node==null and not v.laed and not v.baut and d<v.ab and ResourceLoader.exists(v.datei):
 			ResourceLoader.load_threaded_request(v.datei);v.laed=true
 		elif v.node!=null and d>v.weg:
-			v.node.queue_free();v.node=null
+			# sofort aus dem Baum nehmen (queue_free allein lässt die Kachel bis Bildende stehen; ein gleich
+			# danach geladener Nachfolger hinge sonst kurz doppelt drin)
+			remove_child(v.node);v.node.queue_free();v.node=null
 # Kopien-Lagen aus dem Bake (Meta "puffer") in die MultiMeshes schreiben
 static func puffer_setzen(n:Node):
 	for sch in n.find_children("Schranke*","Node3D",true,false):sch.add_to_group("schranke")
