@@ -1325,9 +1325,10 @@ func _norden()->Dictionary:
 			# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
 			# die Ränder reichen mit Sockel/Gartenmauer nach unten
 			var h0=hy;var hw2=kk.w*0.5;var dd2=kk.d
-			for q in [Vector3(-hw2,0,0),Vector3(hw2,0,0),Vector3(-hw2,0,-dd2),Vector3(hw2,0,-dd2),Vector3(0,0,-dd2*0.5),Vector3(-hw2,0,-dd2*0.5),Vector3(hw2,0,-dd2*0.5),Vector3(0,0,-dd2)]:
-				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
-				hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
+			for gi in 6:
+				for gk in 6:
+					var qw=xf*Vector3(-hw2+kk.w*gi/5.0,0,-dd2*gk/5.0);var qq=Vector2(qw.x,qw.z)+C
+					hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
 			hy=min(hy,h0+0.9)
 		var dh=xf.origin.y-hy
 		if abs(dh)>1.0:
