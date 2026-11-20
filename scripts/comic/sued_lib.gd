@@ -375,12 +375,12 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 	KITLISTE[key].append(name)
 
 func _boden(w:float,d:float,farbe:Color):
-	L.box(T(farbe),_P(0,-0.07,d*0.5),Vector3(w,0.16,d),Basis(),0.0)
+	L.box(T(farbe),_P(0,-0.055,d*0.5),Vector3(w,0.16,d),Basis(),0.0)
 	# Sockelblock nach unten: am Hang (Bausatz auf den höchsten Geländepunkt gesetzt) keine offene Kante
 	L.box(T(farbe.darkened(0.15)),_P(0,-0.86,d*0.5),Vector3(w-0.02,1.4,d-0.02),Basis(),0.0)
 	# schmale Rasen-Schräge rundum (60 cm, 30 cm tief): schließt die Fuge zum Nachbargrundstück/Gehweg,
 	# man schaut nicht in einen Spalt aufs Gelände
-	var so=L._st(T(farbe),true);var b:=0.6;var o:=0.01;var u:=-0.3
+	var so=L._st(T(farbe),true);var b:=0.6;var o:=0.025;var u:=-0.3
 	var A=_P(-w*0.5,o,0);var B=_P(-w*0.5,o,d);var C2=_P(w*0.5,o,d);var D=_P(w*0.5,o,0)
 	var A2=_P(-w*0.5-b,u,-b);var B2=_P(-w*0.5-b,u,d+b);var C3=_P(w*0.5+b,u,d+b);var D2=_P(w*0.5+b,u,-b)
 	for q in [[A,A2,B2,B],[B,B2,C3,C2],[C2,C3,D2,D],[D,D2,A2,A]]:

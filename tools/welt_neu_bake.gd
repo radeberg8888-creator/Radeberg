@@ -1335,9 +1335,9 @@ func _norden()->Dictionary:
 			# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
 			# die Ränder reichen mit Sockel/Gartenmauer nach unten
 			var h0=hy;var hw2=kk.w*0.5;var dd2=kk.d
-			for gi in 6:
-				for gk in 6:
-					var qw=xf*Vector3(-hw2+kk.w*gi/5.0,0,-dd2*gk/5.0);var qq=Vector2(qw.x,qw.z)+C
+			for gi in 13:
+				for gk in 13:
+					var qw=xf*Vector3(-hw2+kk.w*gi/12.0,0,-dd2*gk/12.0);var qq=Vector2(qw.x,qw.z)+C
 					hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
 			hy=min(hy,h0+(1.8 if kn.begins_with("nd_") else 0.9))   # Nord-Bausätze haben 10 m Sockel
 		var dh=xf.origin.y-hy
