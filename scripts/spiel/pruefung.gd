@@ -11,6 +11,8 @@ var G   # galerie
 var BT:=PackedVector3Array()     # Bodendreiecke (3 Ecken je Dreieck)
 var BO:=PackedInt32Array()       # Besitzer (Mesh-Nummer) je Dreieck
 var BG:={}                       # 1-m-Zelle -> PackedInt32Array Dreiecke
+var CG:={}                       # 1-m-Zelle -> alle nach oben zeigenden sichtbaren Dreiecke (Abdeckung)
+var CT:=PackedVector3Array()
 var VT:=PackedVector3Array()     # senkrechte Dreiecke (Wände)
 var VO:=PackedInt32Array()
 var VG:={}                       # 2-m-Zelle -> PackedInt32Array
@@ -69,7 +71,7 @@ func _ink(m)->bool:
 	return false
 
 func sammeln(mitte:Vector2,radius:float):
-	BT.clear();BO.clear();BG.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();KINST.clear();KOPIE_N=0;DOPPEL_KOPIEN.clear()
+	BT.clear();BO.clear();BG.clear();CG.clear();CT.clear();VT.clear();VO.clear();VG.clear();NAMEN.clear();BEIDSEITIG.clear();KANTEN.clear();KXF.clear();KINST.clear();KOPIE_N=0;DOPPEL_KOPIEN.clear()
 	var orte={}
 	var feld=Rect2(mitte-Vector2(radius,radius),Vector2(radius,radius)*2.0)
 	var welt=G.spiel.welt
@@ -125,6 +127,18 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 		var nv=-cr/sqrt(l2)
 		var m=(a+b+c)/3.0
 		if Vector2(m.x,m.z).distance_to(mitte)>radius:continue
+		if nv.y>0.5 and m.y-G._tri_hg(m.x,m.z)<3.0:
+			# Abdeckung für die Lückensuche: jede sichtbare, nach oben zeigende Fläche (auch Schrägen, Bankett,
+			# Markierung, Bausatz-Teile) – wo eine davon liegt, schaut man nicht aufs Gelände durch
+			var ci=CT.size()/3;CT.append_array([a,b,c])
+			var cx0=int(floor(min(a.x,min(b.x,c.x))));var cx1=int(floor(max(a.x,max(b.x,c.x))))
+			var cz0=int(floor(min(a.z,min(b.z,c.z))));var cz1=int(floor(max(a.z,max(b.z,c.z))))
+			if (cx1-cx0+1)*(cz1-cz0+1)<=90000:
+				for gx in range(cx0,cx1+1):
+					for gz in range(cz0,cz1+1):
+						var k=Vector2i(gx,gz)
+						if not CG.has(k):CG[k]=PackedInt32Array()
+						CG[k].append(ci)
 		if nv.y>0.985:   # Boden ist fast eben (höchstens ~17 % Gefälle); Markisen/Dächer/Böschungen nicht
 			var th=G._tri_hg(m.x,m.z)
 			var dh=m.y-th
@@ -187,9 +201,9 @@ func _abstand_flaeche(x:float,z:float)->float:
 	for dx in [-1,0,1]:
 		for dz in [-1,0,1]:
 			var k=Vector2i(int(floor(x))+dx,int(floor(z))+dz)
-			if not BG.has(k):continue
-			for ti in BG[k]:
-				var a=BT[ti*3];var b=BT[ti*3+1];var c=BT[ti*3+2]
+			if not CG.has(k):continue
+			for ti in CG[k]:
+				var a=CT[ti*3];var b=CT[ti*3+1];var c=CT[ti*3+2]
 				var A=Vector2(a.x,a.z);var B=Vector2(b.x,b.z);var Cc=Vector2(c.x,c.z)
 				if Geometry2D.point_is_inside_triangle(p,A,B,Cc):return 0.0
 				for e in [[A,B],[B,Cc],[Cc,A]]:
@@ -273,7 +287,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 			else:
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
 				# Punkt genau auf einer gemeinsamen Kante zweier Dreiecke ist keine Lücke (Spalt unter 2 mm)
-				if hoehen(x,z,-0.002).size()>0:z+=1.0;continue
+				if hoehen(x,z,-0.002).size()>0 or _abstand_flaeche(x,z)<0.002:z+=1.0;continue
 				var th=G._tri_hg(x,z)
 				for d in [Vector2(0.6,0),Vector2(0,0.6)]:
 					var h1=oben(x-d.x,z-d.y);var h2=oben(x+d.x,z+d.y)
