@@ -1825,7 +1825,7 @@ func _grundstuecke_ebnen(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float
 	# im eigenen Grundstück höchstens 2,5 m unter dessen Höhe (Gartenmauern/Tröge reichen 3 m tief; bei
 	# steilerem Hang bleibt der Rest als Böschung zum tieferen Nachbarn)
 	for j in nx*nz:
-		if kern[j]>-1e8:ziel[j]=max(ziel[j],kern[j]-2.5)
+		if kern[j]>-1e8:ziel[j]=max(ziel[j],kern[j]-6.0)
 	for j in nx*nz:
 		if gew[j]>0.0:H[j]=lerp(H[j],ziel[j],gew[j])
 	LOTZIEL=ziel

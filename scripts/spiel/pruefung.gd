@@ -135,7 +135,9 @@ func _mesh_eintragen(F:PackedVector3Array,xf:Transform3D,name:String,beid:bool,m
 		if l2<1e-10:continue
 		var nv=-cr/sqrt(l2)
 		var m=(a+b+c)/3.0
-		if Vector2(m.x,m.z).distance_to(mitte)>radius:continue
+		# großes Dreieck: Mittelpunkt kann außerhalb liegen, während es den Prüfkreis überdeckt
+		var ausd=max(Vector2(a.x-m.x,a.z-m.z).length(),max(Vector2(b.x-m.x,b.z-m.z).length(),Vector2(c.x-m.x,c.z-m.z).length()))
+		if Vector2(m.x,m.z).distance_to(mitte)>radius+ausd:continue
 		if nv.y>0.5 and m.y-G._tri_hg(m.x,m.z)<3.0:
 			# Abdeckung für die Lückensuche: jede sichtbare, nach oben zeigende Fläche (auch Schrägen, Bankett,
 			# Markierung, Bausatz-Teile) – wo eine davon liegt, schaut man nicht aufs Gelände durch
