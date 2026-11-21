@@ -185,6 +185,13 @@ func _y_fremd(p:Vector2,ri:int,rand:float)->float:
 				var t=clamp((p-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
 				if p.distance_to(a.lerp(b,t))<r.w+rand:y=min(y,lerp(r.Y[sg.y],r.Y[sg.y+1],t))
 	return y
+# Höhe eines Fahrbahnpunkts, der auf/an einer vorrangigen Straße liegt: genau deren Belag (keine Stufe an der
+# Einmündung); liegt die eigene Fahrbahn deutlich tiefer (Unterführung), bleibt sie unberührt
+func _y_an(v:Vector3,ri:int)->float:
+	var yf=_y_fremd(Vector2(v.x,v.z),ri,0.3)
+	if yf==INF:return v.y
+	if v.y<yf+0.06-0.5:return v.y   # deutlich tiefer (Unterführung): unberührt
+	return yf+0.06
 func _ende_frei(ri:int,p:Vector2)->bool:
 	var n=naechst(p,ri)
 	return n[2]<0 or n[3]>ROADS[n[2]].w+3.0
@@ -1437,10 +1444,7 @@ func fahrbahnen():
 			var pp=P[i]+(d*(-e if i==0 else e))
 			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
-			for v in [a3,b3]:
-				var yf=_y_fremd(Vector2(v.x,v.z),ri,0.3)
-				if yf<INF:v.y=min(v.y,yf+0.06)
-			a3.y=min(a3.y,_y_fremd(Vector2(a3.x,a3.z),ri,0.3)+0.06);b3.y=min(b3.y,_y_fremd(Vector2(b3.x,b3.z),ri,0.3)+0.06)
+			a3.y=_y_an(a3,ri);b3.y=_y_an(b3,ri)
 			Ls.append(a3);Rs.append(b3)
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
@@ -1467,9 +1471,7 @@ func fahrbahnen():
 						var a=P[i];var b=P[i+1]
 						var tt=clamp((pv-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
 						var yv=lerp(Y[i],Y[i+1],tt)+0.06
-						var yf=_y_fremd(pv,ri,0.3)
-						if yf<INF:yv=min(yv,yf+0.06)
-						V.append(Vector3(pv.x,yv,pv.y))
+						V.append(Vector3(pv.x,_y_an(Vector3(pv.x,yv,pv.y),ri),pv.y))
 					L._tri(so,V[0],V[1],V[2],Vector3.UP)
 		# Bankett: schräg vom Fahrbahnrand 2,6 m nach außen ins Gelände (statt senkrechter Kante)
 		if not r.stadt:

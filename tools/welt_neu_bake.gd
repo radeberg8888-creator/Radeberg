@@ -1313,43 +1313,48 @@ func _norden()->Dictionary:
 	_grundstuecke_ebnen(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
 	_strassen_korridor(HN,NL,gnx,gnz,G0.X0,G0.Z0,G0.STEP)
 	var n_nat=0;var dbg={}
-	for p in NL.PLATZ:
-		var kn:String=p[0];var kk=K.KITS[kn]
-		var klein=kn.begins_with("nt_") or (kk.w<=8.0 and kk.d<=8.0 and not kn.begins_with("kn_"))
-		var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
-		# in der Stadt liegt das Gelände 0,12 m (Block) bzw. 0,45 m (Straße) unter dem Feld -> dieselbe Formel nehmen
-		var hy=_end_h(HN,w)-NL.H0-0.1
-		if klein:
-			# am Hang auf den tiefsten Punkt der Grundfläche setzen (sonst hängt die Talseite in der Luft)
-			var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
-			var pts=[Vector3(-hw,0,0),Vector3(hw,0,0),Vector3(-hw,0,-dd),Vector3(hw,0,-dd),Vector3(0,0,-dd*0.5)]
-			if kn.begins_with("nt_"):
-				var rr=clamp(kk.w*0.5,1.2,3.5)
-				pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr),Vector3(-0.35,0,-0.35),Vector3(0.35,0,-0.35),Vector3(-0.35,0,0.35),Vector3(0.35,0,0.35)]
-			for q in pts:
-				var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
-				hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
-			if kn.begins_with("nt_"):hy-=0.15
-		else:
-			# große Bausätze (Villa, Hof, Laden): auf den höchsten Geländepunkt der Grundfläche (höchstens 30 cm
-			# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
-			# die Ränder reichen mit Sockel/Gartenmauer nach unten
-			# (1,5 m über den Bausatz-Umriss hinaus: Rasen/Terrasse sind teils breiter als die Kit-Maße)
-			var h0=hy;var hw2=kk.w*0.5+1.5;var dd2=kk.d+1.5
-			for gi in 13:
-				for gk in 13:
-					var qw=xf*Vector3(-hw2+hw2*2.0*gi/12.0,0,1.5-(dd2+1.5)*gk/12.0);var qq=Vector2(qw.x,qw.z)+C
-					hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
-			hy=min(hy,h0+(1.8 if kn.begins_with("nd_") else 0.9))   # Nord-Bausätze haben 10 m Sockel
-		var dh=xf.origin.y-hy
-		if abs(dh)>1.0:
-			var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn
-			if not dbg.has(pre):dbg[pre]=[0,0.0,w]
-			dbg[pre][0]+=1
-			if abs(dh)>abs(dbg[pre][1]):dbg[pre][1]=dh;dbg[pre][2]=w
-		if klein and abs(dh)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
-		# große Bausätze nur anheben (Gelände höher als der Boden), höchstens 90 cm – Boden/Sockel reichen 1,4 m tief
-		elif not klein and dh<-0.02:xf.origin.y-=max(dh,(-1.85 if kn.begins_with("nd_") else -0.95));p[1]=xf;n_nat+=1
+	var GROSS=[]   # große Nord-Bausätze nach dem Anheben: [Transform, Kit] -> Gelände darunter einschneiden
+	for durchgang in 2:
+		if durchgang==1:GROSS_KITS=GROSS;_kits_einschneiden(HN,NL.H0)
+		for p in NL.PLATZ:
+			var kn:String=p[0];var kk=K.KITS[kn]
+			var klein=kn.begins_with("nt_") or (kk.w<=8.0 and kk.d<=8.0 and not kn.begins_with("kn_"))
+			if klein!=(durchgang==1):continue
+			var xf:Transform3D=p[1];var w=Vector2(xf.origin.x,xf.origin.z)+C
+			# in der Stadt liegt das Gelände 0,12 m (Block) bzw. 0,45 m (Straße) unter dem Feld -> dieselbe Formel nehmen
+			var hy=_end_h(HN,w)-NL.H0-0.1
+			if klein:
+				# am Hang auf den tiefsten Punkt der Grundfläche setzen (sonst hängt die Talseite in der Luft)
+				var hw=max(kk.w*0.5,1.5);var dd=max(kk.d,1.5)
+				var pts=[Vector3(-hw,0,0),Vector3(hw,0,0),Vector3(-hw,0,-dd),Vector3(hw,0,-dd),Vector3(0,0,-dd*0.5)]
+				if kn.begins_with("nt_"):
+					var rr=clamp(kk.w*0.5,1.2,3.5)
+					pts=[Vector3(-rr,0,-rr),Vector3(rr,0,-rr),Vector3(-rr,0,rr),Vector3(rr,0,rr),Vector3(-0.35,0,-0.35),Vector3(0.35,0,-0.35),Vector3(-0.35,0,0.35),Vector3(0.35,0,0.35)]
+				for q in pts:
+					var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
+					hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
+				if kn.begins_with("nt_"):hy-=0.15
+			else:
+				# große Bausätze (Villa, Hof, Laden): auf den höchsten Geländepunkt der Grundfläche (höchstens 30 cm
+				# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
+				# die Ränder reichen mit Sockel/Gartenmauer nach unten
+				# (1,5 m über den Bausatz-Umriss hinaus: Rasen/Terrasse sind teils breiter als die Kit-Maße)
+				var h0=hy;var hw2=kk.w*0.5+1.5;var dd2=kk.d+1.5
+				for gi in 13:
+					for gk in 13:
+						var qw=xf*Vector3(-hw2+hw2*2.0*gi/12.0,0,1.5-(dd2+1.5)*gk/12.0);var qq=Vector2(qw.x,qw.z)+C
+						hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
+				hy=min(hy,h0+(1.8 if kn.begins_with("nd_") else 0.9))   # Nord-Bausätze haben 10 m Sockel
+			var dh=xf.origin.y-hy
+			if abs(dh)>1.0:
+				var pre=kn.substr(0,kn.rfind("_")) if kn.rfind("_")>0 else kn
+				if not dbg.has(pre):dbg[pre]=[0,0.0,w]
+				dbg[pre][0]+=1
+				if abs(dh)>abs(dbg[pre][1]):dbg[pre][1]=dh;dbg[pre][2]=w
+			if klein and abs(dh)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
+			# große Bausätze nur anheben (Gelände höher als der Boden), höchstens 90 cm – Boden/Sockel reichen 1,4 m tief
+			elif not klein and dh<-0.02:xf.origin.y-=max(dh,(-1.85 if kn.begins_with("nd_") else -0.95));p[1]=xf;n_nat+=1
+			if not klein and kn.begins_with("nd_"):GROSS.append([p[1],kk])
 	print("HOEHE abweichend (vor Korrektur) ",dbg)
 	for i in NATUR_FERN.size():
 		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)
@@ -1547,6 +1552,7 @@ func _gelaende_und_daten(ND:Dictionary):
 			if not is_nan(thn):H[j]=thn
 	_grundstuecke_ebnen(H,NO,nx,nz,X0,Z0,ST)
 	_strassen_korridor(H,NO,nx,nz,X0,Z0,ST)
+	_kits_einschneiden(H,NO.H0)
 	HG=H
 	_gelaende(H,nx,nz,X0,Z0,ST)
 	_natur_fern()
@@ -1666,6 +1672,26 @@ func _tri_h(H:PackedFloat32Array,x:float,z:float)->float:
 	if u+v<=1.0:return h00+u*(h10-h00)+v*(h01-h00)
 	return h11+(1.0-u)*(h01-h11)+(1.0-v)*(h10-h11)
 var LOTZIEL:=PackedFloat32Array()
+var GROSS_KITS:=[]
+func _kits_einschneiden(H:PackedFloat32Array,H0:float):
+	# Steile Grundstücke: das Anheben eines großen Nord-Bausatzes ist begrenzt (1,8 m). Liegt das Gelände im
+	# Grundstück trotzdem höher, wird es dort eingeschnitten (Hang hinter Gartenmauer), statt durch den Rasen
+	# zu stechen. Rasterpunkte bis 7,5 m um den Umriss -> auch zwischen den 10-m-Punkten bleibt es darunter.
+	var nx=G0.rx;var nz=G0.rz;var n=0;var RAND=7.5
+	for g in GROSS_KITS:
+		var xf:Transform3D=g[0];var kk=g[1];var inv=xf.affine_inverse()
+		var hmax=xf.origin.y+H0+0.08;var hw=kk.w*0.5+RAND
+		var r=Vector2(kk.w*0.5,kk.d).length()+RAND+G0.STEP
+		var o=Vector2(xf.origin.x,xf.origin.z)+C
+		var i0=int(floor((o.x-r-G0.X0)/G0.STEP));var i1=int(ceil((o.x+r-G0.X0)/G0.STEP))
+		var k0=int(floor((o.y-r-G0.Z0)/G0.STEP));var k1=int(ceil((o.y+r-G0.Z0)/G0.STEP))
+		for k in range(max(k0,0),min(k1,nz-1)+1):
+			for i in range(max(i0,0),min(i1,nx-1)+1):
+				var j=k*nx+i
+				if H[j]<=hmax:continue
+				var lw=inv*Vector3(G0.X0+i*G0.STEP-C.x,xf.origin.y,G0.Z0+k*G0.STEP-C.y)
+				if abs(lw.x)<=hw and lw.z<=RAND and lw.z>=-kk.d-RAND:H[j]=hmax;n+=1
+	print("NORD Gelände unter Bausätzen eingeschnitten ",n)
 func _farbe(i:int,k:int,h:float)->Color:
 	var nx=G0.rx;var x=G0.X0+i*G0.STEP;var z=G0.Z0+k*G0.STEP
 	var i0=max(i-1,0);var i1=min(i+1,nx-1);var k0=max(k-1,0);var k1=min(k+1,G0.rz-1)
@@ -1945,10 +1971,12 @@ func _deko_auf_boden():
 				if fu.size.x>0.5 or fu.size.y>0.5:
 					for cc in [fu.position,Vector2(fu.end.x,fu.position.y),fu.end,Vector2(fu.position.x,fu.end.y)]:
 						pkt.append(Vector2(buf[m*12]*cc.x+buf[m*12+2]*cc.y+x,buf[m*12+8]*cc.x+buf[m*12+10]*cc.y+z))
-				var boden=INF
+				var boden=INF;var b_mitte=-INF
 				for q in pkt:
 					var bq=_deko_boden(idx,Z,q.x,q.y,y)
-					if bq>-INF:boden=min(boden,bq)
+					if b_mitte==-INF and q==pkt[0]:b_mitte=bq
+					# eine Ecke über Bordstein/Fahrbahn (deutlich tiefer als die Mitte) zieht die Deko nicht hinunter
+					if bq>-INF and (b_mitte==-INF or bq>b_mitte-0.15):boden=min(boden,bq)
 				if boden<INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
 			L.INSTG[key][tk]=buf
 	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt," | Stadtboden geteilt ",L.N_TEIL)
