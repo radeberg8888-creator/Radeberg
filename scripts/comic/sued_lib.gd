@@ -374,6 +374,14 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 	if not KITLISTE.has(key):KITLISTE[key]=[]
 	KITLISTE[key].append(name)
 
+# Randschräge 60 cm rund um eine Grundfläche (Breite w, Tiefe d ab z0, Oberkante o): schließt Fugen zu
+# Nachbarn/Gehweg, ohne dass Flächen gleich hoch übereinanderliegen
+func _rand(w:float,d:float,o:float,mat:Material,z0:=0.0):
+	var so=L._st(mat,true);var b:=0.6;var u:=-0.3
+	var A=_P(-w*0.5,o,z0);var B=_P(-w*0.5,o,z0+d);var C2=_P(w*0.5,o,z0+d);var D=_P(w*0.5,o,z0)
+	var A2=_P(-w*0.5-b,u,z0-b);var B2=_P(-w*0.5-b,u,z0+d+b);var C3=_P(w*0.5+b,u,z0+d+b);var D2=_P(w*0.5+b,u,z0-b)
+	for q in [[A,A2,B2,B],[B,B2,C3,C2],[C2,C3,D2,D],[D,D2,A2,A]]:
+		L._tri(so,q[0],q[1],q[2],Vector3.UP);L._tri(so,q[0],q[2],q[3],Vector3.UP)
 func _boden(w:float,d:float,farbe:Color):
 	L.box(T(farbe),_P(0,-0.055,d*0.5),Vector3(w,0.16,d),Basis(),0.0)
 	# Sockelblock nach unten: am Hang (Bausatz auf den höchsten Geländepunkt gesetzt) keine offene Kante
@@ -512,7 +520,7 @@ func _k_park(i:int):
 	if i==0:
 		L.box(L.M.asphalt,_P(8,0.01,20),Vector3(12,0.02,14),Basis(),0.0);L._korb(_P(8,0,26.0),Vector3(0,0,1))
 func _k_lager(i:int,kauf:bool):
-	L.box(L.M.hof,_P(0,-0.035,15),Vector3(44,0.14,30),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,15),Vector3(44,0.14,30),Basis(),0.0);_rand(44,30,0.035,L.M.hof)
 	var farbe=[Color(0.6,0.62,0.64),Color(0.55,0.5,0.45),Color(0.45,0.55,0.6),Color(0.62,0.55,0.4)][i%4]
 	var c=_P(0,0,17)
 	for sd in [[Vector3(0,0,1),40,0.0],[Vector3(0,0,-1),40,PI],[Vector3(1,0,0),24,PI*0.5],[Vector3(-1,0,0),24,-PI*0.5]]:
@@ -542,7 +550,7 @@ func container(p:Vector3,yaw:float,farbe:Color):
 		x+=0.8
 	for sd in [-1,1]:L.box(dk,p+b*Vector3(sd*6.12,1.3,0),Vector3(0.05,2.4,2.3),b,0.0)
 func _k_container(i:int):
-	L.box(L.M.hof,_P(0,-0.035,4.5),Vector3(14,0.14,9),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,4.5),Vector3(14,0.14,9),Basis(),0.0);_rand(14,9,0.035,L.M.hof)
 	var farben=[Color(0.8,0.2,0.15),Color(0.15,0.4,0.75),Color(0.2,0.55,0.3),Color(0.9,0.6,0.1),Color(0.6,0.6,0.62),Color(0.55,0.25,0.5),Color(0.9,0.9,0.88)]
 	var hmax=0
 	for j in 3:
@@ -550,7 +558,7 @@ func _k_container(i:int):
 		for k in h:container(_P(0,k*2.6,1.5+j*2.6),0.0,farben[(i*3+j*5+k)%farben.size()])
 	K.haupt(_P(0,hmax*1.3,4.1),Vector3(12.2,hmax*2.6,7.8),Basis(),farben[i%farben.size()],Color(0,0,0,0),0,false)
 func _k_buero():
-	L.box(L.M.hof,_P(0,-0.035,5),Vector3(12,0.14,10),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,5),Vector3(12,0.14,10),Basis(),0.0);_rand(12,10,0.035,L.M.hof)
 	for k in 2:container(_P(0,k*2.6,5),0.0,[Color(0.92,0.92,0.9),Color(0.3,0.5,0.75)][k])
 	K.haupt(_P(0,2.6,5),Vector3(12.2,5.2,2.44),Basis(),Color(0.92,0.92,0.9))
 	L.box(L.M.glas[1],_P(0,1.3,3.75),Vector3(8,1.0,0.05),Basis(),0.0)

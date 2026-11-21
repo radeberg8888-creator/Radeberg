@@ -868,7 +868,7 @@ func _k_bar(i:int):
 	GL.label(["SALOON","DUSTY'S BAR"][i],c+Vector3(0,5.5,5.1),Basis(),0.016,Color(1,0.3,0.25),Color(0.1,0.05,0.0),10.0)
 	L._park(Transform3D(Basis(Vector3.UP,PI*0.5),_P(-5,0,2.5)),"c_suv");L._park(Transform3D(Basis(Vector3.UP,PI*0.45),_P(4,0,2.8)),"c_muscle")
 func _k_tanke():
-	L.box(L.M.asphalt,_P(0,-0.07,11),Vector3(26,0.16,22),Basis(),0.0)
+	L.box(L.M.asphalt,_P(0,-0.055,11),Vector3(26,0.16,22),Basis(),0.0);_rand(26,22,0.025,L.M.asphalt)
 	var c=_P(0,0,8);var rot=T(Color(0.85,0.15,0.12))
 	L.box(L.M.weiss,c+Vector3(0,5.6,0),Vector3(14,0.8,9),Basis(),0.04);L.box(rot,c+Vector3(0,5.6,4.52),Vector3(14,0.5,0.05),Basis(),0.0)
 	for sx in [-5,5]:
@@ -898,6 +898,7 @@ func _k_feld(i:int):
 	var farben=[[Color(0.85,0.75,0.3),Color(0.75,0.65,0.25)],[Color(0.45,0.6,0.25),Color(0.38,0.5,0.2)],[Color(0.55,0.42,0.28),Color(0.45,0.35,0.22)]][i]
 	# Ackerboden unter den Reihen (sonst sieht man zwischen den Reihen den Platz-Belag)
 	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.65,14.65),Vector3(29.4,1.4,29.3),Basis(),0.0)
+	_rand(29.4,29.3,0.05,T(Color(0.4,0.3,0.2)))
 	for k in 15:L.box(T(farben[k%2]),_P(0,0.05+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
 	L._zaun(_P(-15,0,0.2),_P(15,0,0.2),1.2)
 func _k_wasserturm():
