@@ -1,0 +1,125 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ZEIT start 0.522 s  RAM 136 MB
+FELD Steigung 10.6% nach 9 Durchgängen
+RASTER Viertelzellen 76272
+AUTOBAHN Stücke 4 Rampen 24
+ZEIT netz 46.743 s  RAM 179 MB
+TEILEN Runde 0 Flächen 839 neue Querstraßen 289
+TEILEN Runde 1 Flächen 1132 neue Querstraßen 225
+TEILEN Runde 2 Flächen 1360 neue Querstraßen 168
+TEILEN Runde 3 Flächen 1531 neue Querstraßen 84
+TEILEN Runde 4 Flächen 1616 neue Querstraßen 43
+TEILEN Runde 5 Flächen 1660 neue Querstraßen 14
+ZEIT flaechen 153.395 s  RAM 209 MB
+SUED Kreuzungen 2852 3912 ms
+ZEIT kreuzungen 157.376 s  RAM 229 MB
+ASPHALT Stücke 2984
+DIAG Fläche bei (-324.63, 964.41): keine
+DIAG Fläche bei (-371.63, 959.41): keine
+DIAG Fläche bei (-74.63, 988.41): keine
+DIAG Fläche bei (2908.37, -155.59): rand
+DIAG Fläche bei (856.37, -5694.59): keine
+DIAG Fläche bei (845.37, -5998.59): keine
+DIAG Fläche bei (942.37, -6003.59): keine
+FLAECHEN Fassade 1413 Bausatz 189 Rand 46
+SUED Bausätze 138 1747 ms
+SUED Werkstatt bei (-198.2334, 949.1902)
+DIENST polizei bei (-48.73042, 1240.479)
+DIENST feuerwehr bei (365.5875, 1668.421)
+DIENST taxi bei (-424.5815, 1170.738)
+DIENST polizei bei (1250.801, 1025.189)
+DIENST polizei bei (326.0303, -496.0934)
+DIENST feuerwehr bei (-706.1918, -298.1184)
+DIENST taxi bei (808.9877, -150.1738)
+DIENST polizei bei (-994.2231, -1253.721)
+RESERVIERT 9
+  Fassadenblöcke 50/1413 Häuser 2050 RAM 776
+  Fassadenblöcke 100/1413 Häuser 3248 RAM 840
+  Fassadenblöcke 150/1413 Häuser 4689 RAM 911
+  Fassadenblöcke 200/1413 Häuser 6119 RAM 981
+  Fassadenblöcke 250/1413 Häuser 7877 RAM 1076
+  Fassadenblöcke 300/1413 Häuser 9449 RAM 1155
+  Fassadenblöcke 350/1413 Häuser 10695 RAM 1214
+  Fassadenblöcke 400/1413 Häuser 12246 RAM 1286
+  Fassadenblöcke 450/1413 Häuser 13589 RAM 1371
+  Fassadenblöcke 500/1413 Häuser 16374 RAM 1601
+  Fassadenblöcke 550/1413 Häuser 17858 RAM 1681
+  Fassadenblöcke 600/1413 Häuser 19593 RAM 1780
+  Fassadenblöcke 650/1413 Häuser 21043 RAM 1853
+  Fassadenblöcke 700/1413 Häuser 23166 RAM 1966
+  Fassadenblöcke 750/1413 Häuser 25374 RAM 2122
+  Fassadenblöcke 800/1413 Häuser 27191 RAM 2215
+  Fassadenblöcke 850/1413 Häuser 28588 RAM 2288
+  Fassadenblöcke 900/1413 Häuser 30194 RAM 2377
+  Fassadenblöcke 950/1413 Häuser 31194 RAM 2553
+  Fassadenblöcke 1000/1413 Häuser 33631 RAM 2678
+  Fassadenblöcke 1050/1413 Häuser 35215 RAM 2756
+  Fassadenblöcke 1100/1413 Häuser 37049 RAM 2846
+  Fassadenblöcke 1150/1413 Häuser 38261 RAM 2912
+  Fassadenblöcke 1200/1413 Häuser 39420 RAM 2975
+  Fassadenblöcke 1250/1413 Häuser 40910 RAM 3049
+  Fassadenblöcke 1300/1413 Häuser 42099 RAM 3120
+  Fassadenblöcke 1350/1413 Häuser 43491 RAM 3195
+RANDGEHWEGE gepflastert 433
+GEHWEGE an Hochstraße/Bahn gepflastert 145
+BAHNSTREIFEN gepflastert 69
+DURCHGAENGE gepflastert 221
+ZEIT fassaden 544.319 s  RAM 3733 MB
+ZEIT ausstattung 601.303 s  RAM 3749 MB
+ZEIT bahn/autobahn 611.511 s  RAM 3806 MB
+SUED FAIL { "rect": 2164, "occ": 22348, "maske": 691842, "frei": 14694 }
+SUED Grundstücke an Straßen 5710 106462 ms
+SUED Hinterhäuser 0 ohne Zufahrt verworfen 62
+SUED Füllstücke 782
+SUED Kaikante 0 Kräne 0 Schiffe 0
+SUED Flughafen 0
+ZEIT bausaetze 731.468 s  RAM 3854 MB
+ZEIT stadt 731.484 s  RAM 3782 MB
+NORD Raster 911x1481 2470 ms
+NORD Verbinder 62
+NORD Belag Schotter 31 Sand 1
+NORD Knoten angeglichen 131
+NORD Straßen 184 Sonder 6
+SUED Hinterstraßen 33
+NORD Knoten angeglichen 150
+SUED Kreuzungen 274 310 ms
+NORD Bausätze 289
+NORD Sonderorte 739 davon Wüste 696
+DIENST polizei bei (1690.833, -5855.359)
+DIENST feuerwehr bei (1860.446, -7605.235)
+SUED Hinterhäuser 0 ohne Zufahrt verworfen 2
+SUED FAIL { "rect": 0, "occ": 12595, "maske": 1624, "frei": 9427 }
+SUED Grundstücke an Straßen 5604 49939 ms
+NORD Füllstücke 580
+LANDSCHAFT Plätze 230 { "ld_schrott": 7, "ld_hochstand": 50, "ld_camp": 12, "ld_holz": 30, "nd_huette": 22, "nd_trailer_%d": 10 } 130 ms
+NATUR Hanf-Suche { "strasse": 120, "land": 24, "nah": 1, "rand": 1 } gefunden 2
+NATUR Villen-Suche 2 { "strasse": 54, "hoehe": 62, "kein_meer": 15, "land": 12, "flach": 1, "nah": 1 }
+NATUR Orte 8 153 ms
+NORD Gelände-Ziel 2564 ms, Straßenzellen 79853
+NATUR Maske 11225 ms
+NATUR Stadt-Prüfung { "wasser": 68645, "ok": 313108, "kit_leer_ring": 38646, "kit_da_ring": 26087, "tief_ring": 102, "kit_leer_stadt": 186251, "kit_da_stadt": 76412, "nord": 2782, "strasse": 69544, "flaeche": 252433, "belegt": 11313 }
+NATUR 882225 Bäume 309397 Fern 103132 { "schilf": 7295, "eiche": 127872, "busch": 139905, "birke": 32301, "kiesel": 26503, "fels": 25655, "tanne": 124227, "totholz": 6861, "kiefer": 24997, "farn": 6990, "gras": 27659, "hohgras": 18333, "blumen": 1687, "kaktus": 2543 } 113798 ms
+NORD Gehweg-Ecken 297 verlängert 251
+NORD Sackgassen-Gehwege 110
+NORD Gehwegstücke 6620
+NORD Geometrie in der Stadt verworfen 78
+GRUNDSTUECKE geebnet 3331
+STRASSEN Korridor Zellen 69070
+NORD Gelände unter Bausätzen eingeschnitten 239
+HOEHE abweichend (vor Korrektur) { "nd": [1, -1.72000033855438, (1780.0, -5905.0)], "nd_einfam": [13, 1.82875587604938, (-2734.135, -8503.513)], "gh_holzL": [8, 2.87768053337932, (2805.576, -1830.145)], "nd_sockel_12": [5, 1.97768053337932, (2805.576, -1830.145)], "gh_holzK": [4, 1.73405904173851, (2755.133, -1883.955)], "sd_reihe": [3, 2.01401068232948, (2811.369, -1947.833)], "nd_sockel_9": [3, 1.59299165867272, (-2863.589, -8415.956)], "nd_villa": [2, -1.39227497531101, (-1600.477, -9384.147)], "laden": [2, 1.23035000264645, (-2770.137, -8410.429)], "nd_feld": [1, -1.26966769280842, (1634.47, -7358.099)], "ld": [71, -13.4606460571289, (-184.6403, -2716.163)], "nd_sockel_40": [1, -3.35638221614063, (-2344.101, -8168.664)], "nd_kaktus": [444, 92.8792930603027, (2199.414, -5056.623)], "nd_fels": [455, 78.6347785949707, (2138.556, -5162.131)], "busch": [717, 13.0865077748615, (1791.769, -5927.079)], "nd_sockel_6": [718, 13.0865077748615, (1791.769, -5927.079)], "werbung": [2, 1.91598199903965, (-2663.159, -8635.626)], "nd_sockel_8": [2, 1.91598199903965, (-2663.159, -8635.626)], "nt": [15037, 19.9264053024353, (-620.4089, -7170.126)], "nt_blumen": [71, 16.0961670380463, (3314.832, 620.4181)], "nt_gras": [4529, -63.3965248271824, (-694.512, -7092.919)], "nt_eiche": [38679, -33.2673208810387, (-637.6226, -7028.808)], "nt_fern": [107282, 47.6383446142072, (100.1766, -7825.524)], "nt_birke": [4122, 27.5936527252197, (-2767.658, -1398.908)], "nt_kiesel": [20188, 53.9959991918874, (110.0678, -7770.805)], "nt_busch": [47687, 50.9734562980011, (103.4681, -7764.36)], "nt_fels": [18651, 51.0099193083122, (102.9974, -7788.809)], "nt_tanne": [56918, 47.6383446142072, (100.1766, -7825.524)], "nt_hohgras": [1047, -22.0271755033173, (-2522.483, -3664.988)] }
+NATUR auf Endgelaende gesetzt 876682
+NORD Kacheln 983
+ZEIT norden 1343.807 s  RAM 4219 MB
+DEKO auf Boden gesetzt 17949 von 109054 | Stadtboden geteilt 504844
+STADT Kollision lange Dreiecke geteilt 5001
+FERN Häuser-Felder 66
+STADT Kacheln 250 RAM 1432
+GRUNDSTUECKE geebnet 3331
+STRASSEN Korridor Zellen 69070
+NORD Gelände unter Bausätzen eingeschnitten 239
+NATUR Fernwald Felder 154 Bäume 103132
+KARTE Grundbild gespeichert
+GESPEICHERT OK OK Straßen 1633 Kreuzungen 3126 Parkplätze 872
+ZEIT fertig 1636.67 s  RAM 1596 MB
+BERICHT {"ampeln":9161,"bahnuebergaenge":15,"bausaetze":6492,"bloecke_bausatz":189,"bloecke_fassade":1413,"doppelt_entfernt":42,"enden_angebunden":33,"enden_verlaengert":8,"flaechen":1674,"flaechen_rand":46,"haeuser_fassade":44493,"kacheln":1233,"koll_dreiecke_entfernt":360201,"kreuzungen":2852,"laeden":4,"loecher_geoeffnet":854,"parkplaetze":1296,"parkplaetze_spiel":872,"querstrassen_neu":823,"steigung_max_%":10.6,"strassen":1388,"strassen_alt":608,"stummel_entfernt":1}
