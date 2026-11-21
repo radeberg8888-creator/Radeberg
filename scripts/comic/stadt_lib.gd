@@ -2014,6 +2014,7 @@ func _container(p:Vector3,yaw:float,farbe:Color):
 	for x in [-0.85,0.85]:
 		zyl(M.reifen,p+b*Vector3(x,0.1,0.5),p+b*Vector3(x,0.0,0.5),0.08,1.2)
 	box(M.metall,p+b*Vector3(0,0.7,0.78),Vector3(1.6,0.06,0.06),b,0.0)
+	koll_box(p+b*Vector3(0,0.66,0),Vector3(2.0,1.32,1.5),b)   # Container begehbar (Deckel ~1,3 m)
 func _sofa(p:Vector3,yaw:float):
 	var b=Basis(Vector3.UP,yaw);var m=_toon(Color(0.45,0.3,0.5))
 	box(m,p+b*Vector3(0,0.25,0),Vector3(2.0,0.4,0.9),b,0.03)

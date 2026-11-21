@@ -590,6 +590,15 @@ const PRUEF_ORTE:=[["Innenstadt",Vector2(250,-350)],["Altstadt",Vector2(-150,-65
 	["Wueste_Staubwinkel",Vector2(945,-5847)],["JVA",Vector2(1828,-4937)],["Nord_Kueste",Vector2(-2504,-8463)],["Nord_Villen",Vector2(-1609,-9248)],
 	["Nord_Feuerwache",Vector2(1752,-7559)],["Nordbucht",Vector2(-119,-9032)],["Berg",Vector2(-600,-7000)]]
 var FUNDE:=[]
+# alle Kollisionsflächen senkrecht über/unter w (±2 m), relativ zu w, mit Körpername
+func _alle_treffer(w:Vector3)->String:
+	var t=[];var von=w+Vector3(0,2.0,0)
+	for i in 6:
+		var q=PhysicsRayQueryParameters3D.create(von,w+Vector3(0,-2.0,0));q.hit_back_faces=true
+		var r=spiel.get_world_3d().direct_space_state.intersect_ray(q)
+		if r.is_empty():break
+		t.append(str(r.collider.get_parent().name)+"/"+str(r.collider.name)+"@"+str(snapped(r.position.y-w.y,0.01)));von=r.position-Vector3(0,0.002,0)
+	return ",".join(t)
 func _strahl(von:Vector3,bis:Vector3,rueck:=false)->Dictionary:
 	var q=PhysicsRayQueryParameters3D.create(von,bis);q.hit_back_faces=rueck
 	return spiel.get_world_3d().direct_space_state.intersect_ray(q)
@@ -706,7 +715,7 @@ func _pruef_kopien(mitte:Vector2,radius:float):
 				if not r.is_empty() and _tri_hg(w.x,w.z)>w.y+0.05:r={}
 				if not r.is_empty():
 					var luft=w.y-r.position.y
-					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))+" Ursprung y:"+str(snapped(gx.origin.y,0.01))+" Fuß:"+str(snapped(ab.position.y,0.01))+" q:"+str(q)])
+					if luft>(10.0 if sockel else 0.10):FUNDE.append([kn,"schwebt",luft,w,str(r.collider.get_parent().name)+"/"+str(r.collider.name)+" über Netz:"+str(snapped(w.y-_tri_hg(w.x,w.z),0.01))+" Ursprung y:"+str(snapped(gx.origin.y,0.01))+" Fuß:"+str(snapped(ab.position.y,0.01))+" q:"+str(q)+" Treffer:"+_alle_treffer(w)])
 				# versunken: Unterkante liegt unter dem Gelände -> Strahl nach oben trifft die Geländeoberseite von unten
 				var ru=_strahl(w+Vector3(0,0.3,0),w+Vector3(0,12.0,0),true)
 				if not ru.is_empty() and ru.normal.y>0.5 and ru.position.y-w.y>1.0:

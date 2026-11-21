@@ -833,7 +833,7 @@ func _bahn_bauen():
 						# auch im selben Gleis: an Knicken (Weichen) überlappen Nachbarschwellen an den Enden
 						elif o[0].distance_to(p)<0.3 or (o[0].distance_to(p)<2.6 and _schwellen_ueberlapp(p,t,o[0],o[3])):im=true
 			if not im:
-				L.box(schwelle,Vector3(p.x,0.155,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)+PI*0.5),0.0)
+				L.box(schwelle,Vector3(p.x,0.155,p.y),Vector3(2.5,0.09,0.24),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)   # x quer zum Gleis
 				if not schw_ort.has(zk):schw_ort[zk]=[]
 				schw_ort[zk].append([p,gnr,s,t])
 			s+=0.75
@@ -1334,10 +1334,11 @@ func _norden()->Dictionary:
 			# große Bausätze (Villa, Hof, Laden): auf den höchsten Geländepunkt der Grundfläche (höchstens 30 cm
 			# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;
 			# die Ränder reichen mit Sockel/Gartenmauer nach unten
-			var h0=hy;var hw2=kk.w*0.5;var dd2=kk.d
+			# (1,5 m über den Bausatz-Umriss hinaus: Rasen/Terrasse sind teils breiter als die Kit-Maße)
+			var h0=hy;var hw2=kk.w*0.5+1.5;var dd2=kk.d+1.5
 			for gi in 13:
 				for gk in 13:
-					var qw=xf*Vector3(-hw2+kk.w*gi/12.0,0,-dd2*gk/12.0);var qq=Vector2(qw.x,qw.z)+C
+					var qw=xf*Vector3(-hw2+hw2*2.0*gi/12.0,0,1.5-(dd2+1.5)*gk/12.0);var qq=Vector2(qw.x,qw.z)+C
 					hy=max(hy,_end_h(HN,qq)-NL.H0-0.1)
 			hy=min(hy,h0+(1.8 if kn.begins_with("nd_") else 0.9))   # Nord-Bausätze haben 10 m Sockel
 		var dh=xf.origin.y-hy
