@@ -543,7 +543,7 @@ func _stadt_bauen(faces:Array,d):
 		if s=="fassade" or s=="sued":fass.append(pc)
 		else:kit.append([pc,s])
 	# Diagnose: in welcher Fläche liegen die letzten Prüf-Funde?
-	for wp in [Vector2(245.83,2056.98),Vector2(899.49,401.78),Vector2(2770.02,-125.65),Vector2(-2240.14,688.91),Vector2(-75.17,989.18),Vector2(2357.21,974.78),Vector2(690.07,-179.32)]:
+	for wp in [Vector2(-324.63,964.41),Vector2(-371.63,959.41),Vector2(-74.63,988.41),Vector2(2908.37,-155.59),Vector2(856.37,-5694.59),Vector2(845.37,-5998.59),Vector2(942.37,-6003.59)]:
 		var lp=wp-C;var art="keine"
 		for pc in fass:
 			if Geometry2D.is_point_in_polygon(lp,pc):art="fassade";break
@@ -1976,7 +1976,7 @@ func _deko_auf_boden():
 					var bq=_deko_boden(idx,Z,q.x,q.y,y)
 					if b_mitte==-INF and q==pkt[0]:b_mitte=bq
 					# eine Ecke über Bordstein/Fahrbahn (deutlich tiefer als die Mitte) zieht die Deko nicht hinunter
-					if bq>-INF and (b_mitte==-INF or bq>b_mitte-0.15):boden=min(boden,bq)
+					if bq>-INF and (b_mitte==-INF or not String(key).begins_with("baum") or bq>b_mitte-0.15):boden=min(boden,bq)
 				if boden<INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
 			L.INSTG[key][tk]=buf
 	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt," | Stadtboden geteilt ",L.N_TEIL)

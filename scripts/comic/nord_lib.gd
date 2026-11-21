@@ -1440,7 +1440,12 @@ func fahrbahnen():
 		for i in n:
 			var d:Vector2=(P[min(i+1,n-1)]-P[max(i-1,0)]).normalized();var nn=Vector2(-d.y,d.x)
 			var e=0.0
-			if i==0 or i==n-1:e=r.w*0.6
+			if i==0 or i==n-1:
+				e=r.w*0.6
+				# Einmündung in eine vorrangige Straße: weiter hineinziehen (wird an deren Belag abgeschnitten),
+				# sonst bleibt bei schrägem Winkel ein Keil Gelände zwischen den Fahrbahnen frei
+				var ne=naechst(P[i],ri)
+				if ne[2]>=0 and ne[3]<ROADS[ne[2]].w+r.w and _vor(ne[2],ri):e=r.w*1.8
 			var pp=P[i]+(d*(-e if i==0 else e))
 			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
@@ -1702,8 +1707,28 @@ func _gehweg_ecken(so)->int:
 				var A=Vector3(pa.x,hs[e[0]],pa.y);var B=Vector3(pb.x,hs[e[1]],pb.y)
 				var nr=Vector3(((pa+pb)*0.5-mid).x,0,((pa+pb)*0.5-mid).y).normalized()
 				L._tri(ss,A,A-Vector3(0,6,0),B-Vector3(0,6,0),nr);L._tri(ss,A,B-Vector3(0,6,0),B,nr)
-			n+=1
-	print("NORD Gehweg-Ecken ",n)
+			n+=1;e1["ecke"]=true;e2["ecke"]=true
+	# Enden ohne Ecke (Einmündung in eine Straße ohne Gehweg): Gehweg bis an deren Fahrbahn verlängern,
+	# sonst bleibt zwischen Gehwegende und Fahrbahn ein Stück Gelände (tiefer) frei
+	var n_v=0
+	for ji in ENDEN:
+		for e in ENDEN[ji]:
+			if e.get("ecke",false):continue
+			var i0=Vector2(e.i.x,e.i.z);var o0=Vector2(e.o.x,e.o.z);var d:Vector2=-e.d
+			var lg=0.0
+			while lg<14.0:
+				var m=(i0+o0)*0.5+d*(lg+0.5)
+				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05):break
+				lg+=0.5
+			if lg<0.25:continue
+			var i1=i0+d*lg;var o1=o0+d*lg;var y=e.i.y
+			_tri_frei(so,Vector3(i0.x,y,i0.y),Vector3(o0.x,e.o.y,o0.y),Vector3(o1.x,e.o.y,o1.y),GW)
+			_tri_frei(so,Vector3(i0.x,y,i0.y),Vector3(o1.x,e.o.y,o1.y),Vector3(i1.x,y,i1.y),GW)
+			var nr=Vector3((o0-i0).x,0,(o0-i0).y).normalized()
+			var A=Vector3(o0.x,e.o.y,o0.y);var B=Vector3(o1.x,e.o.y,o1.y)
+			L._tri(ss,A,A-Vector3(0,6,0),B-Vector3(0,6,0),nr);L._tri(ss,A,B-Vector3(0,6,0),B,nr)
+			n_v+=1
+	print("NORD Gehweg-Ecken ",n," verlängert ",n_v)
 	return n
 func wege():
 	var dreck=L._toon(Color(0.4,0.34,0.25))

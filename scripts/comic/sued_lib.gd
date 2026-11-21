@@ -437,7 +437,7 @@ func _k_holz(w:float,d:float,farbe:Color,i:int,lang:bool):
 			L.zyl(L.M.linie,hof-RECHTS*3.0+Vector3(0,1.9,0),hof+RECHTS*3.0+Vector3(0,1.9,0),0.01,1.0)
 			for q in 5:L.box(T(GL.SPRAY[q%GL.SPRAY.size()]),hof+RECHTS*(-2.4+q*1.2)+Vector3(0,1.55,0),Vector3(0.8,0.7,0.03),Basis(),0.012)
 		elif x==2:
-			L.zyl(T(Color(0.3,0.6,0.9)),hof,hof+Vector3(0,0.5,0),1.4,1.05);L.zyl(T(Color(0.45,0.7,0.6)),hof+Vector3(0,0.42,0),hof+Vector3(0,0.46,0),1.3)
+			L.zyl(T(Color(0.3,0.6,0.9)),hof,hof+Vector3(0,0.5,0),1.4,1.05);L.zyl(T(Color(0.45,0.7,0.6)),hof+Vector3(0,0.42,0),hof+Vector3(0,0.46,0),1.3);L.koll_box(hof+Vector3(0,0.24,0),Vector3(2.6,0.48,2.6))   # Planschbecken begehbar
 		else:GL.reifen(hof,3);GL.muellsack(hof+RECHTS*1.5)
 	elif i%2==0:GL.auto_wrack(_P(ex,0,9.0),rng.randf_range(-0.2,0.2))
 	_zaeune(w,d,true,ex)
