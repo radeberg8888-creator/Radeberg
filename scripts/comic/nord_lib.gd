@@ -1638,6 +1638,16 @@ func platten():
 	var alt=L.koll_an;L.koll_an=true
 	var so=L._st(L.M.pflaster,true);var n_ok=0;var sk=L._st(L.M.stein,true)
 	ENDEN={};GW={}
+	# Grundstücke (große Bausätze) vorab als belegt eintragen: Gehwege/Ecken werden an deren Umriss abgeschnitten
+	# statt 1 cm unter/über dem Rasen weiterzulaufen (doppelte Fläche)
+	for pl in PLATZ:
+		var kk=K.KITS.get(pl[0],null)
+		if kk==null or kk.w<6.0:continue
+		var xf:Transform3D=pl[1];var um=PackedVector2Array()
+		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
+			var w=xf*c;um.append(Vector2(w.x,w.z))
+		if Geometry2D.is_polygon_clockwise(um):um.reverse()
+		_gelegt_dazu(GW,um)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji];var R=float(j.r)+3.0
