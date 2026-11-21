@@ -192,6 +192,12 @@ func _y_an(v:Vector3,ri:int)->float:
 	if yf==INF:return v.y
 	if v.y<yf+0.06-0.5:return v.y   # deutlich tiefer (Unterführung): unberührt
 	return yf+0.06
+func _im_grund(p:Vector2,GR:Array)->bool:
+	for g in GR:
+		if p.distance_to(g[3])>g[4]:continue
+		var l=g[0]*Vector3(p.x,0,p.y)
+		if abs(l.x)<=g[1] and l.z<=0.0 and l.z>=-g[2]:return true
+	return false
 func _ende_frei(ri:int,p:Vector2)->bool:
 	var n=naechst(p,ri)
 	return n[2]<0 or n[3]>ROADS[n[2]].w+3.0
@@ -1448,7 +1454,7 @@ func fahrbahnen():
 				# Einmündung in eine vorrangige Straße: weiter hineinziehen (wird an deren Belag abgeschnitten),
 				# sonst bleibt bei schrägem Winkel ein Keil Gelände zwischen den Fahrbahnen frei
 				var ne=naechst(P[i],ri)
-				if ne[2]>=0 and ne[3]<ROADS[ne[2]].w+r.w and _vor(ne[2],ri):e=r.w*1.8
+				if ne[2]>=0 and ne[3]<ROADS[ne[2]].w+r.w and _vor(ne[2],ri):e=clamp(ne[3],r.w*0.6,r.w*1.8)   # bis zur Mittellinie der anderen, nicht darüber hinaus
 			var pp=P[i]+(d*(-e if i==0 else e))
 			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
@@ -1732,7 +1738,10 @@ func _gehweg_ecken(so)->int:
 			n+=1;e1["ecke"]=true;e2["ecke"]=true
 	# Enden ohne Ecke (Einmündung in eine Straße ohne Gehweg): Gehweg bis an deren Fahrbahn verlängern,
 	# sonst bleibt zwischen Gehwegende und Fahrbahn ein Stück Gelände (tiefer) frei
-	var n_v=0
+	var n_v=0;var GR=[]   # Grundstücke (große Bausätze): [inverse Transform, w/2, d]
+	for pl in PLATZ:
+		var kk=K.KITS.get(pl[0],null)
+		if kk!=null and kk.w>=6.0:GR.append([pl[1].affine_inverse(),kk.w*0.5,kk.d,Vector2(pl[1].origin.x,pl[1].origin.z),Vector2(kk.w*0.5,kk.d).length()])
 	for ji in ENDEN:
 		for e in ENDEN[ji]:
 			if e.get("ecke",false):continue
@@ -1740,7 +1749,7 @@ func _gehweg_ecken(so)->int:
 			var lg=0.0;var lmax=min(14.0,((i0+o0)*0.5-JUNC[ji].p).dot(-d))
 			while lg<lmax:
 				var m=(i0+o0)*0.5+d*(lg+0.5)
-				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05) or _belegt(o0+d*(lg+0.5)) or _belegt(m):break
+				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05) or _im_grund(o0+d*(lg+0.5),GR) or _im_grund(m,GR):break
 				lg+=0.5
 			if lg<0.25:continue
 			var i1=i0+d*lg;var o1=o0+d*lg;var y=e.i.y
