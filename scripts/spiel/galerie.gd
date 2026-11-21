@@ -731,6 +731,21 @@ func _fuss(me:Mesh,ab:AABB)->Rect2:
 			else:r=r.expand(Vector2(v.x,v.z))
 	_fuss_cache[me]=r
 	return r
+# Umgebung eines fehlenden Gehwegpunkts: nächster Knoten und Straßen in 15 m (Abstand zur Mittellinie, w, sw)
+func _gw_diag(ai:Vector2,selbst)->String:
+	var t=" |"
+	var bj=null;var bd=1e9
+	for j in spiel.welt.S.junctions:
+		var d=Vector2(j.p.x,j.p.y).distance_to(ai) if j.p is Vector2 else Vector2(j.p.x,j.p.z).distance_to(ai)
+		if d<bd:bd=d;bj=j
+	if bj!=null:t+=" Knoten %.1f m r:%s"%[bd,str(bj.get("r","?"))]
+	for r in spiel.welt.S.roads:
+		if r==selbst:continue
+		var P:PackedVector2Array=r.P;var dm=1e9
+		for k in P.size()-1:
+			var q=Geometry2D.get_closest_point_to_segment(ai,P[k],P[k+1]);dm=min(dm,q.distance_to(ai))
+		if dm<15.0:t+=" | Str w:%s sw:%s Abst %.1f"%[str(r.w),str(r.get("sw",0)),dm]
+	return t
 func _pruef_gehwege(mitte:Vector2,radius:float):
 	for r in spiel.welt.S.roads:
 		var sw:float=float(r.get("sw",0.0))
@@ -746,7 +761,7 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				if rs.is_empty():continue
 				var ys=rs.position.y
 				# nur echtes Fehlen zählt (Treffer auf das Gelände statt auf eine Gehweg-/Platten-Kollision)
-				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)+" Straße:"+str(r.get("n","?"))+" w:"+str(w)+" sw:"+str(sw)+" i:"+str(i)+"/"+str(P.size())+" P:"+str(P[i])])
+				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)+" Straße:"+str(r.get("n","?"))+" w:"+str(w)+" sw:"+str(sw)+" i:"+str(i)+"/"+str(P.size())+" P:"+str(P[i])+_gw_diag(ai,r)])
 				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
 				if rg.is_empty():continue
 				var yg=rg.position.y

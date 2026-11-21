@@ -371,7 +371,7 @@ func _box_kopie(m:Material,xf:Transform3D,me:Mesh=null):
 		MODULE[key]=am;MODUL_SCHATTEN[key]=false;_MOD_PF[key]=[];_MOD_KF[key]=[]
 	# derselbe Kasten (Material, Lage, Größe) zweimal -> nur einmal (sonst flimmern zwei deckungsgleiche Kästen)
 	var o=xf.origin;var bx=xf.basis
-	var dk="%s|%d|%d|%d|%d|%d|%d|%d|%d|%d"%[key,roundi(o.x*100),roundi(o.y*100),roundi(o.z*100),roundi(bx.x.x*100),roundi(bx.x.z*100),roundi(bx.y.y*100),roundi(bx.z.x*100),roundi(bx.z.z*100),roundi(bx.x.y*100)]
+	var dk="%d|%d|%d|%d|%d|%d|%d|%d|%d"%[roundi(o.x*100),roundi(o.y*100),roundi(o.z*100),roundi(bx.x.x*100),roundi(bx.x.z*100),roundi(bx.y.y*100),roundi(bx.z.x*100),roundi(bx.z.z*100),roundi(bx.x.y*100)]
 	var hk=dk.hash()
 	if _KASTEN_DA.has(hk):return
 	_KASTEN_DA[hk]=true

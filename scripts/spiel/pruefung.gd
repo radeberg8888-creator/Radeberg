@@ -349,7 +349,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					var gleich=(e1[1]==ot and e2[1]==ot)
 					var gleich_mat=e1[1]>=0 and e2[1]>=0 and _kurz(e1[1])==_kurz(ot) and _kurz(e2[1])==_kurz(ot)
 					if gleich or gleich_mat:
-						FUNDE.append(["Boden:"+_kurz(ot),"Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")]);break
+						FUNDE.append(["Boden:"+_kurz(ot),"Stufe",s2,Vector3(x,top,z),NAMEN[ot]+(" | gleiche Fläche" if gleich else " | Übergang")+" | Gefälle %.2f/%.2f"%[(top-e1[0])/0.2,(e2[0]-top)/0.2]+G._gw_diag(Vector2(x,z),null)]);break
 			else:
 				# d) schmale Lücke zwischen zwei Platten (Durchschauen auf das Gelände)
 				# Punkt genau auf einer gemeinsamen Kante zweier Dreiecke ist keine Lücke (Spalt unter 2 mm)
