@@ -1436,7 +1436,7 @@ func fahrbahnen():
 		var r=ROADS[ri];var belag=r.get("belag","asphalt")
 		var so=L._st(L.M.asphalt if belag=="asphalt" else belag_mat(belag),true)
 		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
-		var Ls=[];var Rs=[]
+		var Ls=[];var Rs=[];var La=[];var Ra=[]
 		for i in n:
 			var d:Vector2=(P[min(i+1,n-1)]-P[max(i-1,0)]).normalized();var nn=Vector2(-d.y,d.x)
 			var e=0.0
@@ -1449,12 +1449,27 @@ func fahrbahnen():
 			var pp=P[i]+(d*(-e if i==0 else e))
 			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
+			La.append(a3.y);Ra.append(b3.y)
 			a3.y=_y_an(a3,ri);b3.y=_y_an(b3,ri)
 			# enge Kurve: die Innenkante liefe rückwärts (Viereck überschlägt sich -> doppelte Fläche) -> dort festhalten
 			if i>0:
 				if Vector2(a3.x-Ls[i-1].x,a3.z-Ls[i-1].z).dot(d)<0.0:a3=Vector3(Ls[i-1].x,a3.y,Ls[i-1].z)
 				if Vector2(b3.x-Rs[i-1].x,b3.z-Rs[i-1].z).dot(d)<0.0:b3=Vector3(Rs[i-1].x,b3.y,Rs[i-1].z)
 			Ls.append(a3);Rs.append(b3)
+		# an Einmündungen angehobene/abgesenkte Ecken über 6 m auslaufen (innerhalb des Kreuzungskreises, Gehwege unberührt) lassen (kein Knick/Hubbel an der Kante)
+		for S in [[Ls,La],[Rs,Ra]]:
+			var A:Array=S[0];var A0:Array=S[1];var korr=[]
+			for j in n:korr.append(0.0)
+			for ende in [0,n-1]:
+				var dl=A[ende].y-A0[ende]
+				if abs(dl)<0.005:continue
+				var st=1 if ende==0 else -1;var j=ende+st;var lg=0.0
+				while j>=0 and j<n:
+					lg+=Vector2(A[j].x-A[j-st].x,A[j].z-A[j-st].z).length()
+					if lg>=6.0:break
+					if abs(A[j].y-A0[j])<0.001:korr[j]+=dl*(1.0-lg/6.0)
+					j+=st
+			for j in n:A[j].y+=korr[j]
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
 			var q=PackedVector2Array([Vector2(Ls[i].x,Ls[i].z),Vector2(Ls[i+1].x,Ls[i+1].z),Vector2(Rs[i+1].x,Rs[i+1].z),Vector2(Rs[i].x,Rs[i].z)])
@@ -1722,7 +1737,7 @@ func _gehweg_ecken(so)->int:
 			var lg=0.0;var lmax=min(14.0,((i0+o0)*0.5-JUNC[ji].p).dot(-d))
 			while lg<lmax:
 				var m=(i0+o0)*0.5+d*(lg+0.5)
-				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05):break
+				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05) or _belegt(o0+d*(lg+0.5)) or _belegt(m):break
 				lg+=0.5
 			if lg<0.25:continue
 			var i1=i0+d*lg;var o1=o0+d*lg;var y=e.i.y

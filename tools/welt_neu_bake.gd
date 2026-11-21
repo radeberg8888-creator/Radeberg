@@ -1702,7 +1702,7 @@ func _kits_einschneiden(H:PackedFloat32Array,H0:float):
 	# Steile Grundstücke: das Anheben eines großen Nord-Bausatzes ist begrenzt (1,8 m). Liegt das Gelände im
 	# Grundstück trotzdem höher, wird es dort eingeschnitten (Hang hinter Gartenmauer), statt durch den Rasen
 	# zu stechen. Rasterpunkte bis 7,5 m um den Umriss -> auch zwischen den 10-m-Punkten bleibt es darunter.
-	var nx=G0.rx;var nz=G0.rz;var n=0;var RAND=7.5
+	var nx=G0.rx;var nz=G0.rz;var n=0;var RAND=10.5
 	for g in GROSS_KITS:
 		var xf:Transform3D=g[0];var kk=g[1];var inv=xf.affine_inverse()
 		var hmax=xf.origin.y+H0+0.08;var hw=kk.w*0.5+RAND
@@ -2001,7 +2001,7 @@ func _deko_auf_boden():
 					var bq=_deko_boden(idx,Z,q.x,q.y,y)
 					if b_mitte==-INF and q==pkt[0]:b_mitte=bq
 					# eine Ecke über Bordstein/Fahrbahn (deutlich tiefer als die Mitte) zieht die Deko nicht hinunter
-					if bq>-INF and (b_mitte==-INF or not String(key).begins_with("baum") or bq>b_mitte-0.15):boden=min(boden,bq)
+					if bq>-INF and (b_mitte==-INF or String(key).begins_with("werbung") or bq>b_mitte-0.15):boden=min(boden,bq)
 				if boden<INF and abs(boden-y)>0.03:buf[m*12+7]=boden;n_mod+=1
 			L.INSTG[key][tk]=buf
 	print("DEKO auf Boden gesetzt ",n_mod," von ",n_gesamt," | Stadtboden geteilt ",L.N_TEIL)
