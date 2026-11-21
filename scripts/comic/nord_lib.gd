@@ -187,11 +187,28 @@ func _y_fremd(p:Vector2,ri:int,rand:float)->float:
 	return y
 # Höhe eines Fahrbahnpunkts, der auf/an einer vorrangigen Straße liegt: genau deren Belag (keine Stufe an der
 # Einmündung); liegt die eigene Fahrbahn deutlich tiefer (Unterführung), bleibt sie unberührt
+const AN_AUSLAUF=6.0   # m hinter dem Rand der vorrangigen Straße, auf denen die Höhe ausläuft
 func _y_an(v:Vector3,ri:int)->float:
-	var yf=_y_fremd(Vector2(v.x,v.z),ri,0.3)
+	# auf der vorrangigen Fahrbahn (+0,3 m): genau deren Belag; danach über AN_AUSLAUF m linear zur eigenen Höhe
+	# (früher harte Kante -> 30–45 % steile Dreiecke direkt neben der Einmündung = "Stufe")
+	var p=Vector2(v.x,v.z);var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)))
+	var yf=INF;var ueber=1e9
+	for i in [-1,0,1]:
+		for j in [-1,0,1]:
+			for sg in SEG.get(k+Vector2i(i,j),[]):
+				if sg.x==ri or not _vor(sg.x,ri):continue
+				var r=ROADS[sg.x]
+				if not r.has("Y") or sg.y+1>=r.P.size():continue
+				var a:Vector2=r.P[sg.y];var b:Vector2=r.P[sg.y+1]
+				var t=clamp((p-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
+				var dd=p.distance_to(a.lerp(b,t))-r.w-0.3
+				if dd<AN_AUSLAUF:
+					var yy=lerp(r.Y[sg.y],r.Y[sg.y+1],t)
+					if dd<ueber-0.01 or (abs(dd-ueber)<=0.01 and yy<yf):ueber=dd;yf=yy
 	if yf==INF:return v.y
 	if v.y<yf+0.06-0.5:return v.y   # deutlich tiefer (Unterführung): unberührt
-	return yf+0.06
+	if ueber<=0.0:return yf+0.06
+	return lerp(yf+0.06,v.y,clamp(ueber/AN_AUSLAUF,0.0,1.0))
 func _im_grund(p:Vector2,GR:Array)->bool:
 	for g in GR:
 		if p.distance_to(g[3])>g[4]:continue
