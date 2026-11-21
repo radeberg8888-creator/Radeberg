@@ -628,7 +628,7 @@ func _villa_mediterran(i:int):
 	# Innenhof-Brunnen und Zypressen
 	var br=_P(-4,0,8.5)
 	L.zyl(T(Color(0.8,0.75,0.65)),br,br+Vector3(0,0.55,0),1.4,1.0)
-	L.zyl(T(Color(0.25,0.55,0.75)),br+Vector3(0,0.5,0),br+Vector3(0,0.56,0),1.2,1.0)
+	L.zyl(T(Color(0.25,0.55,0.75)),br+Vector3(0,0.46,0),br+Vector3(0,0.52,0),1.2,1.0);L.koll_box(br+Vector3(0,0.26,0),Vector3(2.6,0.52,2.6))   # Wasser unter dem Rand, Brunnen begehbar
 	L.zyl(T(Color(0.8,0.75,0.65)),br,br+Vector3(0,1.5,0),0.25,1.0)
 	_mb(Color(0.78,0.5,0.32),_P(-2,0.02,8.5),Vector3(13,0.04,5.5),Basis(),0.0)
 	for k in 4:_cypresse(_P(-13.0+k*0.0,0,6.0+k*4.0),5.0+float((i+k)%3))
@@ -1450,6 +1450,10 @@ func fahrbahnen():
 			var a3=Vector3(pp.x+nn.x*r.w,Y[i]+0.06,pp.y+nn.y*r.w);var b3=Vector3(pp.x-nn.x*r.w,Y[i]+0.06,pp.y-nn.y*r.w)
 			# auf einer vorrangigen Fahrbahn immer knapp unter deren Belag (kein Durchstechen an Einmündungen)
 			a3.y=_y_an(a3,ri);b3.y=_y_an(b3,ri)
+			# enge Kurve: die Innenkante liefe rückwärts (Viereck überschlägt sich -> doppelte Fläche) -> dort festhalten
+			if i>0:
+				if Vector2(a3.x-Ls[i-1].x,a3.z-Ls[i-1].z).dot(d)<0.0:a3=Vector3(Ls[i-1].x,a3.y,Ls[i-1].z)
+				if Vector2(b3.x-Rs[i-1].x,b3.z-Rs[i-1].z).dot(d)<0.0:b3=Vector3(Rs[i-1].x,b3.y,Rs[i-1].z)
 			Ls.append(a3);Rs.append(b3)
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)

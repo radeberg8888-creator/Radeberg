@@ -500,7 +500,7 @@ func _k_reihe(w:float,d:float,i:int):
 	_zaeune(w,d,false,0.0)
 	if i%3==0:GL.graffiti(_P(rng.randf_range(-2,2),1.4,2.15),AUSSEN,0.6)
 func _k_autohandel(i:int):
-	L.box(L.M.asphalt,_P(0,-0.035,13),Vector3(30,0.14,26),Basis(),0.0)
+	L.box(L.M.asphalt,_P(0,-0.035,13),Vector3(30,0.14,26),Basis(),0.0);_rand(30,26,0.035,L.M.asphalt)
 	for x in range(-12,13,6):L.box(L.M.markierung,_P(x,0.02,10),Vector3(0.12,0.01,6.0),Basis(),0.0)
 	var c=_P(0,0,21)
 	L.box(L.M.putz[i%L.M.putz.size()],c+Vector3(0,2.2,0),Vector3(12,4.4,8),Basis(),0.05);K.haupt(c+Vector3(0,2.2,0),Vector3(12,4.4,8),Basis(),Color(0.9,0.85,0.75))
@@ -515,7 +515,7 @@ func _k_autohandel(i:int):
 	L._zaun(_P(-15,0,0.2),_P(-15,0,26),1.6);L._zaun(_P(15,0,0.2),_P(15,0,26),1.6)
 	L.koll_box(_P(-15,0.8,13),Vector3(0.12,1.6,26));L.koll_box(_P(15,0.8,13),Vector3(0.12,1.6,26))
 func _k_park(i:int):
-	L.box(L.M.gras,_P(0,-0.035,15),Vector3(30,0.14,30),Basis(),0.0)
+	L.box(L.M.gras,_P(0,-0.035,15),Vector3(30,0.14,30),Basis(),0.0);_rand(30,30,0.035,L.M.gras)
 	L.box(L.M.hof,_P(0,0.01,15),Vector3(2.5,0.02,30),Basis(),0.0)
 	for k in 6:L._baum(_P(rng.randf_range(-12,12),0,rng.randf_range(3,27)))
 	L._bank(_P(-3,0,10),Vector3(1,0,0));L._bank(_P(3,0,20),Vector3(-1,0,0))
@@ -571,7 +571,7 @@ func _fensterreihe(x0:float,x1:float,y:float,z:float,glas:Material,rahmen:Materi
 		L.box(rahmen,_P(x,y,z-0.04),Vector3(1.5,1.5,0.08),Basis(),0.0);L.box(glas,_P(x,y,z-0.09),Vector3(1.2,1.2,0.05),Basis(),0.0);x+=schritt
 func _k_polizei():
 	var hof=L.M.hof;var weiss=T(Color(0.93,0.93,0.9));var blau=T(Color(0.12,0.25,0.55));var grau=T(Color(0.45,0.47,0.5))
-	L.box(hof,_P(0,-0.035,14),Vector3(30,0.14,28),Basis(),0.0)
+	L.box(hof,_P(0,-0.035,14),Vector3(30,0.14,28),Basis(),0.0);_rand(30,28,0.035,hof)
 	for k in 5:L.box(T(Color(0.95,0.95,0.95)),_P(-10+k*4.5,0.02,7),Vector3(0.12,0.02,5),Basis(),0.0)   # Stellplätze
 	var c=_P(0,0,20);L.box(weiss,c+Vector3(0,4.0,0),Vector3(26,8,14),Basis(),0.05)
 	K.haupt(c+Vector3(0,4.0,0),Vector3(26,8,14),Basis(),Color(0.93,0.93,0.9),Color(0.45,0.47,0.5),0,true)
@@ -593,7 +593,7 @@ func _k_polizei():
 	L.koll_box(c+Vector3(0,4.0,0),Vector3(26,8,14))
 func _k_feuerwehr():
 	var hof=L.M.hof;var ziegel=T(Color(0.68,0.26,0.18));var dunkelrot=T(Color(0.6,0.08,0.06));var grau=T(Color(0.5,0.5,0.52));var weiss=T(Color(0.95,0.95,0.93))
-	L.box(hof,_P(0,-0.035,15),Vector3(34,0.14,30),Basis(),0.0)
+	L.box(hof,_P(0,-0.035,15),Vector3(34,0.14,30),Basis(),0.0);_rand(34,30,0.035,hof)
 	var c=_P(-3,0,20);L.box(ziegel,c+Vector3(0,4.5,0),Vector3(26,9,16),Basis(),0.05)
 	K.haupt(c+Vector3(0,4.5,0),Vector3(26,9,16),Basis(),Color(0.68,0.26,0.18),Color(0.35,0.33,0.33),1,false)
 	L.box(grau,c+Vector3(0,9.15,0),Vector3(26.4,0.3,16.4),Basis(),0.04)
@@ -618,7 +618,7 @@ func _k_feuerwehr():
 	L.zyl(T(Color(0.85,0.1,0.08)),_P(-15,0,3),_P(-15,0.9,3),0.18,1.15)
 func _k_taxizentrale():
 	var hof=L.M.hof;var gelb=T(Color(1.0,0.82,0.15));var dunkel=T(Color(0.15,0.15,0.17));var wand=T(Color(0.85,0.82,0.75))
-	L.box(hof,_P(0,-0.035,11),Vector3(26,0.14,22),Basis(),0.0)
+	L.box(hof,_P(0,-0.035,11),Vector3(26,0.14,22),Basis(),0.0);_rand(26,22,0.035,hof)
 	var c=_P(-6,0,16);L.box(wand,c+Vector3(0,2.0,0),Vector3(12,4,9),Basis(),0.05)
 	K.haupt(c+Vector3(0,2.0,0),Vector3(12,4,9),Basis(),Color(0.85,0.82,0.75),Color(0.3,0.3,0.3),0,true)
 	# Schachbrettband
@@ -667,7 +667,7 @@ func _k_schiff():
 	K.LOD.append([Transform3D(Basis(),sch+Vector3(0,7,0)),Vector3(150,6,26),Color(0.25,0.28,0.35),Color(0,0,0,0)])
 	K.LOD.append([Transform3D(Basis(),sch+Vector3(10,13,0)),Vector3(100,6,22),Color(0.6,0.35,0.3),Color(0,0,0,0)])
 func _k_halle(i:int):
-	L.box(L.M.hof,_P(0,-0.035,17),Vector3(44,0.14,34),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,17),Vector3(44,0.14,34),Basis(),0.0);_rand(44,34,0.035,L.M.hof)
 	var h=_P(0,0,19);var wand=L.M.ziegel[i%L.M.ziegel.size()]
 	L.box(wand,h+Vector3(0,5,0),Vector3(40,10,28),Basis(),0.05);K.haupt(h+Vector3(0,5,0),Vector3(40,10,28),Basis(),Color(0.62,0.33,0.25),Color(0.35,0.33,0.33),0,false)
 	for k in 4:
@@ -679,7 +679,7 @@ func _k_halle(i:int):
 	L.box(T(Color(0.85,0.55,0.12)),h+Vector3(12,3,14.06),Vector3(6,6,0.12),Basis(),0.03)
 	L._container(_P(-16,0,3),0.0,Color(0.3,0.35,0.3))
 func _k_tanks():
-	L.box(L.M.hof,_P(0,-0.035,15),Vector3(30,0.14,30),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,15),Vector3(30,0.14,30),Basis(),0.0);_rand(30,30,0.035,L.M.hof)
 	for k in 2:
 		for j in 2:
 			var t=_P(-7.5+k*15,0,7.5+j*15)
@@ -690,7 +690,7 @@ func _k_tanks():
 	for y in [4.0,5.0]:L.zyl(L.M.metall,_P(-14,y,15),_P(14,y,15),0.4,1.1)
 	L._zaun(_P(-15,0,0.3),_P(15,0,0.3),2.4);L.koll_box(_P(0,1.2,0.3),Vector3(30,2.4,0.12))
 func _k_schornstein():
-	L.box(L.M.hof,_P(0,-0.035,10),Vector3(20,0.14,20),Basis(),0.0)
+	L.box(L.M.hof,_P(0,-0.035,10),Vector3(20,0.14,20),Basis(),0.0);_rand(20,20,0.035,L.M.hof)
 	var c=_P(0,0,12)
 	L.box(L.M.ziegel[0],c+Vector3(0,3,0),Vector3(14,6,10),Basis(),0.05);K.haupt(c+Vector3(0,3,0),Vector3(14,6,10),Basis(),Color(0.62,0.33,0.25))
 	L.zyl(L.M.ziegel[0],c+Vector3(4,0,0),c+Vector3(4,45,0),2.2,1.05)
@@ -716,7 +716,7 @@ func _rich(d:Vector3)->Basis:
 	if x.length()<0.01:x=Vector3.RIGHT
 	x=x.normalized();return Basis(x,z.cross(x),z)
 func _k_strandhaus(farbe:Color,i:int):
-	L.box(T(Color(0.94,0.86,0.62)),_P(0,-0.035,8),Vector3(12,0.14,16),Basis(),0.0)
+	L.box(T(Color(0.94,0.86,0.62)),_P(0,-0.035,8),Vector3(12,0.14,16),Basis(),0.0);_rand(12,16,0.035,T(Color(0.94,0.86,0.62)))
 	var pm=L._shader(L.PUTZ,{"farbe":farbe*0.95});var c=_P(0,0,9.5)
 	L.box(pm,c+Vector3(0,3.2,0),Vector3(10,6.4,9),Basis(),0.05);K.haupt(c+Vector3(0,3.2,0),Vector3(10,6.4,9),Basis(),farbe,Color(0.95,0.95,0.92))
 	L.box(L.M.weiss,c+Vector3(0,6.55,0),Vector3(10.6,0.3,9.6),Basis(),0.03)
@@ -729,7 +729,7 @@ func _k_strandhaus(farbe:Color,i:int):
 	L.box(T(Color(0.95,0.95,0.95)),_P(0,0.4,0.2),Vector3(12,0.8,0.15),Basis(),0.02);L.koll_box(_P(0,0.4,0.2),Vector3(12,0.8,0.15))
 	if i%2==0:L._park(Transform3D(Basis(Vector3.UP,PI),_P(3.5,0,2.5)),["c_sport","c_jdm","c_kompakt"][i%3])
 func _k_hotel(farbe:Color,i:int):
-	L.box(L.M.pflaster,_P(0,-0.035,9),Vector3(22,0.14,18),Basis(),0.0)
+	L.box(L.M.pflaster,_P(0,-0.035,9),Vector3(22,0.14,18),Basis(),0.0);_rand(22,18,0.035,L.M.pflaster)
 	var h=[10.0,13.0,16.0,19.0][i%4];var pm=L._shader(L.PUTZ,{"farbe":farbe*0.92});var c=_P(0,0,10)
 	L.box(pm,c+Vector3(0,h*0.5,0),Vector3(20,h,14),Basis(),0.05);K.haupt(c+Vector3(0,h*0.5,0),Vector3(20,h,14),Basis(),farbe,Color(0.9,0.9,0.88))
 	var akz=T(farbe*0.8);var y=3.6
@@ -743,13 +743,13 @@ func _k_hotel(farbe:Color,i:int):
 func _k_palmen(i:int):
 	for k in 2+i%2:palme(_P(rng.randf_range(-3,3),0,rng.randf_range(1.5,6.5)),rng.randf_range(7,11))
 func _k_hangar():
-	L.box(L.M.asphalt,_P(0,-0.035,22),Vector3(40,0.14,44),Basis(),0.0)
+	L.box(L.M.asphalt,_P(0,-0.035,22),Vector3(40,0.14,44),Basis(),0.0);_rand(40,44,0.035,L.M.asphalt)
 	var h=_P(0,0,24);var m=T(Color(0.7,0.72,0.74))
 	L.zyl(m,h+Vector3(0,0,-18),h+Vector3(0,0,18),16,1.02)
 	L.box(L.M.dunkel,h+Vector3(0,6,18.1),Vector3(24,12,0.2),Basis(),0.0)
 	L.koll_box(h+Vector3(0,7,0),Vector3(30,14,36));K.LOD.append([Transform3D(Basis(),h+Vector3(0,7,0)),Vector3(30,14,36),Color(0.7,0.72,0.74),Color(0,0,0,0)])
 func _k_terminal():
-	L.box(L.M.pflaster,_P(0,-0.035,17),Vector3(80,0.14,34),Basis(),0.0)
+	L.box(L.M.pflaster,_P(0,-0.035,17),Vector3(80,0.14,34),Basis(),0.0);_rand(80,34,0.035,L.M.pflaster)
 	var t=_P(0,0,18)
 	L.box(L.M.weiss,t+Vector3(0,5,0),Vector3(76,10,22),Basis(),0.05);K.haupt(t+Vector3(0,5,0),Vector3(76,10,22),Basis(),Color(0.95,0.95,0.95),Color(0.25,0.4,0.6))
 	L.box(L.M.glas[1],t+Vector3(0,5,11.05),Vector3(72,7,0.1),Basis(),0.0)
