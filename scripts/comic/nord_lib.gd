@@ -234,7 +234,9 @@ func _belag_bestimmen():
 func _knoten_angleichen():
 	# Wo eine Straße auf eine vorrangige trifft/sie kreuzt: genau deren Höhe übernehmen, 15 m sanft auslaufen
 	var n=0
-	for ri in ROADS.size():
+	# vorrangige zuerst: sonst gleicht sich eine Nebenstraße an eine Höhe an, die danach noch verschoben wird
+	var folge=range(ROADS.size());folge.sort_custom(func(a,b):return _vor(a,b))
+	for ri in folge:
 		var r=ROADS[ri]
 		if not r.has("Y"):continue
 		var Y:PackedFloat32Array=r.Y;var fest=[]
@@ -339,6 +341,7 @@ func zwischenstrassen():
 	super.zwischenstrassen()
 	for ri in range(alt,ROADS.size()):
 		var r=ROADS[ri];r["stadt"]=true;r["orig"]="strasse";r["Y"]=_profil(r.P,r.S,"strasse",true)
+	_knoten_angleichen()   # neue Zwischenstraßen an die Knotenhöhen anpassen (sonst Rampen/Stufen an Einmündungen)
 
 # ---------------- Stil ----------------
 func stil(pl:Vector2)->String:
