@@ -1348,7 +1348,7 @@ func _norden()->Dictionary:
 			if abs(dh)>abs(dbg[pre][1]):dbg[pre][1]=dh;dbg[pre][2]=w
 		if klein and abs(dh)>0.05:xf.origin.y=hy;p[1]=xf;n_nat+=1
 		# große Bausätze nur anheben (Gelände höher als der Boden), höchstens 90 cm – Boden/Sockel reichen 1,4 m tief
-		elif not klein and dh<-0.02 and dh>(-1.85 if kn.begins_with("nd_") else -0.95):xf.origin.y=hy;p[1]=xf;n_nat+=1
+		elif not klein and dh<-0.02:xf.origin.y-=max(dh,(-1.85 if kn.begins_with("nd_") else -0.95));p[1]=xf;n_nat+=1
 	print("HOEHE abweichend (vor Korrektur) ",dbg)
 	for i in NATUR_FERN.size():
 		var xf:Transform3D=NATUR_FERN[i][1];var w=Vector2(xf.origin.x,xf.origin.z)

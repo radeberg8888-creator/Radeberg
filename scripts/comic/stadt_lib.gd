@@ -434,7 +434,11 @@ func _modul(key:String,xf:Transform3D,bau:Callable,schatten:=false):
 		st=a_st;mats=a_m;zaehler=a_z;hoehen_an=a_h;strassen_modus=a_s;fest_modus=a_f
 	_inst_add(key,xf)
 	for pf in _MOD_PF[key]:PFOSTEN.append([xf*pf[0],pf[1],pf[2]])
-	for v in _MOD_KF[key]:KOLL_F.append(xf*v)
+	# Kollision der Kopie dorthin, wo auch die übrige Kollision gerade landet (fest_modus -> KOLL_N)
+	if fest_modus:
+		for v in _MOD_KF[key]:KOLL_N.append(xf*v)
+	else:
+		for v in _MOD_KF[key]:KOLL_F.append(xf*v)
 func _inst_add(key:String,xf:Transform3D):
 	if _im_haus:_haus_inst.append([key,xf]);return
 	if hoehen_an:xf.origin.y+=FY(xf.origin.x,xf.origin.z)

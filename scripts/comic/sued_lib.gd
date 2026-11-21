@@ -382,6 +382,8 @@ func _rand(w:float,d:float,o:float,mat:Material,z0:=0.0):
 	var A2=_P(-w*0.5-b,u,z0-b);var B2=_P(-w*0.5-b,u,z0+d+b);var C3=_P(w*0.5+b,u,z0+d+b);var D2=_P(w*0.5+b,u,z0-b)
 	for q in [[A,A2,B2,B],[B,B2,C3,C2],[C2,C3,D2,D],[D,D2,A2,A]]:
 		L._tri(so,q[0],q[1],q[2],Vector3.UP);L._tri(so,q[0],q[2],q[3],Vector3.UP)
+	# Sockelblock darunter (am Hang keine offene Kante; gibt dem Bausatz seine Grundfläche)
+	L.box(mat,_P(0,o-0.2-0.7,z0+d*0.5),Vector3(w-0.02,1.4,d-0.02),Basis(),0.0)
 func _boden(w:float,d:float,farbe:Color):
 	L.box(T(farbe),_P(0,-0.055,d*0.5),Vector3(w,0.16,d),Basis(),0.0)
 	# Sockelblock nach unten: am Hang (Bausatz auf den höchsten Geländepunkt gesetzt) keine offene Kante
