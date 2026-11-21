@@ -906,7 +906,7 @@ func _k_feld(i:int):
 	# Ackerboden unter den Reihen (sonst sieht man zwischen den Reihen den Platz-Belag)
 	L.box(T(Color(0.4,0.3,0.2)),_P(0,-0.65,14.65),Vector3(29.4,1.4,29.3),Basis(),0.0)
 	_rand(29.4,29.3,0.05,T(Color(0.4,0.3,0.2)))
-	for k in 15:L.box(T(farben[k%2]),_P(0,0.05+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.0),Basis(),0.0)
+	for k in 15:L.box(T(farben[k%2]),_P(0,0.05+0.15*(k%2),1+k*1.95),Vector3(29,0.3,1.95),Basis(),0.0)
 	L._zaun(_P(-15,0,0.2),_P(15,0,0.2),1.2)
 func _k_wasserturm():
 	var c=_P(0,0,5)
@@ -1715,8 +1715,8 @@ func _gehweg_ecken(so)->int:
 		for e in ENDEN[ji]:
 			if e.get("ecke",false):continue
 			var i0=Vector2(e.i.x,e.i.z);var o0=Vector2(e.o.x,e.o.z);var d:Vector2=-e.d
-			var lg=0.0
-			while lg<14.0:
+			var lg=0.0;var lmax=min(14.0,((i0+o0)*0.5-JUNC[ji].p).dot(-d))
+			while lg<lmax:
 				var m=(i0+o0)*0.5+d*(lg+0.5)
 				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05):break
 				lg+=0.5

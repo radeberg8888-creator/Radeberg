@@ -642,6 +642,31 @@ func _stadt_bauen(faces:Array,d):
 					if abs(L._flaeche2(t))<0.3:continue
 					L._platte(t,-1.2,L.KB-0.018,L.M.pflaster,L.M.stein);gelegt.append([t,L._bbox(t)]);n_sp+=1
 	print("GEHWEGE an Hochstraße/Bahn gepflastert ",n_sp)
+	# Rest des Bahnstreifens (2,4–5 m neben der Gleismitte) in der Stadt: dort liegt keine Blockfläche –
+	# ohne Belag sieht man 0,5 m tiefer das Gelände zwischen Schotter und Pflaster (Grünloch)
+	var n_bs=0;var kern2=[]
+	for b in BAHN:
+		for bd in _baender(b.P,2.6):kern2.append([bd,L._bbox(bd)])
+	for r in NETZ:
+		for bd in _baender(r.P,r.w+0.05):kern2.append([bd,L._bbox(bd)])
+	for b in BAHN:
+		for bd in _baender(b.P,5.0):
+			var bb=L._bbox(bd);var teile=[bd]
+			for kk in kern2+gelegt:
+				if not bb.intersects(kk[1]):continue
+				var t2=[]
+				for t in teile:
+					for y in Geometry2D.clip_polygons(t,kk[0]):
+						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+				teile=t2
+			for t in teile:
+				if abs(L._flaeche2(t))<0.3:continue
+				var cm=Vector2.ZERO
+				for v in t:cm+=v
+				cm/=t.size()
+				if not STADT.has_point(cm+C) or not _stadtflaeche(cm):continue
+				L._platte(t,-1.2,L.KB-0.018,L.M.pflaster,L.M.stein);gelegt.append([t,L._bbox(t)]);n_bs+=1
+	print("BAHNSTREIFEN gepflastert ",n_bs)
 	var nsl=0
 	for e in _SL:
 		if abs(L._flaeche2(e[0]))<0.3:continue
