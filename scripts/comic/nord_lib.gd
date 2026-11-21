@@ -1566,6 +1566,8 @@ func fahrbahnen():
 		while s<Lg-4.0:
 			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var y=y_bei(r,s)+0.075;var nn=Vector2(-t.y,t.x)
 			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
+			# Markierung, die auf eine andere Fahrbahn reicht (Einmündung/Überlappung), läge 1 cm auf deren Belag
+			if auf_fahrbahn(p,ri,1.6) and r.orig!="autobahn":s+=3.0;continue
 			if r.orig=="autobahn":
 				if fmod(s,12.0)<4.0:
 					for o in [-r.w*0.5,r.w*0.5]:var q=p+nn*o;L.box(L.M.markierung,Vector3(q.x,y,q.y),Vector3(0.18,0.012,4.0),bas,0.0)
