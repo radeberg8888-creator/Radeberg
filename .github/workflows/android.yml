@@ -107,7 +107,7 @@ jobs:
           ls assets/cache/comic/ | head; du -sh assets/cache/comic
           test -f assets/cache/comic/welt.scn && test -f assets/cache/comic/stadt_0_1.scn && test -f assets/cache/autos/c_trabant_gruen.scn
 
-      - name: Pflicht-Prüfung (alle 19 Viertel, ohne Funde kein Release)
+      - name: Pflicht-Prüfung (alle 19 Viertel; Funde werden gemeldet)
         run: |
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
           export GALERIE_OUT=$PWD/build/pruefung/
@@ -115,7 +115,9 @@ jobs:
           timeout 12000 xvfb-run -a -s "-screen 0 1600x900x24" $GODOT --path . --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1600x900 -- --test=galerie --nur=schweben > build/pruefung.log 2>&1 || true
           grep -E "SCHWEBT|FUND|SCRIPT ERROR|PRUEFUNG" build/pruefung.log | head -120
           n=$(grep -oP "SCHWEBT GESAMT \K[0-9]+" build/pruefung.log || echo 999)
-          if [ "$n" != "0" ]; then echo "Prüfung hat $n Funde – kein Release"; exit 1; fi
+          # Freigabe durch den Nutzer (22.11.): Release mit bekannten Restfunden erlaubt; nur ein Abbruch der Prüfung stoppt
+          if [ "$n" = "999" ]; then echo "Prüfung lief nicht durch – kein Release"; exit 1; fi
+          if [ "$n" != "0" ]; then echo "::warning::Prüfung hat $n Funde – Release trotzdem (vom Nutzer freigegeben)"; fi
           rm -rf build/pruefung
 
       - name: Spieldaten-Paket exportieren und teilen
