@@ -109,11 +109,21 @@ func _ort(name:String,ziel:Vector2):
 	spiel.env.fog_enabled=true
 	await _foto(name+"_1_strasse")
 	print("LEISTUNG ",name," Straße: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
+	await _leistung_verkehr(name)
 	var h=Vector3(p.x,_boden(p),p.y)
 	cam.look_at_from_position(h+Vector3(-t.x*90+n.x*60,95,-t.y*90+n.y*60),h);spiel.env.fog_enabled=false
 	await _foto(name+"_2_luft")
 	print("LEISTUNG ",name," Luft: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 
+# Leistung MIT Verkehr, geparkten Autos und Passanten bei Grafikstufe Hoch (2) und Ultra (3), gleicher Blick wie Straßenbild
+func _leistung_verkehr(name:String):
+	var alt=spiel.st.e.get("grafik4",1)
+	for stufe in [2,3]:
+		spiel.st.e.grafik4=stufe;spiel.einstellungen_anwenden()
+		for k in 360:await get_tree().process_frame   # ~6 s: Verkehr/Passanten füllen sich auf
+		var dc=Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME);var tr=Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
+		print("LEISTUNG_VERKEHR ",name," Stufe ",["Akku","Mittel","Hoch","Ultra"][stufe],": Zeichenaufrufe ",dc," Dreiecke ",tr," Autos ",spiel.verkehr.size()," geparkt ",spiel.geparkt.size()," Passanten ",spiel.passanten.size(),(" ÜBER GRENZE" if dc>1500 or tr>2500000 else ""))
+	spiel.st.e.grafik4=alt;spiel.einstellungen_anwenden()
 func _bahn():
 	var z=spiel.zug
 	if z==null or z.strecken.is_empty():print("GALERIE kein Zug");return

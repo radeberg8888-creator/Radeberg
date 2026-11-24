@@ -81,7 +81,7 @@ jobs:
           for f in *.png; do [ -f "$f" ] && convert "$f" -quality 82 "${f%.png}.jpg" && rm "$f"; done
           ls | head -80
           cd ../..
-          cd build/testbilder && echo "Lauf ${{ github.run_number }} – ${{ github.sha }}" > LAUF.txt
+          cd build/testbilder && echo "Lauf ${{ github.run_number }} – ${{ github.sha }}" > LAUF.txt && (grep -h "LEISTUNG" galerie.log >> LAUF.txt || true)
           git init -q -b testbilder-ergebnis && git config user.name "testbilder-bot" && git config user.email "actions@github.com"
           git add -A && git commit -qm "Testbilder Lauf ${{ github.run_number }}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" testbilder-ergebnis

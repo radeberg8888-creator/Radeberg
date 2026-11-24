@@ -496,7 +496,7 @@ func _tageszeit():
 	else:
 		# Mondlicht
 		sun.rotation_degrees=Vector3(-45,-60,0);sun.light_color=Color(0.55,0.62,0.85);sun.light_energy=0.35
-	env.ambient_light_energy=lerp(0.32,1.0,tag)
+	env.ambient_light_energy=lerp(0.38,1.0,tag)   # nachts nie unter 0,38 (Villen sonst schwarz)
 	env.fog_light_color=Color(0.7,0.76,0.84).lerp(Color(0.95,0.7,0.5),abend).lerp(Color(0.08,0.09,0.13),1.0-tag)
 	if _sky_mat==null and env.sky and env.sky.sky_material is ShaderMaterial:_sky_mat=env.sky.sky_material
 	if _sky_mat:
@@ -797,7 +797,7 @@ func _parker(p2:Vector2):
 		var d=Vector2(t.origin.x,t.origin.z).distance_to(p2)
 		if _parker_da.has(i):continue
 		if d>130.0 or d<25.0:continue
-		if geparkt.size()>=26:return   # Obergrenze: jedes Auto kostet viele Zeichenaufrufe
+		if geparkt.size()>=[26,40,60,80][_grafik()]:return   # Obergrenze je Grafikstufe (jedes Auto kostet Zeichenaufrufe)
 		if welt.has_method("bereit") and not welt.bereit(Vector2(t.origin.x,t.origin.z)):continue
 		var c=AUTO.new();add_child(c);c.setup(e[0]);c.global_transform=t;c.reset_physics_interpolation();c.parken();geparkt.append(c);_parker_da[i]=c
 		return   # höchstens ein Auto pro Durchgang (verteilt die Arbeit, kein Ruckeln)
