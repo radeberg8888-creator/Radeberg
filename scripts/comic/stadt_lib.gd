@@ -162,6 +162,8 @@ void fragment(){
 	ALBEDO=mix(mix(c,farbe*0.62,fuge),farbe*0.9,aa); ROUGHNESS=0.9;
 }
 """
+# Asphalt zweiseitig: Fahrbahnplatten am Hang sieht man sonst von unten durch (Prüfung "Haus_offen")
+var ASPHALT_2S:=ASPHALT.replace("render_mode diffuse_toon, specular_toon;","render_mode diffuse_toon, specular_toon, cull_disabled;")
 const ASPHALT:=KOPF+"""
 uniform vec3 farbe:source_color=vec3(0.3,0.31,0.33);
 void fragment(){
@@ -303,7 +305,7 @@ func _materialien():
 		M.putz.append(_shader(PUTZ,{"farbe":c}))
 	M.pflaster=_shader(PFLASTER,{})
 	M.hof=_shader(PFLASTER,{"farbe":Color(0.6,0.58,0.55),"gr":0.35})
-	M.asphalt=_shader(ASPHALT,{})
+	M.asphalt=_shader(ASPHALT_2S,{})
 	M.glas=[_shader(GLAS,{}),_shader(GLAS,{"farbe":Color(0.12,0.24,0.32)}),_shader(GLAS,{"farbe":Color(0.95,0.78,0.42),"licht":0.25}),_shader(GLAS,{"farbe":Color(0.2,0.36,0.4)})]
 	M.gras=_shader(GRAS,{})
 	M.stein=_toon(Color(0.86,0.83,0.76))
@@ -317,6 +319,8 @@ func _materialien():
 	M.laub=[_toon(Color(0.3,0.58,0.22)),_toon(Color(0.4,0.66,0.25)),_toon(Color(0.24,0.5,0.24))]
 	M.rinde=_toon(Color(0.4,0.27,0.17))
 	M.markierung=_toon(Color(0.97,0.97,0.94))
+	# zweiseitig: Markierungs-Kanten, Mauersteine und Markisen sind dünne Teile, die man auch von hinten sieht
+	for m in [M.markierung,M.stein]:m.cull_mode=BaseMaterial3D.CULL_DISABLED
 	M.mauer=_shader(ZIEGEL,{"farbe":Color(0.62,0.6,0.56),"fuge":Color(0.45,0.44,0.42),"bw":0.6,"bh":0.3})
 	M.linie=StandardMaterial3D.new();M.linie.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;M.linie.albedo_color=Color(0.07,0.05,0.06)
 	M.gelb=_toon(Color(0.98,0.8,0.15))
@@ -328,6 +332,7 @@ func _materialien():
 	M.reifen=_toon(Color(0.1,0.1,0.11))
 	M.tuer=[_toon(Color(0.2,0.35,0.55)),_toon(Color(0.55,0.15,0.15)),_toon(Color(0.2,0.45,0.3)),_toon(Color(0.35,0.22,0.12)),_toon(Color(0.15,0.15,0.18))]
 	M.markise=[[_toon(Color(0.85,0.18,0.15)),M.weiss],[_toon(Color(0.15,0.5,0.35)),M.weiss],[_toon(Color(0.2,0.35,0.7)),_toon(Color(0.95,0.85,0.4))],[_toon(Color(0.95,0.55,0.15)),M.weiss]]
+	for mk in M.markise:mk[0].cull_mode=BaseMaterial3D.CULL_DISABLED
 	M.fenster=_shader(FENSTER,{});M.gitter=_shader(GITTER,{});M.eck=_shader(ECK,{})
 	SPH_L=SphereMesh.new();SPH_L.radial_segments=7;SPH_L.rings=3
 	M.blume=[_toon(Color(0.95,0.3,0.4)),_toon(Color(0.98,0.85,0.2)),_toon(Color(0.8,0.4,0.9))]
@@ -579,9 +584,11 @@ func _mi(am:Mesh,m:Material,weit:float):
 	if m==ink or kein_schatten.has(m):mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if weit>0.0:mi.visibility_range_end=weit;mi.visibility_range_end_margin=20.0
 	return mi
+var _TRI_DA:={}
+func _r2(v:Vector3)->Vector3i:return Vector3i(roundi(v.x*50.0),roundi(v.y*50.0),roundi(v.z*50.0))
 func _fertig(mit_kopien:=true):
 	for k in st.keys():_mesh_aus(k)
-	st.clear()
+	st.clear();_TRI_DA.clear()
 	if mit_kopien:_module_aus()
 # ---------------- Umgebung ----------------
 func _umgebung():
@@ -1164,6 +1171,12 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 					for t in range(1,V.size()-1):_tri(s,V[0],V[t],V[t+1],aussen)
 			_im_raster=false
 			return
+	if abs(fn.y)>0.95:
+		# gleiches waagerechtes Bodendreieck (2-cm-Raster) im selben Material schon da -> nicht doppelt erzeugen
+		var ks=[_r2(a),_r2(b),_r2(c)];ks.sort()
+		var hk=[s.get_instance_id(),ks].hash()
+		if _TRI_DA.has(hk):return
+		_TRI_DA[hk]=true
 	if koll_an:
 		if fest_modus:KOLL_N.append_array([a,b,c])
 		else:KOLL_F.append_array([a,b,c])
@@ -1948,7 +1961,7 @@ func _durchfahrt(front:Vector3,o:Vector3,w:float,T:float):
 
 func _hof():
 	var a=HOF0;var e=HOF1;var mid=Vector3((a+e)*0.5,0,(a+e)*0.5)
-	var hofasph=_shader(ASPHALT,{"farbe":Color(0.36,0.36,0.37)})
+	var hofasph=_shader(ASPHALT_2S,{"farbe":Color(0.36,0.36,0.37)})
 	box(hofasph,mid+Vector3(0,0.03,0),Vector3(e-a,0.06,e-a),Basis(),0.0)
 	# Ölflecken, Pfützen, Risse
 	for k in 14:
@@ -2771,7 +2784,7 @@ func hoefe_von(pc:PackedVector2Array)->Array:
 func _hof2(q:PackedVector2Array,deko:=true,yh:=0.025):
 	# Hofbelag 2,5 cm über dem Gehwegpflaster (gewollte Kante, kein Z-Fighting), begehbar; yh<0: nur Deko
 	# (Höhe bleibt unter KB+0.03, sonst folgt die Fläche nicht dem Gelände)
-	if _hofbelag==null:_hofbelag=_shader(ASPHALT,{"farbe":Color(0.42,0.41,0.4)});_hofbelag.resource_name="hofbelag"
+	if _hofbelag==null:_hofbelag=_shader(ASPHALT_2S,{"farbe":Color(0.42,0.41,0.4)});_hofbelag.resource_name="hofbelag"
 	# Hof als eigene Platte mit Kante (das Blockpflaster hat an dieser Stelle ein Loch, siehe hoefe_von)
 	if yh>=0.0:_platte(q,-0.3,KB+yh,_hofbelag,M.stein)
 	if not deko:return

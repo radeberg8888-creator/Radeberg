@@ -509,7 +509,8 @@ func _process(dt):
 		for e in rad_knoten:e[0].transform=Transform3D(b,e[2])
 
 func aufrichten():
-	var fw=global_transform.basis.z;fw.y=0;fw=fw.normalized()
+	var fw=global_transform.basis.z;fw.y=0
+	fw=fw.normalized() if fw.length_squared()>0.0001 else Vector3.FORWARD
 	global_transform=Transform3D(Basis.looking_at(-fw,Vector3.UP),global_position+Vector3(0,1.2,0))
 	linear_velocity=Vector3.ZERO;angular_velocity=Vector3.ZERO;_kopfueber=0.0
 
@@ -653,9 +654,13 @@ func _ki_place(dt:float):
 	# Steigung der Straße übernehmen (sonst steckt bei Gefälle Bug oder Heck in der Fahrbahn)
 	var L=S.length(ki_road)
 	var hv=S.at(ki_road,clamp(ki_s+2.0*ki_dir,0.0,L))[1];var hh=S.at(ki_road,clamp(ki_s-2.0*ki_dir,0.0,L))[1]
-	var dy=(hv-hh)/4.0
-	var fwd=Vector3(t.x,dy,t.y).normalized()
-	var target=Transform3D(Basis.looking_at(-fwd,Vector3.UP),Vector3(p.x,y,p.y))
+	var dy=clampf((hv-hh)/4.0,-0.6,0.6)   # nie senkrecht (Höhensprung an Brücke/Rampe)
+	var fwd=Vector3(t.x,dy,t.y)
+	if fwd.length_squared()<0.0001:fwd=-global_transform.basis.z
+	fwd=fwd.normalized()
+	var up:=Vector3.UP
+	if absf(fwd.y)>0.98:up=Vector3.FORWARD
+	var target=Transform3D(Basis.looking_at(-fwd,up),Vector3(p.x,y,p.y))
 	if dt>0.0:
 		var q=global_transform.basis.get_rotation_quaternion().slerp(target.basis.get_rotation_quaternion(),clamp(dt*5.0,0.0,1.0))
 		global_transform=Transform3D(Basis(q),target.origin)

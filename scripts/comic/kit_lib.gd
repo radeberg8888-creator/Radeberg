@@ -85,7 +85,7 @@ func _gruppe(m:Material)->Array:   # [Schlüssel, Zielmaterial, vertexfarbe]
 	if m==L.ink:return ["ink",m,null]
 	if m is StandardMaterial3D:
 		var sm:StandardMaterial3D=m
-		if sm.albedo_texture==null and sm.transparency==BaseMaterial3D.TRANSPARENCY_DISABLED and not sm.emission_enabled and sm.shading_mode==BaseMaterial3D.SHADING_MODE_PER_PIXEL and not sm.vertex_color_use_as_albedo:
+		if sm.albedo_texture==null and sm.transparency==BaseMaterial3D.TRANSPARENCY_DISABLED and not sm.emission_enabled and sm.shading_mode==BaseMaterial3D.SHADING_MODE_PER_PIXEL and not sm.vertex_color_use_as_albedo and sm.cull_mode==BaseMaterial3D.CULL_BACK:
 			return ["vc",_vc_mat,sm.albedo_color]
 		return ["m"+str(m.get_instance_id()),m,null]
 	if m is ShaderMaterial and m.shader.code.find("uniform vec3 farbe")>=0:

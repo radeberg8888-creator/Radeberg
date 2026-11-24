@@ -446,6 +446,8 @@ func _k_block(w:float,d:float,i:int,sued:bool):
 	_boden(w,d,Color(0.45,0.44,0.4))
 	var hd=13.0;var stock=[2,3,3,4][i%4] if sued else [2,3][i%2]
 	L._haus(_P(0,0,0.8),w-0.6,hd,AUSSEN,{"stock":stock,"laden":i%2==0})
+	# Fundament unter dem Haus bis 2,4 m tief: am Hang hängt die Fassade sonst über tieferem Gehweg/Gelände
+	L.box(L.M.stein_d,_P(0,-1.6,0.8+hd*0.5),Vector3(w-0.62,1.6,hd-0.02),Basis(),0.0)
 	var H=3.7+(stock-1)*3.15
 	K.haupt(_P(0,H*0.5,0.8+hd*0.5),Vector3(w-0.6,H,hd),Basis(),Color(0.62,0.35,0.28) if i%2==0 else Color(0.85,0.8,0.7),Color(0.35,0.33,0.33))
 	if not sued:GL.graffiti(_P(rng.randf_range(-w*0.3,w*0.3),1.5,0.75),AUSSEN,0.8)
@@ -543,8 +545,14 @@ func _k_lager(i:int,kauf:bool):
 		GL.label("ZU VERKAUFEN\nLAGERHALLE",_P(-10,4.5,4.48),Basis(),0.012,Color(0.85,0.1,0.1),Color(1,1,1),7.4)
 	L._zaun(_P(-22,0,0.3),_P(-6,0,0.3),2.2);L._zaun(_P(6,0,0.3),_P(22,0,0.3),2.2)
 	L.koll_box(_P(-14,1.1,0.3),Vector3(16,2.2,0.12));L.koll_box(_P(14,1.1,0.3),Vector3(16,2.2,0.12))
+var _cont_mat:={}
+func _zweiseitig(c:Color)->Material:
+	var k=c.to_html()
+	if not _cont_mat.has(k):
+		var m:StandardMaterial3D=T(c).duplicate();m.cull_mode=BaseMaterial3D.CULL_DISABLED;_cont_mat[k]=m
+	return _cont_mat[k]
 func container(p:Vector3,yaw:float,farbe:Color):
-	var m=T(farbe);var dk=T(farbe*0.75);var b=Basis(Vector3.UP,yaw)
+	var m=_zweiseitig(farbe);var dk=_zweiseitig(farbe*0.75);var b=Basis(Vector3.UP,yaw)   # Wellblech zweiseitig (offene Rückseiten im Stapel)
 	L.box(m,p+Vector3(0,1.3,0),Vector3(12.2,2.58,2.44),b,0.04)
 	var x=-5.6
 	while x<6.0:

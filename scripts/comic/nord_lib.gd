@@ -187,7 +187,7 @@ func _y_fremd(p:Vector2,ri:int,rand:float)->float:
 	return y
 # Höhe eines Fahrbahnpunkts, der auf/an einer vorrangigen Straße liegt: genau deren Belag (keine Stufe an der
 # Einmündung); liegt die eigene Fahrbahn deutlich tiefer (Unterführung), bleibt sie unberührt
-const AN_AUSLAUF=6.0   # m hinter dem Rand der vorrangigen Straße, auf denen die Höhe ausläuft
+const AN_AUSLAUF=12.0   # m hinter dem Rand der vorrangigen Straße, auf denen die Höhe ausläuft
 func _y_an(v:Vector3,ri:int)->float:
 	# auf der vorrangigen Fahrbahn (+0,3 m): genau deren Belag; danach über AN_AUSLAUF m linear zur eigenen Höhe
 	# (früher harte Kante -> 30–45 % steile Dreiecke direkt neben der Einmündung = "Stufe")
@@ -208,7 +208,53 @@ func _y_an(v:Vector3,ri:int)->float:
 	if yf==INF:return v.y
 	if v.y<yf+0.06-0.5:return v.y   # deutlich tiefer (Unterführung): unberührt
 	if ueber<=0.0:return yf+0.06
-	return lerp(yf+0.06,v.y,clamp(ueber/AN_AUSLAUF,0.0,1.0))
+	return lerp(yf+0.06,v.y,smoothstep(0.0,AN_AUSLAUF,ueber))
+var SCHUERZE_MAT:Material=null
+var FB_GELEGT:={}
+# Unterlage je Knoten: Kreisfläche (Radius wie der Gehweg-Schnitt) 4 cm unter dem Belag der nächsten Straße.
+# Bleibt zwischen Fahrbahnen, Gehwegen und Ecken an einer Einmündung ein Keil frei, sieht man diese Fläche
+# statt des tieferen Geländes; überall sonst liegt sie unsichtbar unter den Belägen. Nicht in Grundstücken.
+func _knoten_unterlage():
+	var su=L._st(L.M.asphalt,true);var GR=[];var n=0
+	for pl in PLATZ:
+		var kk=K.KITS.get(pl[0],null)
+		if kk!=null and kk.w>=6.0:GR.append([pl[1].affine_inverse(),kk.w*0.5,kk.d,Vector2(pl[1].origin.x,pl[1].origin.z),Vector2(kk.w*0.5,kk.d).length()])
+	var hy=func(q:Vector2)->float:
+		# Belaghöhe der nächsten Straße (Mittellinie, interpoliert), an Einmündungen wie dort angeglichen
+		var kz=Vector2i(int(floor(q.x/20.0)),int(floor(q.y/20.0)));var best=1e9;var yb=-INF;var rb=-1
+		for i in [-1,0,1]:
+			for jj in [-1,0,1]:
+				for sg in SEG.get(kz+Vector2i(i,jj),[]):
+					var r=ROADS[sg.x]
+					if not r.has("Y") or sg.y+1>=r.P.size():continue
+					var a2:Vector2=r.P[sg.y];var b2:Vector2=r.P[sg.y+1]
+					var t=clamp((q-a2).dot(b2-a2)/max((b2-a2).length_squared(),0.0001),0.0,1.0)
+					var d=q.distance_to(a2.lerp(b2,t))
+					if d<best:best=d;yb=lerp(r.Y[sg.y],r.Y[sg.y+1],t);rb=sg.x
+		if rb<0:return -INF
+		# nur unter Belag/Gehweg (nicht frei über Gelände in den Ecken zwischen den Armen)
+		if best>ROADS[rb].w+ROADS[rb].get("sw",0.0)+0.6:return -INF
+		return _y_an(Vector3(q.x,yb+0.06,q.y),rb)-0.04
+	for ji in JUNC.size():
+		var j=JUNC[ji];var c:Vector2=j.p;var R=float(j.r)+3.0;var N=24
+		var ring=[[c]]
+		for rr in [R*0.5,R]:
+			var pk=[]
+			for k in N:pk.append(c+Vector2(cos(TAU*k/N),sin(TAU*k/N))*rr)
+			ring.append(pk)
+		var H={}
+		for rg in ring:
+			for q in rg:H[q]=hy.call(q)
+		var tris=[]
+		for k in N:
+			tris.append([c,ring[1][k],ring[1][(k+1)%N]])
+			tris.append([ring[1][k],ring[2][k],ring[2][(k+1)%N]]);tris.append([ring[1][k],ring[2][(k+1)%N],ring[1][(k+1)%N]])
+		for t in tris:
+			if H[t[0]]==-INF or H[t[1]]==-INF or H[t[2]]==-INF:continue
+			var m=(t[0]+t[1]+t[2])/3.0
+			if _im_grund(m,GR):continue
+			L._tri(su,Vector3(t[0].x,H[t[0]],t[0].y),Vector3(t[1].x,H[t[1]],t[1].y),Vector3(t[2].x,H[t[2]],t[2].y),Vector3.UP);n+=1
+	print("NORD Knoten-Unterlage Dreiecke ",n)
 func _im_grund(p:Vector2,GR:Array)->bool:
 	for g in GR:
 		if p.distance_to(g[3])>g[4]:continue
@@ -1458,6 +1504,7 @@ func fahrbahnen():
 	# liegt (auch eigene Stücke an engen Kurven) -> nirgends zwei Fahrbahnen übereinander
 	var folge=range(ROADS.size());folge.sort_custom(func(a,b):return _vor(a,b))
 	var gelegt={}   # 20-m-Zelle -> [Vierecke]
+	FB_GELEGT=gelegt
 	for ri in folge:
 		var r=ROADS[ri];var belag=r.get("belag","asphalt")
 		var so=L._st(L.M.asphalt if belag=="asphalt" else belag_mat(belag),true)
@@ -1541,7 +1588,8 @@ func fahrbahnen():
 					else:L._tri(sb,a_in,b_in,b_out,Vector3.UP);L._tri(sb,a_in,b_out,a_out,Vector3.UP)
 	# Schürze: senkrechte Erd-/Mauerkante 6 m nach unten am äußeren Rand (Gehweg bzw. Bankett). Liegt das
 	# Gelände tiefer, sieht man eine Böschungsmauer statt eines Spalts – und niemand fährt unter die Straße.
-	var sch=T(Color(0.5,0.46,0.4))
+	var sch:StandardMaterial3D=T(Color(0.5,0.46,0.4)).duplicate();sch.cull_mode=BaseMaterial3D.CULL_DISABLED   # Schürze/Böschungsmauer: auch von der Hangseite sichtbar
+	SCHUERZE_MAT=sch
 	for ri in ROADS.size():
 		var r=ROADS[ri];var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var n=P.size()
 		var aus=r.w+(r.sw if r.stadt else 2.6);var oben=0.11 if r.stadt else -0.35
@@ -1555,7 +1603,7 @@ func fahrbahnen():
 				var mid=(a+b)*0.5
 				if auf_fahrbahn(mid,ri,0.8) or nah_kreuzung(mid,2.0):continue
 				var ya=Y[i]+oben;var yb=Y[i+1]+oben
-				var A=Vector3(a.x,ya,a.y);var B=Vector3(b.x,yb,b.y);var A2=Vector3(a.x,ya-6.0,a.y);var B2=Vector3(b.x,yb-6.0,b.y)
+				var A=Vector3(a.x,ya,a.y);var B=Vector3(b.x,yb,b.y);var A2=Vector3(a.x,ya-14.0,a.y);var B2=Vector3(b.x,yb-14.0,b.y)
 				var nrm=Vector3(nn.x*sd,0,nn.y*sd)
 				# beidseitig: von unten/hinten gesehen keine unsichtbare Rückseite
 				L._tri(ss,A,A2,B2,nrm);L._tri(ss,A,B2,B,nrm);L._tri(ss,A,B2,A2,-nrm);L._tri(ss,A,B,B2,-nrm)
@@ -1564,7 +1612,9 @@ func fahrbahnen():
 		var r=ROADS[ri];var s=4.0;var Lg:float=r.S[-1]
 		if r.get("belag","asphalt")!="asphalt":continue
 		while s<Lg-4.0:
-			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var y=y_bei(r,s)+0.075;var nn=Vector2(-t.y,t.x)
+			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var nn=Vector2(-t.y,t.x)
+			# 3 cm über dem tatsächlichen Belag (an Einmündungen angeglichen), nie gleichauf mit Asphalt
+			var y=max(y_bei(r,s)+0.09,_y_an(Vector3(p.x,y_bei(r,s)+0.06,p.y),ri)+0.03)
 			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
 			# Markierung, die auf eine andere Fahrbahn reicht (Einmündung/Überlappung), läge 1 cm auf deren Belag
 			if auf_fahrbahn(p,ri,1.6) and r.orig!="autobahn":s+=3.0;continue
@@ -1628,8 +1678,8 @@ func _sackgassen_enden(so,sk,jr:Dictionary)->int:
 				if o.dot(Vector3(d.x,0,d.y))<0.0 and i==1:o=-o
 				var mitte_ab=(A+B)*0.5-p0
 				if Vector2(o.x,o.z).dot(mitte_ab)<0.0:o=-o
-				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y,B.y),Vector3(B.x,y-1.8,B.y),o)
-				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y-1.8,B.y),Vector3(A.x,y-1.8,A.y),o)
+				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y,B.y),Vector3(B.x,y-6.0,B.y),o)
+				L._tri(sk,Vector3(A.x,y,A.y),Vector3(B.x,y-6.0,B.y),Vector3(A.x,y-6.0,A.y),o)
 			n_e+=1
 	print("NORD Sackgassen-Gehwege ",n_e)
 	return n_e
@@ -1640,6 +1690,8 @@ func platten():
 	var alt=L.koll_an;L.koll_an=true
 	var so=L._st(L.M.pflaster,true);var n_ok=0;var sk=L._st(L.M.stein,true)
 	ENDEN={};GW={}
+	# gelegte Fahrbahnflächen vorab: Gehwegstücke werden an ihnen abgeschnitten (kein Pflaster auf Asphalt)
+	for zk in FB_GELEGT:GW[zk]=FB_GELEGT[zk].duplicate()
 	# Grundstücke (große Bausätze) vorab als belegt eintragen: Gehwege/Ecken werden an deren Umriss abgeschnitten
 	# statt 1 cm unter/über dem Rasen weiterzulaufen (doppelte Fläche)
 	for pl in PLATZ:
@@ -1688,14 +1740,15 @@ func platten():
 				var mo=(a1+c1)*0.5
 				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):
 					var aus=Vector3(n0.x,0,n0.y)
-					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1,c1.y),Vector3(c1.x,y1-1.8,c1.y),aus)
-					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1-1.8,c1.y),Vector3(a1.x,y0-1.8,a1.y),aus)
+					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1,c1.y),Vector3(c1.x,y1-6.0,c1.y),aus)
+					L._tri(sk,Vector3(a1.x,y0,a1.y),Vector3(c1.x,y1-6.0,c1.y),Vector3(a1.x,y0-6.0,a1.y),aus)
 				n_ok+=1
 				# Schnittkanten am Knoten merken (Richtung: vom Knoten weg)
 				if kn0>=0:_ende(kn0,ri,Vector3(a0.x,y0,a0.y),Vector3(a1.x,y0,a1.y),m0)
 				if kn1>=0:_ende(kn1,ri,Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),-m1)
 	n_ok+=_gehweg_ecken(so)
 	n_ok+=_sackgassen_enden(so,sk,jr)
+	_knoten_unterlage()
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)
 	if not KNAST_WAND.is_empty():
@@ -1723,7 +1776,7 @@ func _ende(ji:int,ri:int,innen:Vector3,aussen:Vector3,weg:Vector2):
 	if not ENDEN.has(ji):ENDEN[ji]=[]
 	ENDEN[ji].append({"ri":ri,"i":innen,"o":aussen,"d":weg.normalized()})
 func _gehweg_ecken(so)->int:
-	var n=0;var ss=L._st(T(Color(0.5,0.46,0.4)),true)
+	var n=0;var ss=L._st(SCHUERZE_MAT if SCHUERZE_MAT!=null else T(Color(0.5,0.46,0.4)),true)
 	for ji in ENDEN:
 		var c:Vector2=JUNC[ji].p;var E:Array=ENDEN[ji]
 		if E.size()<2:continue

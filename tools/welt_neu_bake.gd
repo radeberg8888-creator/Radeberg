@@ -1930,6 +1930,29 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)
+	# Knoten: Fahrbahnen werden an Einmündungen angeglichen (bis 0,5 m tiefer als ihre Mittellinie) –
+	# das Gelände im Knotenkreis darum unter die tiefste beteiligte Fahrbahn legen, sonst sticht es durch Gehweg/Ecke
+	var nk=0
+	for jn in NO.JUNC:
+		var c:Vector2=jn.p+NO.C;var R=float(jn.r)+3.0+ST
+		var ymin=INF
+		for ri in [jn.a,jn.b]:
+			if ri<0 or ri>=NO.ROADS.size():continue
+			var r=NO.ROADS[ri]
+			if not r.has("Y"):continue
+			var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
+			for i in P.size():
+				if (P[i]+NO.C).distance_to(c)<=R:ymin=min(ymin,Y[i])
+		if ymin==INF:continue
+		var hz=ymin+NO.H0-0.55
+		for k in range(max(int((c.y-R-Z0)/ST),0),min(int((c.y+R-Z0)/ST)+2,nz)):
+			for ii in range(max(int((c.x-R-X0)/ST),0),min(int((c.x+R-X0)/ST)+2,nx)):
+				var w=Vector2(X0+ii*ST,Z0+k*ST)
+				if w.distance_to(c)>R:continue
+				var j=k*nx+ii
+				if NO.LOT[j]!=0:continue
+				if H[j]>hz:H[j]=hz;nk+=1
+	print("STRASSEN Knotengelände abgesenkt ",nk)
 
 # ================= Stadt-Deko auf den Boden =================
 # Laternen, Bänke, Bäume, Mülleimer, Hydranten … wurden mit der Feldhöhe an ihrem Fußpunkt gesetzt. Der Gehweg
