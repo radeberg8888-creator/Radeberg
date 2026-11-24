@@ -775,16 +775,17 @@ func _villa_garten(i:int):
 			k+=4.0
 		L.box(stein,_P(x1-0.2,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
 		# Pflanzbeet vor der Mauer: Steintrog bis 1,5 m unter Grundstückshöhe, gestutzte Hecke als Band
-		L.box(stein,_P(xm,-0.75,-0.45),Vector3(lg,1.9,0.62),Basis(),0.02)
-		L.box(deck,_P(xm,0.22,-0.45),Vector3(lg+0.04,0.06,0.66),Basis(),0.0)
+		# Trog 20 cm über Gehweghöhe: steht auf dem Gehweg statt gleichauf mit ihm (sonst doppelte Fläche)
+		L.box(stein,_P(xm,-0.65,-0.45),Vector3(lg,2.1,0.62),Basis(),0.02)
+		L.box(deck,_P(xm,0.42,-0.45),Vector3(lg+0.04,0.06,0.66),Basis(),0.0)
 		var n=int(floor(lg))
 		for q in n+1:L.box(fuge,_P(x0+q*lg/max(n,1),-0.75,-0.77),Vector3(0.05,1.9,0.02),Basis(),0.0)
 		for q in 3:L.box(fuge,_P(xm,-1.4+q*0.55,-0.77),Vector3(lg,0.04,0.02),Basis(),0.0)
 		var nh=max(1,int(round(lg/2.0)));var bw=lg/nh
 		for q in nh:
 			var hh=0.55+0.12*sin(float(q)*1.7+float(i)+x0)
-			L.box(laub,_P(x0+bw*(q+0.5),0.25+hh*0.5,-0.45),Vector3(bw+0.02,hh,0.5),Basis(),0.03)
-			if q%3==0:L.kugel(bluete,_P(x0+bw*(q+0.5),0.3+hh,-0.45),Vector3(0.22,0.14,0.22),1.0)
+			L.box(laub,_P(x0+bw*(q+0.5),0.45+hh*0.5,-0.45),Vector3(bw+0.02,hh,0.5),Basis(),0.03)
+			if q%3==0:L.kugel(bluete,_P(x0+bw*(q+0.5),0.5+hh,-0.45),Vector3(0.22,0.14,0.22),1.0)
 	# Tor in der Öffnung (Hanghaus: offen, Einfahrt direkt vor den Garagen)
 	if i%3!=2:L.box(T(Color(0.15,0.15,0.17)),_P((o0+o1)*0.5,1.0,0.2),Vector3(o1-o0-2.0,2.0,0.1),Basis(),0.0)
 	var auto=["c_luxus","c_sport","c_suv","c_jdm","c_luxus"][i%5]
@@ -1526,8 +1527,9 @@ func fahrbahnen():
 			a3.y=_y_an(a3,ri);b3.y=_y_an(b3,ri)
 			# enge Kurve: die Innenkante liefe rückwärts (Viereck überschlägt sich -> doppelte Fläche) -> dort festhalten
 			if i>0:
-				if Vector2(a3.x-Ls[i-1].x,a3.z-Ls[i-1].z).dot(d)<0.0:a3=Vector3(Ls[i-1].x,a3.y,Ls[i-1].z)
-				if Vector2(b3.x-Rs[i-1].x,b3.z-Rs[i-1].z).dot(d)<0.0:b3=Vector3(Rs[i-1].x,b3.y,Rs[i-1].z)
+				# ganz festhalten (auch Höhe): sonst stünden zwei Höhen übereinander -> senkrechte Kante/steiles Dreieck
+				if Vector2(a3.x-Ls[i-1].x,a3.z-Ls[i-1].z).dot(d)<0.0:a3=Ls[i-1]
+				if Vector2(b3.x-Rs[i-1].x,b3.z-Rs[i-1].z).dot(d)<0.0:b3=Rs[i-1]
 			Ls.append(a3);Rs.append(b3)
 		# an Einmündungen angehobene/abgesenkte Ecken über 6 m auslaufen (innerhalb des Kreuzungskreises, Gehwege unberührt) lassen (kein Knick/Hubbel an der Kante)
 		for S in [[Ls,La],[Rs,Ra]]:
@@ -1698,8 +1700,7 @@ func platten():
 		var kk=K.KITS.get(pl[0],null)
 		if kk==null or kk.w<6.0:continue
 		var xf:Transform3D=pl[1];var um=PackedVector2Array()
-		var vor=0.8 if String(pl[0]).begins_with("nd_villa") else 0.0   # Villen: Pflanztrog 0,8 m vor der Gartenmauer
-		for c in [Vector3(-kk.w*0.5,0,vor),Vector3(kk.w*0.5,0,vor),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
+		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
 		_gelegt_dazu(GW,um)
