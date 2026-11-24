@@ -585,7 +585,7 @@ func _mi(am:Mesh,m:Material,weit:float):
 	if weit>0.0:mi.visibility_range_end=weit;mi.visibility_range_end_margin=20.0
 	return mi
 var _TRI_DA:={}
-func _r2(v:Vector3)->Vector3i:return Vector3i(roundi(v.x*50.0),roundi(v.y*50.0),roundi(v.z*50.0))
+func _r2(v:Vector3)->Vector3i:return Vector3i(roundi(v.x*1000.0),roundi(v.y*1000.0),roundi(v.z*1000.0))   # 1 mm: nur echte Duplikate, keine Kleinstdreiecke wegwerfen
 func _fertig(mit_kopien:=true):
 	for k in st.keys():_mesh_aus(k)
 	st.clear();_TRI_DA.clear()
@@ -1172,8 +1172,10 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 			_im_raster=false
 			return
 	if abs(fn.y)>0.95:
-		# gleiches waagerechtes Bodendreieck (2-cm-Raster) im selben Material schon da -> nicht doppelt erzeugen
-		var ks=[_r2(a),_r2(b),_r2(c)];ks.sort()
+		# gleiches waagerechtes Bodendreieck (1-mm-Raster) im selben Material schon da -> nicht doppelt erzeugen
+		# Umlaufsinn behalten (Rückseiten-Dreieck ist kein Duplikat): zyklisch so drehen, dass das kleinste vorn steht
+		var ks=[_r2(a),_r2(b),_r2(c)]
+		while not (ks[0]<=ks[1] and ks[0]<=ks[2]):ks=[ks[1],ks[2],ks[0]]
 		var hk=[s.get_instance_id(),ks].hash()
 		if _TRI_DA.has(hk):return
 		_TRI_DA[hk]=true

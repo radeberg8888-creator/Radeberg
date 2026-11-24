@@ -1748,7 +1748,6 @@ func platten():
 				if kn1>=0:_ende(kn1,ri,Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),-m1)
 	n_ok+=_gehweg_ecken(so)
 	n_ok+=_sackgassen_enden(so,sk,jr)
-	_knoten_unterlage()
 	L.koll_an=alt
 	# Gefängnismauer (ovaler Ring)
 	if not KNAST_WAND.is_empty():
