@@ -1704,9 +1704,14 @@ func platten():
 		_gelegt_dazu(GW,um)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
-		var j=JUNC[ji];var R=float(j.r)+3.0
+		var j=JUNC[ji]
 		for ri in [j.a,j.b]:
 			if not jr.has(ri):jr[ri]=[]
+			# Andere Straße ohne Gehweg (Landstraße/Zufahrt): keine Ecke zu bauen -> Gehweg bis an deren Fahrbahn
+			# führen (Rest schneidet _tri_frei an der gelegten Fahrbahn ab), statt 11 m vorher aufzuhören
+			var ot=j.b if ri==j.a else j.a
+			var R=float(j.r)+3.0
+			if ot>=0 and ot<ROADS.size() and (not ROADS[ot].stadt or ROADS[ot].sw<=0.0):R=ROADS[ot].w+0.4
 			jr[ri].append([ji,j.p,R])
 	for ri in ROADS.size():
 		var r=ROADS[ri]
@@ -1844,12 +1849,14 @@ func _gehweg_ecken(so)->int:
 	return n
 func wege():
 	var dreck=L._toon(Color(0.4,0.34,0.25))
+	var alt=L.koll_an;L.koll_an=true   # Wege begehbar (sonst sinkt man durch: "Kollision_tiefer")
 	for w in WEGE:
 		var a:Vector2=w.a;var b:Vector2=w.b;var d=(b-a).normalized();var n=Vector2(-d.y,d.x)*1.5
 		var m=dreck if w.stil in ["ghetto","redneck","farm","dorf"] else L.M.pflaster
 		var so=L._st(m,true);var ya=hy(a)+0.1;var yb=hy(b)+0.1
 		L._tri(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x+n.x,yb,b.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),Vector3.UP)
 		L._tri(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),Vector3(a.x-n.x,ya,a.y-n.y),Vector3.UP)
+	L.koll_an=alt
 func strassenrand():
 	for ri in ROADS.size():
 		var r=ROADS[ri]

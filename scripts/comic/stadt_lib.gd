@@ -1171,14 +1171,6 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 					for t in range(1,V.size()-1):_tri(s,V[0],V[t],V[t+1],aussen)
 			_im_raster=false
 			return
-	if abs(fn.y)>0.95:
-		# gleiches waagerechtes Bodendreieck (1-mm-Raster) im selben Material schon da -> nicht doppelt erzeugen
-		# Umlaufsinn behalten (Rückseiten-Dreieck ist kein Duplikat): zyklisch so drehen, dass das kleinste vorn steht
-		var ks=[_r2(a),_r2(b),_r2(c)]
-		while not (ks[0]<=ks[1] and ks[0]<=ks[2]):ks=[ks[1],ks[2],ks[0]]
-		var hk=[s.get_instance_id(),ks].hash()
-		if _TRI_DA.has(hk):return
-		_TRI_DA[hk]=true
 	if koll_an:
 		if fest_modus:KOLL_N.append_array([a,b,c])
 		else:KOLL_F.append_array([a,b,c])
