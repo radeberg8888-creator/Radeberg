@@ -120,7 +120,8 @@ func _leistung_verkehr(name:String):
 	var alt=spiel.st.e.get("grafik4",1)
 	for stufe in [2,3]:
 		spiel.st.e.grafik4=stufe;spiel.einstellungen_anwenden()
-		for k in 360:await get_tree().process_frame   # ~6 s: Verkehr/Passanten füllen sich auf
+		await get_tree().create_timer(6.0).timeout   # Verkehr/Passanten füllen sich auf (Echtzeit, nicht Bilder: Software-Rendern ist langsam)
+		for k in 3:await get_tree().process_frame
 		var dc=Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME);var tr=Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
 		print("LEISTUNG_VERKEHR ",name," Stufe ",["Akku","Mittel","Hoch","Ultra"][stufe],": Zeichenaufrufe ",dc," Dreiecke ",tr," Autos ",spiel.verkehr.size()," geparkt ",spiel.geparkt.size()," Passanten ",spiel.passanten.size(),(" ÜBER GRENZE" if dc>1500 or tr>2500000 else ""))
 	spiel.st.e.grafik4=alt;spiel.einstellungen_anwenden()
