@@ -1617,7 +1617,7 @@ func fahrbahnen():
 			var y=max(y_bei(r,s)+0.09,_y_an(Vector3(p.x,y_bei(r,s)+0.06,p.y),ri)+0.03)
 			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
 			# Markierung, die auf eine andere Fahrbahn reicht (Einmündung/Überlappung), läge 1 cm auf deren Belag
-			if auf_fahrbahn(p,ri,1.6) and r.orig!="autobahn":s+=3.0;continue
+			if auf_fahrbahn(p,ri,1.6 if r.orig!="autobahn" else 0.6):s+=3.0;continue
 			if r.orig=="autobahn":
 				if fmod(s,12.0)<4.0:
 					for o in [-r.w*0.5,r.w*0.5]:var q=p+nn*o;L.box(L.M.markierung,Vector3(q.x,y,q.y),Vector3(0.18,0.012,4.0),bas,0.0)
@@ -1698,7 +1698,8 @@ func platten():
 		var kk=K.KITS.get(pl[0],null)
 		if kk==null or kk.w<6.0:continue
 		var xf:Transform3D=pl[1];var um=PackedVector2Array()
-		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
+		var vor=0.8 if String(pl[0]).begins_with("nd_villa") else 0.0   # Villen: Pflanztrog 0,8 m vor der Gartenmauer
+		for c in [Vector3(-kk.w*0.5,0,vor),Vector3(kk.w*0.5,0,vor),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
 		_gelegt_dazu(GW,um)
