@@ -1542,6 +1542,7 @@ func _y_mitte(r,c:Vector2)->float:
 func fahrbahnen():
 	_knoten_plateau()
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
+	var su_f=L._st(T(Color(0.16,0.16,0.18)),true)   # Fugenstreifen (dunkel wie Asphalt, eigenes Material: keine "gleiche Fläche")
 	var bank=T(Color(0.47,0.6,0.33)).duplicate();var bank_sand=T(Color(0.72,0.62,0.45)).duplicate();bank.resource_name="bankett";bank_sand.resource_name="bankett_sand";L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
 	# Reihenfolge nach Vorfahrt: vorrangige Straßen zuerst; jede spätere Fläche spart alles aus, was schon
@@ -1588,6 +1589,18 @@ func fahrbahnen():
 					if abs(A[j].y-A0[j])<0.001:korr[j]+=dl*(1.0-lg/6.0)
 					j+=st
 			for j in n:A[j].y+=korr[j]
+		# Fugenstreifen unter der Fahrbahnkante (±0,4 m, 5 cm unter Belag): schmale Schnittkeile zwischen Fahrbahn
+		# und Gehweg/Nachbarfahrbahn zeigen diesen Streifen (mit Kollision) statt des tiefen Geländes
+		if r.get("stadt",false):
+			for i in n-1:
+				for S in [[Ls,Rs],[Rs,Ls]]:
+					var A:Array=S[0];var B:Array=S[1]
+					var o0=Vector3(A[i].x-B[i].x,0,A[i].z-B[i].z).normalized()*0.4;var o1=Vector3(A[i+1].x-B[i+1].x,0,A[i+1].z-B[i+1].z).normalized()*0.4
+					var d=Vector3(0,-0.05,0)
+					var p0=A[i]-o0+d;var p1=A[i]+o0+d;var p2=A[i+1]+o1+d;var p3=A[i+1]-o1+d
+					var nrm=(p1-p0).cross(p3-p0)
+					if nrm.y<0:L._tri(su_f,p0,p3,p2,Vector3.UP);L._tri(su_f,p0,p2,p1,Vector3.UP)
+					else:L._tri(su_f,p0,p1,p2,Vector3.UP);L._tri(su_f,p0,p2,p3,Vector3.UP)
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
 			var q=PackedVector2Array([Vector2(Ls[i].x,Ls[i].z),Vector2(Ls[i+1].x,Ls[i+1].z),Vector2(Rs[i+1].x,Rs[i+1].z),Vector2(Rs[i].x,Rs[i].z)])
@@ -1866,7 +1879,7 @@ func _gehweg_ecken(so)->int:
 				var pa:Vector2=poly[e[0]];var pb:Vector2=poly[e[1]]
 				var A=Vector3(pa.x,hs[e[0]],pa.y);var B=Vector3(pb.x,hs[e[1]],pb.y)
 				var nr=Vector3(((pa+pb)*0.5-mid).x,0,((pa+pb)*0.5-mid).y).normalized()
-				L._tri(ss,A,A-Vector3(0,6,0),B-Vector3(0,6,0),nr);L._tri(ss,A,B-Vector3(0,6,0),B,nr)
+				L._tri(ss,A,A-Vector3(0,14,0),B-Vector3(0,14,0),nr);L._tri(ss,A,B-Vector3(0,14,0),B,nr)
 			n+=1;e1["ecke"]=true;e2["ecke"]=true
 	# Enden ohne Ecke (Einmündung in eine Straße ohne Gehweg): Gehweg bis an deren Fahrbahn verlängern,
 	# sonst bleibt zwischen Gehwegende und Fahrbahn ein Stück Gelände (tiefer) frei
@@ -1889,7 +1902,7 @@ func _gehweg_ecken(so)->int:
 			_tri_frei(so,Vector3(i0.x,y,i0.y),Vector3(o1.x,e.o.y,o1.y),Vector3(i1.x,y,i1.y),GW)
 			var nr=Vector3((o0-i0).x,0,(o0-i0).y).normalized()
 			var A=Vector3(o0.x,e.o.y,o0.y);var B=Vector3(o1.x,e.o.y,o1.y)
-			L._tri(ss,A,A-Vector3(0,6,0),B-Vector3(0,6,0),nr);L._tri(ss,A,B-Vector3(0,6,0),B,nr)
+			L._tri(ss,A,A-Vector3(0,14,0),B-Vector3(0,14,0),nr);L._tri(ss,A,B-Vector3(0,14,0),B,nr)
 			n_v+=1
 	print("NORD Gehweg-Ecken ",n," verlängert ",n_v)
 	return n

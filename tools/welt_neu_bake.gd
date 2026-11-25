@@ -1281,7 +1281,7 @@ func _norden()->Dictionary:
 	NL.KITLISTE=SU.KITLISTE.duplicate(true)
 	NL.laden("res://assets/data/karte_nord.json",Rect2(insel.position-C,insel.size),[Rect2(STADT.position-C,STADT.size).grow(20)])
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
-	NL.zwischenstrassen();NL.kreuzungen();NL.kits_bauen();NL.sonderorte()
+	NL.zwischenstrassen();NL.kreuzungen();NL._knoten_plateau();NL.kits_bauen();NL.sonderorte()
 	N=load("res://scripts/comic/natur_lib.gd").new(L,K,G0);N.kits_bauen()
 	KN=load("res://scripts/comic/knast_lib.gd").new(L,K);KN.kits_bauen()
 	for e in [["polizei",Vector2(1760,-5900)],["feuerwehr",Vector2(1900,-7650)]]:NL.dienst_reservieren(e[0],e[1])
