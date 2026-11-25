@@ -357,7 +357,7 @@ func _st(m:Material,eigen:=false)->SurfaceTool:
 			_mesh_aus(k)
 			st.erase(k);zaehler[k]=0
 	if not st.has(k):
-		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m
+		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m;_st_m[s]=m.get_instance_id()
 	return st[k]
 var zaehler:={}
 # Kasten: Mitte, Größe, Drehung; Kontur als etwas größerer Kasten mit Rückseiten
@@ -1158,6 +1158,54 @@ func ausschneiden(t:PackedVector2Array,f:PackedVector2Array)->Array:
 			for y in Geometry2D.clip_polygons(teil,f):
 				if not Geometry2D.is_polygon_clockwise(y):out.append(y)
 	return out
+# Bake: waagerechte Flächen desselben Materials, derselben Richtung und Höhe (±3 cm) dürfen sich nicht
+# überlappen – jede neue wird um die schon gelegten ausgeschnitten (Ursache der "gleiche Kopie"-Doppelflächen:
+# Gehwege, Plätze, Höfe und Bausatz-Platten, die übereinander gelegt wurden)
+var boden_frei=null;var _frei_innen:=false;var _st_m:={};var _frei_st=null   # nur im Haupt-Aufbau (nicht in Bausatz-Kopien mit eigenem Rahmen)
+func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3)->bool:
+	var cr=(b-a).cross(c-a)
+	var fn=cr if cr.dot(aussen)>0 else -cr   # Flächennormale wie in _tri
+	var mk=str(_st_m.get(s,0))+("o" if fn.y>0 else "u")
+	var q=PackedVector2Array([Vector2(a.x,a.z),Vector2(b.x,b.z),Vector2(c.x,c.z)])
+	if Geometry2D.is_polygon_clockwise(q):q.reverse()
+	var ym=(a.y+b.y+c.y)/3.0
+	var bb=Rect2(q[0],Vector2.ZERO)
+	for v in q:bb=bb.expand(v)
+	var zell=[]
+	for x in range(int(floor(bb.position.x/20.0)),int(floor(bb.end.x/20.0))+1):
+		for z in range(int(floor(bb.position.y/20.0)),int(floor(bb.end.y/20.0))+1):zell.append(Vector3i(x,z,0))
+	var teile=[q];var getroffen=false;var gesehen={}
+	for zk in zell:
+		for e in boden_frei.get(zk,[]):
+			if e[2]!=mk or abs(e[1]-ym)>0.03 or gesehen.has(e):continue
+			if not e[3].intersects(bb.grow(-0.001)):continue
+			gesehen[e]=true
+			var t2=[]
+			for t in teile:
+				if Geometry2D.intersect_polygons(t,e[0]).is_empty():t2.append(t);continue
+				getroffen=true
+				for y in ausschneiden(t,e[0]):
+					if not Geometry2D.is_polygon_clockwise(y):t2.append(y)
+			teile=t2
+	for zk in zell:
+		if not boden_frei.has(zk):boden_frei[zk]=[]
+		boden_frei[zk].append([q,ym,mk,bb])
+	if not getroffen:return false
+	# Reststücke in der Ebene des Dreiecks legen
+	var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
+	if abs(d)<1e-9:return true
+	_frei_innen=true
+	for t in teile:
+		var ix=dreiecke(t)
+		for k in range(0,ix.size(),3):
+			var pp=[]
+			for m in 3:
+				var v:Vector2=t[ix[k+m]]
+				var l1=((b.z-c.z)*(v.x-c.x)+(c.x-b.x)*(v.y-c.z))/d;var l2=((c.z-a.z)*(v.x-c.x)+(a.x-c.x)*(v.y-c.z))/d
+				pp.append(Vector3(v.x,a.y*l1+b.y*l2+c.y*(1.0-l1-l2),v.y))
+			_tri(s,pp[0],pp[1],pp[2],aussen)
+	_frei_innen=false
+	return true
 var tri_log=null   # Bake: gelegte waagerechte Belagdreiecke mitschreiben (Gelände darunter absenken)
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)
@@ -1167,6 +1215,8 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 	var lk=max((b-a).length(),max((c-b).length(),(a-c).length()))
 	if lk>0.5 and cr.length()<0.002*lk:return
 	if tri_log!=null and abs(cr.normalized().y)>0.5:tri_log.append(PackedVector3Array([a,b,c]))
+	if boden_frei!=null and not _frei_innen and is_same(st,_frei_st) and abs(cr.normalized().y)>0.9 and not fest_modus:
+		if _boden_frei_legen(s,a,b,c,aussen):return
 	if cr.dot(aussen)>0:
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
 		cr=(b-a).cross(c-a)

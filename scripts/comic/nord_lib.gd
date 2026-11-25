@@ -1770,9 +1770,7 @@ func platten():
 		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
-		# Der Gehwegstreifen hat Vorrang: Grundstücksumriss ohne die Gehwegbänder eintragen, sonst fehlt
-		# neben Grundstücken, die bis an die Straße reichen, ein Stück Gehweg (Galerie "ohne_Kollision")
-		for teil in _ohne_gehwegband(um):_gelegt_dazu(GW,teil)
+		_gelegt_dazu(GW,um)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji]

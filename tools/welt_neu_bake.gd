@@ -1281,6 +1281,7 @@ func _norden()->Dictionary:
 	NL.KITLISTE=SU.KITLISTE.duplicate(true)
 	NL.laden("res://assets/data/karte_nord.json",Rect2(insel.position-C,insel.size),[Rect2(STADT.position-C,STADT.size).grow(20)])
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
+	L.boden_frei={};L._frei_st=L.st   # keine übereinander gelegten waagerechten Flächen gleichen Materials (bis Nord fertig)
 	NL.zwischenstrassen();NL.kreuzungen();NL._knoten_plateau();NL.kits_bauen();NL.sonderorte()
 	N=load("res://scripts/comic/natur_lib.gd").new(L,K,G0);N.kits_bauen()
 	KN=load("res://scripts/comic/knast_lib.gd").new(L,K);KN.kits_bauen()
@@ -1289,7 +1290,7 @@ func _norden()->Dictionary:
 	var hs=[];for h in dn.houses:hs.append(Vector2(h[0],h[1]))
 	NL.hinterland(hs);NL.grundstuecke();NL.fuellen();NL.landschaft_orte();_natur_orte(NL);NL.parken_strasse();NL.gelaende_ziel();_natur(NL)
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
-	L.tri_log=NL.BODEN_TRI;NL.fahrbahnen();NL.platten();NL.wege();L.tri_log=null;L._fertig(false)
+	L.tri_log=NL.BODEN_TRI;NL.fahrbahnen();NL.platten();NL.wege();L.tri_log=null;L.boden_frei=null;L._fertig(false)
 	L.weit_detail=300.0;L.weit_ink=120.0
 	NL.strassenrand();L._fertig(false)
 	var KF=L.KOLL_F.slice(n0);var PF=L.PFOSTEN.slice(p0)
