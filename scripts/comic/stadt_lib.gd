@@ -1162,6 +1162,10 @@ var tri_log=null   # Bake: gelegte waagerechte Belagdreiecke mitschreiben (Gelä
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)
 	if cr.length()<1e-9:return
+	# entartetes Splitterdreieck (Höhe unter 2 mm, z. B. aus kollinearen Schnittpunkten): deckt nichts ab,
+	# liegt aber genau auf der Kante des Nachbarn -> doppelte Fläche
+	var lk=max((b-a).length(),max((c-b).length(),(a-c).length()))
+	if lk>0.5 and cr.length()<0.002*lk:return
 	if tri_log!=null and abs(cr.normalized().y)>0.5:tri_log.append(PackedVector3Array([a,b,c]))
 	if cr.dot(aussen)>0:
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn

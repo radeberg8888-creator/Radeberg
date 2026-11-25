@@ -1844,18 +1844,18 @@ func _gehweg_ecken(so)->int:
 			if e1.ri==e2.ri and e1.d.dot(e2.d)>0.8:continue
 			var i1=Vector2(e1.i.x,e1.i.z);var i2=Vector2(e2.i.x,e2.i.z);var a1=Vector2(e1.o.x,e1.o.z);var a2=Vector2(e2.o.x,e2.o.z)
 			var ym=(e1.i.y+e2.i.y)*0.5
+			# Innenkante 0,5 m unter die Fahrbahn (wie die Gehwegbänder): _tri_frei schneidet exakt an der gelegten
+			# Fahrbahn ab. Früher wurde der Eckpunkt K vom Asphalt weg geschoben -> Rasenkeil zwischen Ecke und Fahrbahn
+			var j1=i1+(i1-a1).normalized()*0.5;var j2=i2+(i2-a2).normalized()*0.5
 			var poly:Array;var hs:Array
 			if e1.d.dot(e2.d)<-0.95:
-				poly=[i1,i2,a2,a1];hs=[e1.i.y,e2.i.y,e2.o.y,e1.o.y]   # gerade gegenüber einer Einmündung
+				poly=[j1,j2,a2,a1];hs=[e1.i.y,e2.i.y,e2.o.y,e1.o.y]   # gerade gegenüber einer Einmündung
 			else:
-				var K=Geometry2D.line_intersects_line(i1,-e1.d,i2,-e2.d)
+				var K=Geometry2D.line_intersects_line(j1,-e1.d,j2,-e2.d)
 				var O=Geometry2D.line_intersects_line(a1,-e1.d,a2,-e2.d)
 				if K==null or O==null:continue
 				if (K-c).length()>(i1-c).length()*1.6 or (O-c).length()>(a1-c).length()*1.8:continue
-				for st in 11:
-					var Kt:Vector2=K.lerp(O,st*0.1)
-					if not auf_fahrbahn(Kt,-1,-0.15):K=Kt;break
-				poly=[i1,K,i2,a2,O,a1];hs=[e1.i.y,ym,e2.i.y,e2.o.y,ym,e1.o.y]
+				poly=[j1,K,j2,a2,O,a1];hs=[e1.i.y,ym,e2.i.y,e2.o.y,ym,e1.o.y]
 			var mid=Vector2.ZERO
 			for q in poly:mid+=q
 			mid/=poly.size()
@@ -1889,8 +1889,9 @@ func _gehweg_ecken(so)->int:
 				lg+=0.5
 			if lg<0.25:continue
 			var i1=i0+d*lg;var o1=o0+d*lg;var y=e.i.y
-			_tri_frei(so,Vector3(i0.x,y,i0.y),Vector3(o0.x,e.o.y,o0.y),Vector3(o1.x,e.o.y,o1.y),GW)
-			_tri_frei(so,Vector3(i0.x,y,i0.y),Vector3(o1.x,e.o.y,o1.y),Vector3(i1.x,y,i1.y),GW)
+			var ein=(i0-o0).normalized()*0.5;var j0=i0+ein;var j1=i1+ein   # Innenkante bis unter die Fahrbahn
+			_tri_frei(so,Vector3(j0.x,y,j0.y),Vector3(o0.x,e.o.y,o0.y),Vector3(o1.x,e.o.y,o1.y),GW)
+			_tri_frei(so,Vector3(j0.x,y,j0.y),Vector3(o1.x,e.o.y,o1.y),Vector3(j1.x,y,j1.y),GW)
 			var nr=Vector3((o0-i0).x,0,(o0-i0).y).normalized()
 			var A=Vector3(o0.x,e.o.y,o0.y);var B=Vector3(o1.x,e.o.y,o1.y)
 			L._tri(ss,A,A-Vector3(0,14,0),B-Vector3(0,14,0),nr);L._tri(ss,A,B-Vector3(0,14,0),B,nr)
@@ -1904,8 +1905,9 @@ func wege():
 		var a:Vector2=w.a;var b:Vector2=w.b;var d=(b-a).normalized();var n=Vector2(-d.y,d.x)*1.5
 		var m=dreck if w.stil in ["ghetto","redneck","farm","dorf"] else L.M.pflaster
 		var so=L._st(m,true);var ya=hy(a)+0.1;var yb=hy(b)+0.1
-		L._tri(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x+n.x,yb,b.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),Vector3.UP)
-		L._tri(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),Vector3(a.x-n.x,ya,a.y-n.y),Vector3.UP)
+		# über _tri_frei: Wegstücke überlappen sich an Knicken und mit Gehwegen nicht mehr (doppelte Fläche)
+		_tri_frei(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x+n.x,yb,b.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),GW)
+		_tri_frei(so,Vector3(a.x+n.x,ya,a.y+n.y),Vector3(b.x-n.x,yb,b.y-n.y),Vector3(a.x-n.x,ya,a.y-n.y),GW)
 	L.koll_an=alt
 func strassenrand():
 	for ri in ROADS.size():
