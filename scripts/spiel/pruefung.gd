@@ -276,11 +276,17 @@ func _breite(ti:int)->float:
 	var A2=abs((b.x-a.x)*(c.z-a.z)-(c.x-a.x)*(b.z-a.z))
 	var L=max(Vector2(b.x-a.x,b.z-a.z).length(),max(Vector2(c.x-b.x,c.z-b.z).length(),Vector2(a.x-c.x,a.z-c.z).length()))
 	return A2/max(L,0.0001)
+func _tri_txt(ti:int)->String:
+	var o=""
+	for m in 3:
+		var v=BT[ti*3+m];o+="(%.2f,%.3f,%.2f)"%[v.x,v.y,v.z]
+	return o
 # Hinweis für Bausätze: gleiche/andere Kopie, Punkt und Höhen im Bausatz (lokal)
 func _diag(e1:Array,e2:Array,x:float,z:float)->String:
 	var o1=BO[e1[1]];var o2=BO[e2[1]]
 	var gleich=o1==o2 or (KINST[o1]>0 and KINST[o1]==KINST[o2])
 	var t=" | "+("gleiche Kopie" if gleich else "andere Kopie")
+	t+=" | T1 "+_tri_txt(e1[1])+" T2 "+_tri_txt(e2[1])
 	var xf=KXF[o1] if KXF[o1]!=null else KXF[o2]
 	if xf!=null:
 		var inv=xf.affine_inverse()

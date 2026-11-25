@@ -211,6 +211,7 @@ func _y_an(v:Vector3,ri:int)->float:
 	return lerp(yf+0.06,v.y,smoothstep(0.0,AN_AUSLAUF,ueber))
 var SCHUERZE_MAT:Material=null
 var FB_GELEGT:={}
+var BODEN_TRI:=[]   # Bake: alle gelegten Belagdreiecke (lokal)
 # Unterlage je Knoten: Kreisfläche (Radius wie der Gehweg-Schnitt) 4 cm unter dem Belag der nächsten Straße.
 # Bleibt zwischen Fahrbahnen, Gehwegen und Ecken an einer Einmündung ein Keil frei, sieht man diese Fläche
 # statt des tieferen Geländes; überall sonst liegt sie unsichtbar unter den Belägen. Nicht in Grundstücken.
@@ -1476,7 +1477,7 @@ func _tri_frei(so,A:Vector3,B:Vector3,C:Vector3,g:Dictionary):
 	for f in fremd:
 		var t2=[]
 		for t in teile:
-			for y in Geometry2D.clip_polygons(t,f):
+			for y in L.ausschneiden(t,f):
 				if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 		teile=t2
 	var hy=func(p:Vector2)->float:
@@ -1601,7 +1602,7 @@ func fahrbahnen():
 			for f in fremd:
 				var t2=[]
 				for t in teile:
-					for y in Geometry2D.clip_polygons(t,f):
+					for y in L.ausschneiden(t,f):
 						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 				teile=t2
 			for t in teile:
@@ -1785,8 +1786,11 @@ func platten():
 				var a0:Vector2=q0+n0*r.w;var a1:Vector2=q0+n0*(r.w+r.sw);var c0:Vector2=q1+n1*r.w;var c1:Vector2=q1+n1*(r.w+r.sw)
 				var mid=(a0+a1+c0+c1)*0.25
 				if auf_fahrbahn(mid,ri,0.3):continue
-				_tri_frei(so,Vector3(a0.x,y0,a0.y),Vector3(c0.x,y1,c0.y),Vector3(c1.x,y1,c1.y),GW)
-				_tri_frei(so,Vector3(a0.x,y0,a0.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),GW)
+				# Innenkante 0,5 m unter die Fahrbahn gezogen: _tri_frei schneidet sie exakt an der gelegten Fahrbahn
+				# ab. Weicht deren Rand (Einmündungsangleich, enge Kurve) von r.w ab, bleibt so kein Rasenstreifen frei
+				var ai:Vector2=q0+n0*(r.w-0.5);var ci:Vector2=q1+n1*(r.w-0.5)
+				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(ci.x,y1,ci.y),Vector3(c1.x,y1,c1.y),GW)
+				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),GW)
 				# Außenkante bis ins Gelände nur dort, wo die Straßen-Schürze fehlt (nahe Kreuzungen) – sonst doppelte Wand
 				var mo=(a1+c1)*0.5
 				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):

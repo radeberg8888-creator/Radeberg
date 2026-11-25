@@ -579,7 +579,7 @@ func _stadt_bauen(faces:Array,d):
 		# Pflaster mit Loch für den Hof (der Hofbelag ist eine eigene Platte, nichts liegt doppelt)
 		var hoefe=L.hoefe_von(pc)
 		if wk_poly.size()>0 and L._bbox(pc).intersects(L._bbox(wk_poly)):
-			for teil in Geometry2D.clip_polygons(pc,wk_poly):
+			for teil in L.ausschneiden(pc,wk_poly):
 				if not Geometry2D.is_polygon_clockwise(teil):
 					for t in _ring_teile(teil,hoefe):L._platte(t,-1.6,L.KB,L.M.pflaster,L.M.stein)
 		else:
@@ -606,7 +606,7 @@ func _stadt_bauen(faces:Array,d):
 				for f in fertig:
 					var t2=[]
 					for t in teile:
-						for y in Geometry2D.clip_polygons(t,f):
+						for y in L.ausschneiden(t,f):
 							if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 					teile=t2
 				for t in teile:
@@ -635,7 +635,7 @@ func _stadt_bauen(faces:Array,d):
 					if not bb.intersects(kk[1]):continue
 					var t2=[]
 					for t in teile:
-						for y in Geometry2D.clip_polygons(t,kk[0]):
+						for y in L.ausschneiden(t,kk[0]):
 							if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 					teile=t2
 				for t in teile:
@@ -656,7 +656,7 @@ func _stadt_bauen(faces:Array,d):
 				if not bb.intersects(kk[1]):continue
 				var t2=[]
 				for t in teile:
-					for y in Geometry2D.clip_polygons(t,kk[0]):
+					for y in L.ausschneiden(t,kk[0]):
 						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 				teile=t2
 			for t in teile:
@@ -736,7 +736,7 @@ func _ring_teile(pc:PackedVector2Array,innen:Array)->Array:
 			for h in [links,rechts]:
 				for x in Geometry2D.intersect_polygons(t,h):
 					if Geometry2D.is_polygon_clockwise(x):continue
-					for y in Geometry2D.clip_polygons(x,inn):
+					for y in L.ausschneiden(x,inn):
 						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 		teile=t2
 	return teile
@@ -763,7 +763,7 @@ func _asphalt_ohne_ueberlappung():
 				if not bb.intersects(g[1]):continue
 				var t2=[]
 				for t in teile:
-					for y in Geometry2D.clip_polygons(t,g[0]):
+					for y in L.ausschneiden(t,g[0]):
 						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 				teile=t2
 				if teile.is_empty():break
@@ -830,7 +830,7 @@ func _bahn_bauen():
 				if not L._bbox(r.P).grow(r.w+1).intersects(L._bbox(bb)):continue
 				var t2=[]
 				for t in teile:
-					for x in Geometry2D.clip_polygons(t,Geometry2D.offset_polyline(r.P,r.w+0.3)[0]):
+					for x in L.ausschneiden(t,Geometry2D.offset_polyline(r.P,r.w+0.3)[0]):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
 				teile=t2
 			# schon gelegtes Schotterbett anderer Gleise/Bänder aussparen (Weichen, Parallelgleise)
@@ -838,7 +838,7 @@ func _bahn_bauen():
 				if not g[1].intersects(L._bbox(bb)):continue
 				var t3=[]
 				for t in teile:
-					for x in Geometry2D.clip_polygons(t,g[0]):
+					for x in L.ausschneiden(t,g[0]):
 						if not Geometry2D.is_polygon_clockwise(x) and x.size()>=3:t3.append(x)
 				teile=t3
 			for pc in teile:L._platte(pc,-0.4,0.11,schotter,schotter)
@@ -1289,7 +1289,7 @@ func _norden()->Dictionary:
 	var hs=[];for h in dn.houses:hs.append(Vector2(h[0],h[1]))
 	NL.hinterland(hs);NL.grundstuecke();NL.fuellen();NL.landschaft_orte();_natur_orte(NL);NL.parken_strasse();NL.gelaende_ziel();_natur(NL)
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
-	NL.fahrbahnen();NL.platten();NL.wege();L._fertig(false)
+	L.tri_log=NL.BODEN_TRI;NL.fahrbahnen();NL.platten();NL.wege();L.tri_log=null;L._fertig(false)
 	L.weit_detail=300.0;L.weit_ink=120.0
 	NL.strassenrand();L._fertig(false)
 	var KF=L.KOLL_F.slice(n0);var PF=L.PFOSTEN.slice(p0)
@@ -1985,6 +1985,26 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 							if H[j]>y:H[j]=y;nz2+=1
 				s+=2.0
 	print("STRASSEN Zellen unter Fahrbahn gesenkt ",nz2)
+	# Dasselbe für jedes tatsächlich gelegte Belagdreieck (Fahrbahn, Einmündungsangleich, Gehweg, Platz, Weg):
+	# dessen Höhe weicht an Einmündungen von der Mittellinie ab -> dort stach das Raster noch durch
+	var nz3=0
+	for t in NO.BODEN_TRI:
+		var A:Vector3=t[0];var B:Vector3=t[1];var Cc:Vector3=t[2]
+		var y=min(A.y,min(B.y,Cc.y))+NO.H0-0.25
+		var m=int(ceil(max(A.distance_to(B),max(B.distance_to(Cc),Cc.distance_to(A)))/2.0))
+		for u in m+1:
+			for v in m+1-u:
+				var p3=A+(B-A)*(float(u)/max(m,1))+(Cc-A)*(float(v)/max(m,1))
+				var p=Vector2(p3.x,p3.z)+NO.C
+				if STADT.has_point(p):continue
+				var gi=int(floor((p.x-X0)/ST));var gk=int(floor((p.y-Z0)/ST))
+				for dk in 2:
+					for di in 2:
+						var ii=gi+di;var kk=gk+dk
+						if ii<0 or kk<0 or ii>=nx or kk>=nz:continue
+						var j=kk*nx+ii
+						if H[j]>y:H[j]=y;nz3+=1
+	print("STRASSEN Zellen unter Belagdreiecken gesenkt ",nz3)
 
 # ================= Stadt-Deko auf den Boden =================
 # Laternen, Bänke, Bäume, Mülleimer, Hydranten … wurden mit der Feldhöhe an ihrem Fußpunkt gesetzt. Der Gehweg

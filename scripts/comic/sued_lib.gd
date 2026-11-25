@@ -1219,7 +1219,7 @@ func _kachel(R:Rect2,tiefe:int)->int:
 						for w0 in weg:
 							var t2=[]
 							for t in teile2:
-								for y in Geometry2D.clip_polygons(t,w0):
+								for y in L.ausschneiden(t,w0):
 									if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
 							teile2=t2
 						weg.append_array(teile2)

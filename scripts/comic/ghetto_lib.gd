@@ -78,7 +78,7 @@ func bauen():
 			for band in baender:
 				var t2=[]
 				for t in teile:
-					for x in Geometry2D.clip_polygons(t,band):
+					for x in L.ausschneiden(t,band):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
 						else:loecher+=1
 				teile=t2

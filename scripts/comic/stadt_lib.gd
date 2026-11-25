@@ -1137,9 +1137,32 @@ func _clip_achse(P:Array,achse:int,grenze:float,seite:float)->Array:
 			var r=p.lerp(q,t);r[achse]=grenze   # genau auf der Linie (beide Nachbarn rechnen denselben Punkt)
 			out.append(r)
 	return out
+# Fläche t ohne f: clip_polygons liefert ein Loch (im Uhrzeigersinn), wenn f ganz in t liegt – das Loch
+# wurde bisher verworfen und t voll gelegt (doppelte Fläche). Dann t an f's Mitte teilen, so dass f beide
+# Hälften schneidet und kein Loch entsteht.
+func ausschneiden(t:PackedVector2Array,f:PackedVector2Array)->Array:
+	var r=Geometry2D.clip_polygons(t,f);var loch=false
+	for y in r:
+		if Geometry2D.is_polygon_clockwise(y):loch=true
+	if not loch:return r
+	var cx=0.0
+	for v in f:cx+=v.x
+	cx/=f.size()
+	var bb=Rect2(t[0],Vector2.ZERO)
+	for v in t:bb=bb.expand(v)
+	bb=bb.grow(1.0)
+	var out=[]
+	for h in [PackedVector2Array([Vector2(bb.position.x,bb.position.y),Vector2(cx,bb.position.y),Vector2(cx,bb.end.y),Vector2(bb.position.x,bb.end.y)]),PackedVector2Array([Vector2(cx,bb.position.y),Vector2(bb.end.x,bb.position.y),Vector2(bb.end.x,bb.end.y),Vector2(cx,bb.end.y)])]:
+		for teil in Geometry2D.intersect_polygons(t,h):
+			if Geometry2D.is_polygon_clockwise(teil):continue
+			for y in Geometry2D.clip_polygons(teil,f):
+				if not Geometry2D.is_polygon_clockwise(y):out.append(y)
+	return out
+var tri_log=null   # Bake: gelegte waagerechte Belagdreiecke mitschreiben (Gelände darunter absenken)
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)
 	if cr.length()<1e-9:return
+	if tri_log!=null and abs(cr.normalized().y)>0.5:tri_log.append(PackedVector3Array([a,b,c]))
 	if cr.dot(aussen)>0:
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
 		cr=(b-a).cross(c-a)
@@ -2345,7 +2368,7 @@ func _stadt():
 			for band in baender:
 				var t2=[]
 				for t in teile:
-					for x in Geometry2D.clip_polygons(t,band):
+					for x in ausschneiden(t,band):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
 				teile=t2
 			neu.append_array(teile)
@@ -2364,14 +2387,14 @@ func _stadt():
 	for q in [[-470,-300,0,0],[0,-300,470,0],[-470,0,0,300],[0,0,470,300]]:
 		var rect=PackedVector2Array([Vector2(q[0],q[1]),Vector2(q[2],q[1]),Vector2(q[2],q[3]),Vector2(q[0],q[3])])
 		var teile=[]
-		for x in Geometry2D.clip_polygons(rect,ringaussen):
+		for x in ausschneiden(rect,ringaussen):
 			if not Geometry2D.is_polygon_clockwise(x):teile.append(x)
 		for r in R:
 			if not r.aussen:continue
 			for band in Geometry2D.offset_polyline(r.P,r.w,Geometry2D.JOIN_ROUND,Geometry2D.END_ROUND):
 				var t2=[]
 				for t in teile:
-					for x in Geometry2D.clip_polygons(t,band):
+					for x in ausschneiden(t,band):
 						if not Geometry2D.is_polygon_clockwise(x):t2.append(x)
 				teile=t2
 		AUSSEN_STUECKE.append_array(teile)
