@@ -754,7 +754,7 @@ func _villa_garten(i:int):
 	var o0=5.0;var o1=15.0
 	if i%3==2:o0=-7.4;o1=9.2
 	var putz=T([Color(0.86,0.8,0.7),Color(0.82,0.76,0.66),Color(0.88,0.84,0.76),Color(0.8,0.74,0.64),Color(0.85,0.82,0.74)][i%5])
-	var stein=T([Color(0.62,0.6,0.56),Color(0.66,0.55,0.45),Color(0.58,0.56,0.54)][i%3]);var deck=T(Color(0.5,0.48,0.45))
+	var stein=_zweiseitig([Color(0.62,0.6,0.56),Color(0.66,0.55,0.45),Color(0.58,0.56,0.54)][i%3]);var deck=T(Color(0.5,0.48,0.45))   # Gartenmauern zweiseitig (Haus_offen von der Straße)
 	for sx in [-1,1]:
 		var x=sx*(15-0.15)
 		L.box(putz,_P(x,-5.9,16),Vector3(0.3,16.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
@@ -1497,7 +1497,50 @@ func _gelegt_dazu(g:Dictionary,q:PackedVector2Array):
 			var k=Vector2i(x,z)
 			if not g.has(k):g[k]=[]
 			g[k].append(e)
+# Kreuzungsplatte: jeder Knoten bekommt EINE Höhe (die der vorrangigen Straße an der Knotenmitte). Alle Arme
+# liegen im Knotenkreis (Gehweg-Schnittradius) genau auf dieser Höhe und laufen danach über 12 m (smoothstep)
+# in ihr eigenes Profil zurück. Weil Fahrbahn, Gehweg, Ecken und Markierung alle aus r.Y entstehen, passen sie
+# an der Einmündung zusammen – keine Keile, Stufen oder schrägen Querschnitte mehr.
+const PLATTE_AUSLAUF=12.0
+var _plateau_fertig:=false
+func _knoten_plateau():
+	if _plateau_fertig:return
+	_plateau_fertig=true
+	var knoten={}   # gerundete Mitte -> [Mitte, Radius, [Straßen]]
+	for j in JUNC:
+		var c:Vector2=j.p;var k=Vector2i(roundi(c.x*2.0),roundi(c.y*2.0))
+		if not knoten.has(k):knoten[k]=[c,0.0,[]]
+		knoten[k][1]=max(knoten[k][1],float(j.r)+3.0)
+		for ri in [j.a,j.b]:
+			if ri>=0 and ri<ROADS.size() and ROADS[ri].has("Y") and not ri in knoten[k][2]:knoten[k][2].append(ri)
+	var n=0
+	for k in knoten:
+		var c:Vector2=knoten[k][0];var R:float=knoten[k][1];var arme:Array=knoten[k][2]
+		if arme.size()<2:continue
+		# Brücken/Unterführungen: Arme, die an der Mitte mehr als 1,5 m auseinanderliegen, sind kein Knoten
+		var hoch=arme[0]
+		for ri in arme:
+			if _vor(ri,hoch):hoch=ri
+		var yj=_y_mitte(ROADS[hoch],c)
+		for ri in arme:
+			var r=ROADS[ri];var Y:PackedFloat32Array=r.Y;var P:PackedVector2Array=r.P
+			if abs(_y_mitte(r,c)-yj)>1.5:continue
+			for i in P.size():
+				var d=P[i].distance_to(c)
+				if d>R+PLATTE_AUSLAUF:continue
+				Y[i]=lerp(yj,Y[i],smoothstep(R,R+PLATTE_AUSLAUF,d))
+			r["Y"]=Y;n+=1
+	print("NORD Kreuzungsplatten ",knoten.size()," Arme angeglichen ",n)
+func _y_mitte(r,c:Vector2)->float:
+	var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y;var best=1e9;var y=0.0
+	for i in P.size()-1:
+		var a:Vector2=P[i];var b:Vector2=P[i+1]
+		var t=clamp((c-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
+		var d=c.distance_to(a.lerp(b,t))
+		if d<best:best=d;y=lerp(Y[i],Y[i+1],t)
+	return y
 func fahrbahnen():
+	_knoten_plateau()
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
 	var bank=T(Color(0.47,0.6,0.33)).duplicate();var bank_sand=T(Color(0.72,0.62,0.45)).duplicate();bank.resource_name="bankett";bank_sand.resource_name="bankett_sand";L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
@@ -1620,6 +1663,7 @@ func fahrbahnen():
 			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
 			# Markierung, die auf eine andere Fahrbahn reicht (Einmündung/Überlappung), läge 1 cm auf deren Belag
 			if auf_fahrbahn(p,ri,1.6 if r.orig!="autobahn" else 0.6):s+=3.0;continue
+			if nah_kreuzung(p,3.0):s+=3.0;continue   # in der Kreuzungsplatte keine Linien
 			if r.orig=="autobahn":
 				if fmod(s,12.0)<4.0:
 					for o in [-r.w*0.5,r.w*0.5]:var q=p+nn*o;L.box(L.M.markierung,Vector3(q.x,y,q.y),Vector3(0.18,0.012,4.0),bas,0.0)
