@@ -1489,6 +1489,28 @@ func _tri_frei(so,A:Vector3,B:Vector3,C:Vector3,g:Dictionary):
 		for k in range(0,idx.size(),3):
 			var a:Vector2=t[idx[k]];var b:Vector2=t[idx[k+1]];var c:Vector2=t[idx[k+2]]
 			L._tri(so,Vector3(a.x,hy.call(a),a.y),Vector3(b.x,hy.call(b),b.y),Vector3(c.x,hy.call(c),c.y),Vector3.UP)
+func _ohne_gehwegband(um:PackedVector2Array)->Array:
+	var bb=Rect2(um[0],Vector2.ZERO)
+	for v in um:bb=bb.expand(v)
+	var teile=[um];var gesehen={}
+	for x in range(int(floor(bb.position.x/20.0))-1,int(floor(bb.end.x/20.0))+2):
+		for z in range(int(floor(bb.position.y/20.0))-1,int(floor(bb.end.y/20.0))+2):
+			for sg in SEG.get(Vector2i(x,z),[]):
+				if gesehen.has(sg):continue
+				gesehen[sg]=true
+				var r=ROADS[sg.x]
+				if not r.stadt or float(r.sw)<=0.0:continue
+				var P:PackedVector2Array=r.P;var j=sg.y
+				if j+1>=P.size():continue
+				var d=(P[j+1]-P[j]).normalized();var nn=Vector2(-d.y,d.x)*(r.w+float(r.sw)+0.05)
+				var f=PackedVector2Array([P[j]-d*0.5+nn,P[j+1]+d*0.5+nn,P[j+1]+d*0.5-nn,P[j]-d*0.5-nn])
+				if Geometry2D.is_polygon_clockwise(f):f.reverse()
+				var t2=[]
+				for t in teile:
+					for y in L.ausschneiden(t,f):
+						if not Geometry2D.is_polygon_clockwise(y) and y.size()>=3:t2.append(y)
+				teile=t2
+	return teile
 func _gelegt_dazu(g:Dictionary,q:PackedVector2Array):
 	var bb=Rect2(q[0],Vector2.ZERO)
 	for v in q:bb=bb.expand(v)
@@ -1748,7 +1770,9 @@ func platten():
 		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
-		_gelegt_dazu(GW,um)
+		# Der Gehwegstreifen hat Vorrang: Grundstücksumriss ohne die Gehwegbänder eintragen, sonst fehlt
+		# neben Grundstücken, die bis an die Straße reichen, ein Stück Gehweg (Galerie "ohne_Kollision")
+		for teil in _ohne_gehwegband(um):_gelegt_dazu(GW,teil)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji]

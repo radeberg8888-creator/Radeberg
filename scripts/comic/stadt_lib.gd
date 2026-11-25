@@ -2235,9 +2235,21 @@ func _platte(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mater
 	koll_an=alt_k
 # Dreiecksliste eines Polygons, auch wenn Godots Ohrschneider aufgibt (doppelte/fast gerade Punkte nach dem
 # Ausschneiden) – sonst fehlt das ganze Stück und man schaut durch ein Loch auf das Gelände
+# Ohrenschneiden liefert bei Polygonen, die sich in einem Punkt selbst berühren (häufig nach clip_polygons),
+# überlappende Dreiecke -> doppelte Fläche. Prüfen: Summe der Dreiecksflächen = Polygonfläche.
+static func _zerlegung_ok(poly:PackedVector2Array,idx:PackedInt32Array)->bool:
+	if idx.is_empty():return false
+	var s=0.0
+	for t in range(0,idx.size(),3):
+		var a=poly[idx[t]];var b=poly[idx[t+1]];var c=poly[idx[t+2]]
+		s+=abs((b-a).cross(c-a))*0.5
+	var f=0.0
+	for i in poly.size():f+=poly[i].cross(poly[(i+1)%poly.size()])
+	f=abs(f)*0.5
+	return abs(s-f)<=0.002*f+0.0005
 static func dreiecke(poly:PackedVector2Array)->PackedInt32Array:
 	var idx=Geometry2D.triangulate_polygon(poly)
-	if not idx.is_empty() or poly.size()<3:return idx
+	if poly.size()<3 or _zerlegung_ok(poly,idx):return idx
 	# 1) doppelte Punkte entfernen, Index merken
 	var keep=PackedInt32Array()
 	for i in poly.size():
@@ -2246,7 +2258,8 @@ static func dreiecke(poly:PackedVector2Array)->PackedInt32Array:
 	var p2=PackedVector2Array()
 	for i in keep:p2.append(poly[i])
 	var i2=Geometry2D.triangulate_polygon(p2)
-	if i2.is_empty():
+	if not _zerlegung_ok(p2,i2):
+		i2=PackedInt32Array()
 		# 2) Delaunay über alle Punkte, nur Dreiecke im Polygon
 		var dl=Geometry2D.triangulate_delaunay(p2)
 		for t in range(0,dl.size(),3):
@@ -2254,6 +2267,22 @@ static func dreiecke(poly:PackedVector2Array)->PackedInt32Array:
 			if Geometry2D.is_point_in_polygon(c,p2):i2.append_array([dl[t],dl[t+1],dl[t+2]])
 	var out=PackedInt32Array()
 	for v in i2:out.append(keep[v])
+	# Delaunay-Ersatz deckt eine eingeschnürte Form evtl. nicht ganz ab: dann Ohrenschnitt ohne die
+	# überlappenden Dreiecke (jedes Dreieck nur, wenn es keines der schon genommenen überdeckt)
+	if not _zerlegung_ok(poly,out) and not idx.is_empty():
+		var neu=PackedInt32Array()
+		for t in range(0,idx.size(),3):
+			var tr=PackedVector2Array([poly[idx[t]],poly[idx[t+1]],poly[idx[t+2]]])
+			var frei=true
+			for u in range(0,neu.size(),3):
+				var tu=PackedVector2Array([poly[neu[u]],poly[neu[u+1]],poly[neu[u+2]]])
+				for y in Geometry2D.intersect_polygons(tr,tu):
+					var fl=0.0
+					for i in y.size():fl+=y[i].cross(y[(i+1)%y.size()])
+					if abs(fl)*0.5>0.0005:frei=false
+				if not frei:break
+			if frei:neu.append_array([idx[t],idx[t+1],idx[t+2]])
+		return neu
 	return out
 func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Material):
 	var idx=dreiecke(poly)
