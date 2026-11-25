@@ -1963,6 +1963,28 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				var hz=ym+NO.H0-0.3
 				if H[j]>hz:H[j]=hz;nk+=1
 	print("STRASSEN Knotengelände abgesenkt ",nk)
+	# Grundregel zuletzt: unter jeder Fahrbahn liegen alle vier Gitterpunkte der Rasterzelle unter dem Belag
+	# (Fahrbahn alle 2 m, auf ganzer Breite abgetastet) – sonst spannt das 10-m-Raster durch den Asphalt
+	var nz2=0
+	for r in NO.ROADS:
+		if not r.has("Y"):continue
+		var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
+		for i in P.size()-1:
+			var a=P[i]+NO.C;var b=P[i+1]+NO.C;var lg=a.distance_to(b);var t2=(b-a)/max(lg,0.01);var nn=Vector2(-t2.y,t2.x);var s=0.0
+			while s<=lg:
+				var y=lerp(Y[i],Y[i+1],s/max(lg,0.01))+NO.H0-0.3
+				for q in [-1.0,-0.5,0.0,0.5,1.0]:
+					var p=a+t2*s+nn*q*r.w
+					if STADT.has_point(p):continue
+					var gi=int(floor((p.x-X0)/ST));var gk=int(floor((p.y-Z0)/ST))
+					for dk in 2:
+						for di in 2:
+							var ii=gi+di;var kk=gk+dk
+							if ii<0 or kk<0 or ii>=nx or kk>=nz:continue
+							var j=kk*nx+ii
+							if H[j]>y:H[j]=y;nz2+=1
+				s+=2.0
+	print("STRASSEN Zellen unter Fahrbahn gesenkt ",nz2)
 
 # ================= Stadt-Deko auf den Boden =================
 # Laternen, Bänke, Bäume, Mülleimer, Hydranten … wurden mit der Feldhöhe an ihrem Fußpunkt gesetzt. Der Gehweg
