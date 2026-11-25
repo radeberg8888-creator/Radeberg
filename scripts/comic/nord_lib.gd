@@ -494,6 +494,31 @@ func strasse_y(p:Vector2)->Array:   # [Abstand zur Mittellinie, Fahrbahnhöhe lo
 					if p.distance_to(f)<best:best=p.distance_to(f);res=[best,lerp(r.Y[sg.y],r.Y[sg.y+1],t),sg.x]
 		if res[2]>=0 and rad>=1:break
 	return res
+# Grundstück darf in keinen Gehwegstreifen (Fahrbahn + Gehweg) einer anderen oder derselben Straße ragen.
+# Die Süd-Prüfung tastet die Vorderkante (z<0,5) und die Ecken nicht ab -> Bausatzplatten lagen auf dem
+# Gehweg (doppelte Fläche) bzw. der Grundstücksumriss schnitt den Gehweg weg (fehlendes Gehwegstück)
+func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
+	if not super._rechteck_ok(F,t,n,w,d):return false
+	var xs=[];var x0=-w*0.5
+	while x0<w*0.5:xs.append(x0);x0+=1.5
+	xs.append(w*0.5)
+	for x in xs:
+		var z=0.0
+		while z<=d+0.01:
+			if _im_gehwegband(F+t*x+n*z):FAIL.rect+=1;return false
+			z+=1.5
+		if _im_gehwegband(F+t*x+n*d):FAIL.rect+=1;return false
+	return true
+func _im_gehwegband(p:Vector2)->bool:
+	var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)))
+	for i in range(-1,2):
+		for j in range(-1,2):
+			for sg in SEG.get(k+Vector2i(i,j),[]):
+				var r=ROADS[sg.x];var a:Vector2=r.P[sg.y];var b:Vector2=r.P[sg.y+1]
+				var tt=clamp((p-a).dot(b-a)/max((b-a).length_squared(),0.0001),0.0,1.0)
+				var rand=r.w+(float(r.sw) if r.stadt else 0.0)-0.05
+				if p.distance_to(a.lerp(b,tt))<rand:return true
+	return false
 func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	var k=K.KITS[kit]
 	var mitte=F+n*k.d*0.5
