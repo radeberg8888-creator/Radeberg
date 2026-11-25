@@ -1932,7 +1932,9 @@ func _gehweg_ecken(so)->int:
 			var lg=0.0;var lmax=min(14.0,((i0+o0)*0.5-JUNC[ji].p).dot(-d))
 			while lg<lmax:
 				var m=(i0+o0)*0.5+d*(lg+0.5)
-				if auf_fahrbahn(m,-1,0.05) or auf_fahrbahn(o0+d*(lg+0.5),-1,0.05) or _im_grund(o0+d*(lg+0.5),GR) or _im_grund(m,GR):break
+				# erst aufhören, wenn Mitte UND Außenkante auf der Fahrbahn sind: bei schräg einmündender Straße
+				# blieb sonst ein Rasenkeil an der Außenseite (Überstand auf der Fahrbahn schneidet _tri_frei ab)
+				if (auf_fahrbahn(m,-1,0.05) and auf_fahrbahn(o0+d*(lg+0.5),-1,0.05)) or _im_grund(o0+d*(lg+0.5),GR) or _im_grund(m,GR):break
 				lg+=0.5
 			if lg<0.25:continue
 			var i1=i0+d*lg;var o1=o0+d*lg;var y=e.i.y

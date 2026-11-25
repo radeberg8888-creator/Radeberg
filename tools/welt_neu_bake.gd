@@ -1955,13 +1955,18 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				var w=Vector2(X0+ii*ST,Z0+k*ST)
 				if w.distance_to(c)>R:continue
 				var j=k*nx+ii
-				var ym=INF;var dm=INF
+				var ym=INF;var dm=INF;var ynah=0.0
 				for q in pkt:
 					var dq=q[0].distance_to(w)
-					if dq<=15.0:ym=min(ym,q[1]);dm=min(dm,dq)
+					if dq<=15.0:
+						ym=min(ym,q[1])
+						if dq<dm:dm=dq;ynah=q[1]
 				if ym==INF:continue
 				if NO.LOT[j]!=0 and dm>10.0:continue   # Grundstück: nur der Rasterpunkt direkt an der Fahrbahn
 				var hz=ym+NO.H0-0.3
+				# Grundstück: nur unter die nächste Fahrbahnstelle, nicht unter den tiefsten Arm im 15-m-Umkreis –
+				# sonst wird die Terrasse am Hang bis über 1 m abgegraben und das Haus schwebt (Wand_schwebt)
+				if NO.LOT[j]!=0:hz=ynah+NO.H0-0.3
 				if H[j]>hz:H[j]=hz;nk+=1
 	print("STRASSEN Knotengelände abgesenkt ",nk)
 	# Grundregel zuletzt: unter jeder Fahrbahn liegen alle vier Gitterpunkte der Rasterzelle unter dem Belag

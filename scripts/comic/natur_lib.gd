@@ -323,6 +323,10 @@ func platzieren(rect:Rect2,hoehe:Callable,frei:Callable,info:Callable,raster:=6.
 			var kit=waehle(px,pz,h,inf[0],inf[1],inf[2],true)
 			if kit=="":continue
 			var sc=rng.randf_range(0.85,1.25)
+			# Felsen/Steine am Hang: auf die tiefste Stelle unter ihrem Rand setzen (sonst schwebt die Talseite)
+			if "fels" in kit or "stein" in kit:
+				for o in [Vector2(2,0),Vector2(-2,0),Vector2(0,2),Vector2(0,-2),Vector2(1.4,1.4),Vector2(-1.4,1.4),Vector2(1.4,-1.4),Vector2(-1.4,-1.4)]:
+					h=min(h,hoehe.call(px+o.x*sc,pz+o.y*sc))
 			var xf=Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3.ONE*sc),Vector3(px,h-0.1,pz))
 			out.append([kit,xf])
 			var fk=ist_baum(kit)
