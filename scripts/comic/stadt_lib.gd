@@ -1171,6 +1171,9 @@ func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector
 	var ym=(a.y+b.y+c.y)/3.0
 	var bb=Rect2(q[0],Vector2.ZERO)
 	for v in q:bb=bb.expand(v)
+	# Schutz: ungültige oder riesige Dreiecke (NaN/Unendlich, > 400 m) nicht rastern – sonst unendliche Zellenliste
+	if not (is_finite(bb.position.x) and is_finite(bb.position.y) and is_finite(bb.size.x) and is_finite(bb.size.y)):return false
+	if bb.size.x>400.0 or bb.size.y>400.0:return false
 	var zell=[]
 	for x in range(int(floor(bb.position.x/20.0)),int(floor(bb.end.x/20.0))+1):
 		for z in range(int(floor(bb.position.y/20.0)),int(floor(bb.end.y/20.0))+1):zell.append(Vector3i(x,z,0))

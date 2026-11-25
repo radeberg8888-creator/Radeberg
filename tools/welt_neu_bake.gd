@@ -1290,7 +1290,7 @@ func _norden()->Dictionary:
 	var hs=[];for h in dn.houses:hs.append(Vector2(h[0],h[1]))
 	NL.hinterland(hs);NL.grundstuecke();NL.fuellen();NL.landschaft_orte();_natur_orte(NL);NL.parken_strasse();NL.gelaende_ziel();_natur(NL)
 	L.kachel=KACHEL;L.weit_detail=900.0;L.weit_ink=300.0
-	L.tri_log=NL.BODEN_TRI;NL.fahrbahnen();NL.platten();NL.wege();L.tri_log=null;L.boden_frei=null;L._fertig(false)
+	L.tri_log=NL.BODEN_TRI;NL.fahrbahnen();NL.platten();NL.wege();L.tri_log=null;print("PFLASTER Überlappungsschnitt Zellen ",L.boden_frei.size());L.boden_frei=null;L._fertig(false)
 	L.weit_detail=300.0;L.weit_ink=120.0
 	NL.strassenrand();L._fertig(false)
 	var KF=L.KOLL_F.slice(n0);var PF=L.PFOSTEN.slice(p0)
