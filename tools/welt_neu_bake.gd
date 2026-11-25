@@ -1930,27 +1930,37 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 		elif NO.LOT[j]==0:H[j]=lerp(y,H[j],smoothstep(e[2],e[3],d))
 		n+=1
 	print("STRASSEN Korridor Zellen ",n)
-	# Knoten: Fahrbahnen werden an Einmündungen angeglichen (bis 0,5 m tiefer als ihre Mittellinie) –
-	# das Gelände im Knotenkreis darum unter die tiefste beteiligte Fahrbahn legen, sonst sticht es durch Gehweg/Ecke
+	# Knoten (Kreuzungsplatte + 12 m Auslauf): das Gelände muss überall unter der tiefsten Fahrbahn in seiner
+	# Nähe liegen – das 10-m-Raster spannt sonst über die Mulde der Platte und sticht durch den Asphalt.
+	# Je Rasterpunkt: niedrigste Fahrbahnhöhe (Knotenarme) im Umkreis von 15 m, minus 0,3 m.
 	var nk=0
 	for jn in NO.JUNC:
-		var c:Vector2=jn.p+NO.C;var R=float(jn.r)+3.0+ST
-		var ymin=INF
+		var c:Vector2=jn.p+NO.C;var R=float(jn.r)+3.0+12.0+ST
+		var pkt=[]   # [Punkt, Y] der Arme im Umkreis
 		for ri in [jn.a,jn.b]:
 			if ri<0 or ri>=NO.ROADS.size():continue
 			var r=NO.ROADS[ri]
 			if not r.has("Y"):continue
 			var P:PackedVector2Array=r.P;var Y:PackedFloat32Array=r.Y
-			for i in P.size():
-				if (P[i]+NO.C).distance_to(c)<=R:ymin=min(ymin,Y[i])
-		if ymin==INF:continue
-		var hz=ymin+NO.H0-0.55
+			for i in P.size()-1:
+				var a=P[i]+NO.C;var b=P[i+1]+NO.C
+				if a.distance_to(c)>R+20.0 and b.distance_to(c)>R+20.0:continue
+				var lg=a.distance_to(b);var s=0.0
+				while s<=lg:
+					pkt.append([a.lerp(b,s/max(lg,0.01)),lerp(Y[i],Y[i+1],s/max(lg,0.01))]);s+=2.0
+		if pkt.is_empty():continue
 		for k in range(max(int((c.y-R-Z0)/ST),0),min(int((c.y+R-Z0)/ST)+2,nz)):
 			for ii in range(max(int((c.x-R-X0)/ST),0),min(int((c.x+R-X0)/ST)+2,nx)):
 				var w=Vector2(X0+ii*ST,Z0+k*ST)
 				if w.distance_to(c)>R:continue
 				var j=k*nx+ii
-				if NO.LOT[j]!=0:continue
+				var ym=INF;var dm=INF
+				for q in pkt:
+					var dq=q[0].distance_to(w)
+					if dq<=15.0:ym=min(ym,q[1]);dm=min(dm,dq)
+				if ym==INF:continue
+				if NO.LOT[j]!=0 and dm>10.0:continue   # Grundstück: nur der Rasterpunkt direkt an der Fahrbahn
+				var hz=ym+NO.H0-0.3
 				if H[j]>hz:H[j]=hz;nk+=1
 	print("STRASSEN Knotengelände abgesenkt ",nk)
 

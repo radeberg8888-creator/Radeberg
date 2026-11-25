@@ -1542,7 +1542,6 @@ func _y_mitte(r,c:Vector2)->float:
 func fahrbahnen():
 	_knoten_plateau()
 	var flick=T(Color(0.2,0.2,0.22));var gelb=T(Color(0.95,0.8,0.15))
-	var su_f=L._st(T(Color(0.16,0.16,0.18)),true)   # Fugenstreifen (dunkel wie Asphalt, eigenes Material: keine "gleiche Fläche")
 	var bank=T(Color(0.47,0.6,0.33)).duplicate();var bank_sand=T(Color(0.72,0.62,0.45)).duplicate();bank.resource_name="bankett";bank_sand.resource_name="bankett_sand";L.kein_schatten[bank_sand]=true;L.kein_schatten[bank]=true;L.kein_schatten[L.M.asphalt]=true;L.kein_schatten[L.M.markierung]=true;L.kein_schatten[gelb]=true;L.kein_schatten[L.M.pflaster]=true
 	var alt=L.koll_an;L.koll_an=true
 	# Reihenfolge nach Vorfahrt: vorrangige Straßen zuerst; jede spätere Fläche spart alles aus, was schon
@@ -1589,18 +1588,6 @@ func fahrbahnen():
 					if abs(A[j].y-A0[j])<0.001:korr[j]+=dl*(1.0-lg/6.0)
 					j+=st
 			for j in n:A[j].y+=korr[j]
-		# Fugenstreifen unter der Fahrbahnkante (±0,4 m, 5 cm unter Belag): schmale Schnittkeile zwischen Fahrbahn
-		# und Gehweg/Nachbarfahrbahn zeigen diesen Streifen (mit Kollision) statt des tiefen Geländes
-		if r.get("stadt",false):
-			for i in n-1:
-				for S in [[Ls,Rs],[Rs,Ls]]:
-					var A:Array=S[0];var B:Array=S[1]
-					var o0=Vector3(A[i].x-B[i].x,0,A[i].z-B[i].z).normalized()*0.4;var o1=Vector3(A[i+1].x-B[i+1].x,0,A[i+1].z-B[i+1].z).normalized()*0.4
-					var d=Vector3(0,-0.05,0)
-					var p0=A[i]-o0+d;var p1=A[i]+o0+d;var p2=A[i+1]+o1+d;var p3=A[i+1]-o1+d
-					var nrm=(p1-p0).cross(p3-p0)
-					if nrm.y<0:L._tri(su_f,p0,p3,p2,Vector3.UP);L._tri(su_f,p0,p2,p1,Vector3.UP)
-					else:L._tri(su_f,p0,p1,p2,Vector3.UP);L._tri(su_f,p0,p2,p3,Vector3.UP)
 		for i in n-1:
 			# an Einmündungen: das Stück unter einer vorrangigen Straße weglassen (keine doppelte Fläche)
 			var q=PackedVector2Array([Vector2(Ls[i].x,Ls[i].z),Vector2(Ls[i+1].x,Ls[i+1].z),Vector2(Rs[i+1].x,Rs[i+1].z),Vector2(Rs[i].x,Rs[i].z)])
