@@ -357,7 +357,8 @@ func _st(m:Material,eigen:=false)->SurfaceTool:
 			_mesh_aus(k)
 			st.erase(k);zaehler[k]=0
 	if not st.has(k):
-		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m;_st_m[s]=m.get_instance_id()
+		var s=SurfaceTool.new();s.begin(Mesh.PRIMITIVE_TRIANGLES);st[k]=s;mats[k]=m
+		if boden_frei!=null:_st_m[s.get_instance_id()]=m.get_instance_id()   # nur Kennzahl: hielt sonst jedes SurfaceTool samt Daten fest (Speicherleck)
 	return st[k]
 var zaehler:={}
 # Kasten: Mitte, Größe, Drehung; Kontur als etwas größerer Kasten mit Rückseiten
@@ -1217,7 +1218,7 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 	var lk=max((b-a).length(),max((c-b).length(),(a-c).length()))
 	if lk>0.5 and cr.length()<0.002*lk:return
 	if tri_log!=null and abs(cr.normalized().y)>0.5:tri_log.append(PackedVector3Array([a,b,c]))
-	if boden_frei!=null and not _frei_innen and is_same(st,_frei_st) and _st_m.get(s,0)==_frei_mat and abs(cr.normalized().y)>0.9 and not fest_modus:
+	if boden_frei!=null and not _frei_innen and is_same(st,_frei_st) and _st_m.get(s.get_instance_id(),0)==_frei_mat and abs(cr.normalized().y)>0.9 and not fest_modus:
 		if _boden_frei_legen(s,a,b,c,aussen):return
 	if cr.dot(aussen)>0:
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
