@@ -1161,11 +1161,11 @@ func ausschneiden(t:PackedVector2Array,f:PackedVector2Array)->Array:
 # Bake: waagerechte Flächen desselben Materials, derselben Richtung und Höhe (±3 cm) dürfen sich nicht
 # überlappen – jede neue wird um die schon gelegten ausgeschnitten (Ursache der "gleiche Kopie"-Doppelflächen:
 # Gehwege, Plätze, Höfe und Bausatz-Platten, die übereinander gelegt wurden)
-var boden_frei=null;var _frei_innen:=false;var _st_m:={};var _frei_st=null   # nur im Haupt-Aufbau (nicht in Bausatz-Kopien mit eigenem Rahmen)
+var boden_frei=null;var _frei_innen:=false;var _st_m:={};var _frei_st=null;var _frei_mat:=0   # nur Pflaster; nur im Haupt-Aufbau (nicht in Bausatz-Kopien mit eigenem Rahmen)
 func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3)->bool:
 	var cr=(b-a).cross(c-a)
 	var fn=cr if cr.dot(aussen)>0 else -cr   # Flächennormale wie in _tri
-	var mk=str(_st_m.get(s,0))+("o" if fn.y>0 else "u")
+	var mk=1 if fn.y>0 else -1
 	var q=PackedVector2Array([Vector2(a.x,a.z),Vector2(b.x,b.z),Vector2(c.x,c.z)])
 	if Geometry2D.is_polygon_clockwise(q):q.reverse()
 	var ym=(a.y+b.y+c.y)/3.0
@@ -1174,12 +1174,11 @@ func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector
 	var zell=[]
 	for x in range(int(floor(bb.position.x/20.0)),int(floor(bb.end.x/20.0))+1):
 		for z in range(int(floor(bb.position.y/20.0)),int(floor(bb.end.y/20.0))+1):zell.append(Vector3i(x,z,0))
-	var teile=[q];var getroffen=false;var gesehen={}
+	var teile=[q];var getroffen=false
 	for zk in zell:
 		for e in boden_frei.get(zk,[]):
-			if e[2]!=mk or abs(e[1]-ym)>0.03 or gesehen.has(e):continue
+			if e[2]!=mk or abs(e[1]-ym)>0.03:continue
 			if not e[3].intersects(bb.grow(-0.001)):continue
-			gesehen[e]=true
 			var t2=[]
 			for t in teile:
 				if Geometry2D.intersect_polygons(t,e[0]).is_empty():t2.append(t);continue
@@ -1215,7 +1214,7 @@ func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=
 	var lk=max((b-a).length(),max((c-b).length(),(a-c).length()))
 	if lk>0.5 and cr.length()<0.002*lk:return
 	if tri_log!=null and abs(cr.normalized().y)>0.5:tri_log.append(PackedVector3Array([a,b,c]))
-	if boden_frei!=null and not _frei_innen and is_same(st,_frei_st) and abs(cr.normalized().y)>0.9 and not fest_modus:
+	if boden_frei!=null and not _frei_innen and is_same(st,_frei_st) and _st_m.get(s,0)==_frei_mat and abs(cr.normalized().y)>0.9 and not fest_modus:
 		if _boden_frei_legen(s,a,b,c,aussen):return
 	if cr.dot(aussen)>0:
 		var t=b;b=c;c=t;var tn=nb;nb=nc;nc=tn
