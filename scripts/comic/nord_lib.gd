@@ -830,9 +830,9 @@ func _boden(w:float,d:float,farbe:Color):
 	# oberer Rand in Rasenfarbe: wo der Sockel knapp durchs Gelände stößt, sieht man keine dunkle Naht
 	L.box(T(farbe),_P(0,-2.1,d*0.5),Vector3(w-0.02,4.0,d-0.02),Basis(),0.0)
 	# flache Rasen-Schräge an Seiten und Rückseite: keine 6-cm-Stufe zum Gelände -> keine gestrichelte Konturlinie
-	# zweiseitig und steiler (bis −0,9 m): am Hang hob die Schräge vom Gelände ab, von unten sah man ihre
-	# Rückseite (Haus_offen am Rasen von Einfamilienhaus/Scheune)
-	var so=L._st(_zweiseitig(farbe),true);var b:=1.2;var o:=0.025;var u:=-0.9
+	# Schräge bis zur Unterkante des 4-m-Rasenkörpers: am Hang (tiefer liegende Straße) hob die flache Schräge vom
+	# Gelände ab und man sah von unten ihre Rückseite (Haus_offen am Rasen von Einfamilienhaus/Scheune)
+	var so=L._st(_zweiseitig(farbe),true);var b:=1.2;var o:=0.025;var u:=-4.0
 	var A=_P(-w*0.5,o,0);var B=_P(-w*0.5,o,d);var C2=_P(w*0.5,o,d);var D=_P(w*0.5,o,0)
 	var A2=_P(-w*0.5-b,u,0);var B2=_P(-w*0.5-b,u,d+b);var C3=_P(w*0.5+b,u,d+b);var D2=_P(w*0.5+b,u,0)
 	for q in [[A,A2,B2,B],[B,B2,C3,C2],[C2,C3,D2,D]]:
