@@ -2361,7 +2361,9 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 		else:P2.append(p0)
 	for i in P2.size():
 		var p=P2[i];var q=P2[(i+1)%P2.size()];var t=(q-p).normalized();var n=Vector2(t.y,-t.x)*sg
-		var A=Vector3(p.x,y0,p.y);var B=Vector3(q.x,y0,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
+		# Seitenwand mindestens 0,8 m tief: am Hafen/Hang hing die Unterkante sonst über tieferem Boden
+		var yu=min(y0,-0.8)
+		var A=Vector3(p.x,yu,p.y);var B=Vector3(q.x,yu,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		var o=Vector3(n.x,0,n.y);_tri(ss,A,B,C,o);_tri(ss,A,C,D,o)
 		# Rückseite auch (am Hang sieht man sonst durch eine fehlende Nachbarkante ins Innere der Platte)
 		_tri(ss,A,C,B,-o);_tri(ss,A,D,C,-o)

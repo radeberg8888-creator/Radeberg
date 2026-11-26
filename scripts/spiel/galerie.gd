@@ -689,24 +689,25 @@ func _schwebe_lauf():
 # Nahbilder der Kleinteile (Abschnitt 8a): je Art einmal pro Lauf, bei Tag, aus 4 m
 var _nah_fertig:={}
 func _nah_kleinteile(mitte:Vector2):
-	for art in ["K_d_tonnen_g","K_d_rad","K_d_kuebel","K_d_waesche"]:
+	# Kleinteile stecken jetzt in den Bausätzen: Vorgarten eines Ghetto-Holzhauses und eines Reihenhauses
+	for art in ["gh_holzL_0","gh_holzL_1","sd_reihe_0","sd_reihe_1"]:
 		if _nah_fertig.has(art):continue
 		var best=null;var bd=1e9
-		for m in get_tree().root.find_children(art+"*","MultiMeshInstance3D",true,false):
-			if m.multimesh==null:continue
+		for m in get_tree().root.find_children(art+"/*","MultiMeshInstance3D",true,false)+get_tree().root.find_children(art+"*","MultiMeshInstance3D",true,false):
+			if m.multimesh==null or m.multimesh.instance_count==0:continue
 			for i in m.multimesh.instance_count:
 				var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
 				var d=Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)
-				if d<bd and d<260.0:bd=d;best=gx
+				if d<bd and d<300.0:bd=d;best=gx
+			break
 		if best==null:continue
 		_nah_fertig[art]=true
 		var b:Basis=best.basis.orthonormalized();var o:Vector3=best.origin
-		var weit=7.0 if art=="K_d_waesche" else 4.0
-		var cp=o+b.z*weit+b.x*1.5+Vector3(0,1.6,0)
-		spiel.spieler.global_position=o+b.z*30.0+Vector3(0,1,0)
-		cam.look_at_from_position(cp,o+Vector3(0,0.6,0));cam.current=true
+		var cp=o+b.z*7.0+b.x*2.0+Vector3(0,2.2,0)
+		spiel.spieler.global_position=o+b.z*40.0+Vector3(0,1,0)
+		cam.look_at_from_position(cp,o-b.z*1.2+Vector3(0,0.7,0));cam.current=true
 		for fr in 5:await get_tree().process_frame
-		await _foto("Nah_"+art.substr(2))
+		await _foto("Nah_"+art)
 var _gk=null
 func _gelaende_koerper():
 	if _gk==null:_gk=spiel.welt.get_node_or_null("Kollision")
