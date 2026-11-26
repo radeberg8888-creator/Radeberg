@@ -211,6 +211,7 @@ func _y_an(v:Vector3,ri:int)->float:
 	return lerp(yf+0.06,v.y,smoothstep(0.0,AN_AUSLAUF,ueber))
 var SCHUERZE_MAT:Material=null
 var FB_GELEGT:={}
+var GU:={};var su=null;var _unter_mat=null   # Unterlage unter den Gehwegen
 var BODEN_TRI:=[]   # Bake: alle gelegten Belagdreiecke (lokal)
 # Unterlage je Knoten: Kreisfläche (Radius wie der Gehweg-Schnitt) 4 cm unter dem Belag der nächsten Straße.
 # Bleibt zwischen Fahrbahnen, Gehwegen und Ecken an einer Einmündung ein Keil frei, sieht man diese Fläche
@@ -1308,15 +1309,22 @@ func fuellen():
 var KNAST_WAND:=[]   # für Geometrie
 func _platz_bei(kit:String,welt:Vector2,yaw:float,flach:=-1.0):
 	var k=K.KITS[kit];var aussen=Vector2(sin(yaw),cos(yaw));var n=-aussen;var t=Vector2(-n.y,n.x)
-	var F=welt-C-n*k.d*0.5
-	# ganze Fläche prüfen, nicht nur die Mitte (Sonderort-Gebäude standen sonst in schon gesetzten Häusern)
-	var x=-k.w*0.5+0.7
-	while x<=k.w*0.5-0.7+0.01:
-		var z=0.3
-		while z<=k.d-0.3+0.01:
-			if _belegt(F+t*x+n*z):return
-			z+=1.5
-		x+=1.5
+	var F0=welt-C-n*k.d*0.5;var F=F0;var frei=false
+	# ganze Fläche prüfen, nicht nur die Mitte (Sonderort-Gebäude standen sonst in schon gesetzten Häusern);
+	# ragt die Fläche in einen Gehwegstreifen, bis zu 6 m von der Straße weg rücken statt den Gehweg abzuschneiden
+	for rueck in 5:
+		F=F0+n*(rueck*1.5);var ok=true;var nur_band=true
+		var x=-k.w*0.5+0.7
+		while ok and x<=k.w*0.5-0.7+0.01:
+			var z=0.3
+			while z<=k.d-0.3+0.01:
+				if _belegt(F+t*x+n*z):ok=false;nur_band=false;break
+				if _im_gehwegband(F+t*x+n*z):ok=false;break
+				z+=1.5
+			x+=1.5
+		if ok:frei=true;break
+		if not nur_band:break
+	if not frei:return
 	_belegen(F,t,n,k.w,k.d)
 	var xf=_setzen(kit,F,t,n)
 	if flach>-1000.0:
@@ -1819,9 +1827,13 @@ func platten():
 	# diese Schnittkanten an (keine zwei Flächen übereinander, kein Spalt). Außenkante: Böschungsmauer.
 	var alt=L.koll_an;L.koll_an=true
 	var so=L._st(L.M.pflaster,true);var n_ok=0;var sk=L._st(L.M.stein,true)
-	ENDEN={};GW={}
+	ENDEN={};GW={};GU={}
 	# gelegte Fahrbahnflächen vorab: Gehwegstücke werden an ihnen abgeschnitten (kein Pflaster auf Asphalt)
-	for zk in FB_GELEGT:GW[zk]=FB_GELEGT[zk].duplicate()
+	for zk in FB_GELEGT:GW[zk]=FB_GELEGT[zk].duplicate();GU[zk]=FB_GELEGT[zk].duplicate()
+	# Unterlage 5 cm unter dem Gehweg (eigenes Material, keine Kollision): wo zwei geschnittene Gehwegstücke nicht
+	# millimetergenau aneinanderstoßen, sah man durch den Haarriss die dunkle Kantenwand (Lücke)
+	if _unter_mat==null:_unter_mat=L.M.pflaster.duplicate()
+	su=L._st(_unter_mat,false)
 	# Grundstücke (große Bausätze) vorab als belegt eintragen: Gehwege/Ecken werden an deren Umriss abgeschnitten
 	# statt 1 cm unter/über dem Rasen weiterzulaufen (doppelte Fläche)
 	for pl in PLATZ:
@@ -1831,7 +1843,9 @@ func platten():
 		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
-		_gelegt_dazu(GW,um)
+		# Gehwegstreifen haben Vorrang vor dem Grundstücksumriss: Bausätze, die nicht über die Grundstücksprüfung
+		# gesetzt wurden (Sonderorte, Landschaft), schnitten sonst ein Stück Gehweg weg (Gehweg ohne_Kollision)
+		for teil in _ohne_gehwegband(um):_gelegt_dazu(GW,teil);_gelegt_dazu(GU,teil)
 		# Villen: Pflanztröge vor der Gartenmauer stehen auf dem Gehweg -> dort kein Pflaster darunter
 		if String(pl[0]).begins_with("nd_villa_"):
 			var vi=int(String(pl[0]).get_slice("_",2));var o0=5.0;var o1=15.0
@@ -1842,7 +1856,7 @@ func platten():
 				for c in [Vector3(seg[0],0,0.0),Vector3(seg[1],0,0.0),Vector3(seg[1],0,0.78),Vector3(seg[0],0,0.78)]:
 					var w=xf*c;tr.append(Vector2(w.x,w.z))
 				if Geometry2D.is_polygon_clockwise(tr):tr.reverse()
-				_gelegt_dazu(GW,tr)
+				_gelegt_dazu(GW,tr);_gelegt_dazu(GU,tr)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji]
@@ -1885,6 +1899,8 @@ func platten():
 				var ai:Vector2=q0+n0*(r.w-0.5);var ci:Vector2=q1+n1*(r.w-0.5)
 				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(ci.x,y1,ci.y),Vector3(c1.x,y1,c1.y),GW)
 				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),GW)
+				_tri_frei(su,Vector3(ai.x,y0-0.05,ai.y),Vector3(ci.x,y1-0.05,ci.y),Vector3(c1.x,y1-0.05,c1.y),GU)
+				_tri_frei(su,Vector3(ai.x,y0-0.05,ai.y),Vector3(c1.x,y1-0.05,c1.y),Vector3(a1.x,y0-0.05,a1.y),GU)
 				# Außenkante bis ins Gelände nur dort, wo die Straßen-Schürze fehlt (nahe Kreuzungen) – sonst doppelte Wand
 				var mo=(a1+c1)*0.5
 				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):
@@ -1958,6 +1974,7 @@ func _gehweg_ecken(so)->int:
 			for i in poly.size():
 				var pa:Vector2=poly[i];var pb:Vector2=poly[(i+1)%poly.size()]
 				_tri_frei(so,m3,Vector3(pa.x,hs[i],pa.y),Vector3(pb.x,hs[(i+1)%poly.size()],pb.y),GW)
+				_tri_frei(su,m3-Vector3(0,0.05,0),Vector3(pa.x,hs[i]-0.05,pa.y),Vector3(pb.x,hs[(i+1)%poly.size()]-0.05,pb.y),GU)
 			# Böschungsmauer unter der Außenkante
 			var aus=[[3,4],[4,5]] if poly.size()==6 else [[2,3]]
 			for e in aus:
