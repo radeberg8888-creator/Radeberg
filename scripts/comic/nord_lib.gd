@@ -660,12 +660,12 @@ func _cypresse(p:Vector3,h:float):
 	_mb(Color(0.35,0.26,0.18),p+Vector3(0,0.4,0),Vector3(0.18,0.8,0.18),Basis(),0.0)
 	L.kugel(T(Color(0.16,0.34,0.18)),p+Vector3(0,h*0.55,0),Vector3(0.75,h*0.5,0.75),1.06)
 func _villa_modern(i:int):
-	var weiss=T([Color(0.96,0.95,0.92),Color(0.86,0.85,0.83),Color(0.92,0.9,0.86),Color(0.78,0.78,0.76)][i%4])
+	var weiss=_W([Color(0.96,0.95,0.92),Color(0.86,0.85,0.83),Color(0.92,0.9,0.86),Color(0.78,0.78,0.76)][i%4])
 	var beton=Color(0.68,0.67,0.65)
 	var c=_P(-2,0,18)
 	L.box(weiss,c+Vector3(0,1.8,0),Vector3(16,3.6,11),Basis(),0.05)
 	L.box(weiss,c+Vector3(2,5.2,-1),Vector3(12,3.2,9),Basis(),0.05)
-	_mb(beton,c+Vector3(-5.5,1.8,0),Vector3(5,3.62,11.02),Basis(),0.0)   # Sichtbeton-Teil
+	L.box(_W(beton),c+Vector3(-5.5,1.8,0),Vector3(5,3.62,11.02),Basis(),0.0)   # Sichtbeton-Teil
 	L.box(T(Color(0.25,0.25,0.28)),c+Vector3(2,6.9,-1),Vector3(13,0.25,10),Basis(),0.03)
 	L.box(T(Color(0.25,0.25,0.28)),c+Vector3(0,3.7,0),Vector3(17,0.25,12),Basis(),0.03)
 	L.box(L.M.glas[1],c+Vector3(0,1.7,5.53),Vector3(12,2.8,0.05),Basis(),0.0)
@@ -695,7 +695,7 @@ func _villa_mediterran(i:int):
 	var c=_P(-1,0,19)
 	var B:=15.0;var TT:=10.0;var H:=6.6
 	_mb(Color(0.62,0.58,0.52),c+Vector3(0,0.3,0),Vector3(B+0.3,0.6,TT+0.3))
-	_mb(creme,c+Vector3(0,0.6+H*0.5,0),Vector3(B,H,TT),Basis(),0.05)
+	L.box(_W(creme),c+Vector3(0,0.6+H*0.5,0),Vector3(B,H,TT),Basis(),0.05)
 	K.haupt(c+Vector3(0,0.6+H*0.5,0),Vector3(B,H,TT),Basis(),creme,ziegel,1,true)
 	_dach_sattel(c+Vector3(0,0.6+H,0),B,TT,2.4,ziegel,creme)
 	# Zierleisten, Dachkante
@@ -745,14 +745,14 @@ func _villa_hang(i:int):
 	var stein=Color(0.6,0.57,0.52)
 	var c=_P(0,0,14)
 	# Garagengeschoss (Bruchstein) mit zwei Toren
-	_mb(stein,c+Vector3(0,1.6,0),Vector3(14,3.2,12),Basis(),0.05)
+	L.box(_W(stein,"stein"),c+Vector3(0,1.6,0),Vector3(14,3.2,12),Basis(),0.05)
 	for k in 6:_mb(stein.darkened(0.15),c+Vector3(0,0.45+k*0.5,6.01),Vector3(14.02,0.05,0.02),Basis(),0.0)
 	for x in [-3.4,3.4]:
 		_mb(Color(0.85,0.85,0.82),c+Vector3(x,1.25,6.04),Vector3(5.0,2.5,0.08),Basis(),0.0)
 		for k in 5:_mb(Color(0.7,0.7,0.68),c+Vector3(x,0.3+k*0.48,6.09),Vector3(4.9,0.04,0.02),Basis(),0.0)
 	L.koll_box(c+Vector3(0,1.6,0),Vector3(14,3.2,12))
 	# Wohngeschoss darüber, Satteldach
-	_mb(wand,c+Vector3(0,3.2+1.6,-0.5),Vector3(13,3.2,11),Basis(),0.05)
+	L.box(_W(wand),c+Vector3(0,3.2+1.6,-0.5),Vector3(13,3.2,11),Basis(),0.05)
 	K.haupt(c+Vector3(0,3.2,0),Vector3(14,6.4,12),Basis(),wand,dach,1,true)
 	_dach_sattel(c+Vector3(0,6.4,-0.5),13.0,11.0,2.6,dach,wand)
 	for x in [-4.0,0.0,4.0]:_ef_fenster(c+Vector3(x,4.8,5.0),0.0,Color(0.2,0.3,0.25))
@@ -788,9 +788,11 @@ func _villa_garten(i:int):
 	for sx in [-1,1]:
 		var x=sx*(15-0.15)
 		L.box(putz,_P(x,-5.9,16),Vector3(0.3,16.2,32),Basis(),0.02);L.koll_box(_P(x,1.1,16),Vector3(0.3,2.2,32))
-		L.box(deck,_P(x,2.26,16),Vector3(0.46,0.12,32.1),Basis(),0.0)
-		L.box(stein,_P(x,0.2,16),Vector3(0.34,0.4,32.02),Basis(),0.0)
-		for k in 9:L.box(stein,_P(x,1.1,0.3+k*3.9),Vector3(0.5,2.3,0.5),Basis(),0.0)
+		# Seitenmauer beginnt hinter der Frontmauer: Abdeckplatte, Sockelstreifen und Eckpfeiler lagen an der Ecke
+		# doppelt und gleich hoch übereinander (doppelte Fläche)
+		L.box(deck,_P(x,2.26,16.25),Vector3(0.46,0.12,31.6),Basis(),0.0)
+		L.box(stein,_P(x,0.2,16.2),Vector3(0.34,0.4,31.62),Basis(),0.0)
+		for k in range(1,9):L.box(stein,_P(x,1.1,0.3+k*3.9),Vector3(0.5,2.3,0.5),Basis(),0.0)
 	var laub=T(Color(0.32,0.55,0.25));var bluete=T(Color(0.85,0.45,0.6));var fuge=T(Color(0.46,0.44,0.41))
 	for seg in [[-15.0,o0],[o1,15.0]]:
 		var x0:float=seg[0];var x1:float=seg[1];var lg=x1-x0
@@ -806,7 +808,7 @@ func _villa_garten(i:int):
 		L.box(stein,_P(x1-0.2,1.1,0.2),Vector3(0.5,2.3,0.5),Basis(),0.0)
 		# Pflanzbeet vor der Mauer: Steintrog bis 1,5 m unter Grundstückshöhe, gestutzte Hecke als Band
 		# Trog 20 cm über Gehweghöhe: steht auf dem Gehweg statt gleichauf mit ihm (sonst doppelte Fläche)
-		L.box(stein,_P(xm,-0.65,-0.45),Vector3(lg,2.1,0.62),Basis(),0.02)
+		L.box(stein,_P(xm,-0.65,-0.45),Vector3(lg,2.1,0.62),Basis(),0.02);L.koll_box(_P(xm,-0.65,-0.45),Vector3(lg,2.1,0.62))
 		L.box(deck,_P(xm,0.42,-0.45),Vector3(lg+0.04,0.06,0.66),Basis(),0.0)
 		var n=int(floor(lg))
 		for q in n+1:L.box(fuge,_P(x0+q*lg/max(n,1),-0.75,-0.77),Vector3(0.05,1.9,0.02),Basis(),0.0)
@@ -848,6 +850,14 @@ func _kit(stil_:String,typ:String,name:String,w:float,d:float,f:Callable):
 const EF_WAND:=[Color(0.72,0.24,0.2),Color(0.86,0.76,0.56),Color(0.45,0.52,0.62),Color(0.6,0.72,0.62),Color(0.9,0.88,0.8),Color(0.55,0.5,0.62),Color(0.82,0.62,0.42),Color(0.5,0.62,0.7)]
 const EF_LADEN:=[Color(0.2,0.3,0.25),Color(0.35,0.25,0.18),Color(0.62,0.2,0.18),Color(0.9,0.9,0.86),Color(0.2,0.28,0.45),Color(0.95,0.93,0.88),Color(0.25,0.35,0.3),Color(0.6,0.18,0.15)]
 func _mb(c:Color,pos:Vector3,gr:Vector3,rot:=Basis(),k:=0.03):L.box(T(c),pos,gr,rot,k)
+# Fassaden mit eigener Wandtextur (Putz mit Körnung, Sichtbeton, Bruchstein) statt glatter Volltonfarbe
+var _WM:={}
+func _W(c:Color,art:="putz")->Material:
+	var k=art+c.to_html()
+	if not _WM.has(k):
+		if art=="stein":_WM[k]=L._shader(L.ZIEGEL,{"farbe":c,"fuge":c.darkened(0.35)})
+		else:_WM[k]=L._shader(L.PUTZ,{"farbe":c})
+	return _WM[k]
 func _ef_fenster(pos:Vector3,yaw:float,laden:Color,b:=1.1,h:=1.5):
 	var r=Basis(Vector3.UP,yaw);var vor=r*Vector3(0,0,1);var weiss=Color(0.95,0.94,0.9)
 	_mb(weiss,pos+vor*0.06,Vector3(b+0.2,h+0.2,0.1),r,0.0)
@@ -1712,14 +1722,20 @@ func fahrbahnen():
 			var b=bei(r,s);var p:Vector2=b[0];var t:Vector2=b[1];var nn=Vector2(-t.y,t.x)
 			# 3 cm über dem tatsächlichen Belag (an Einmündungen angeglichen), nie gleichauf mit Asphalt
 			var y=max(y_bei(r,s)+0.09,_y_an(Vector3(p.x,y_bei(r,s)+0.06,p.y),ri)+0.03)
-			var bas=Basis(Vector3.UP,atan2(t.x,t.y))
+			# Strich folgt der Steigung: flach liegend tauchte ein 3-m-Strich am Hang an einem Ende in den Asphalt
+			# (doppelte Fläche gelb/Asphalt). Enden je 3 cm über ihrem Belag.
+			var pa=bei(r,max(s-1.5,0.0))[0];var pb=bei(r,min(s+1.5,Lg))[0]
+			var ya=max(y_bei(r,max(s-1.5,0.0))+0.09,_y_an(Vector3(pa.x,y_bei(r,max(s-1.5,0.0))+0.06,pa.y),ri)+0.03)
+			var yb=max(y_bei(r,min(s+1.5,Lg))+0.09,_y_an(Vector3(pb.x,y_bei(r,min(s+1.5,Lg))+0.06,pb.y),ri)+0.03)
+			y=max(y,(ya+yb)*0.5)
+			var bas=Basis(Vector3.UP,atan2(t.x,t.y))*Basis(Vector3.RIGHT,-atan2(yb-ya,3.0))
 			# Markierung, die auf eine andere Fahrbahn reicht (Einmündung/Überlappung), läge 1 cm auf deren Belag
 			if auf_fahrbahn(p,ri,1.6 if r.orig!="autobahn" else 0.6):s+=3.0;continue
 			if nah_kreuzung(p,3.0):s+=3.0;continue   # in der Kreuzungsplatte keine Linien
 			if r.orig=="autobahn":
 				if fmod(s,12.0)<4.0:
 					for o in [-r.w*0.5,r.w*0.5]:var q=p+nn*o;L.box(L.M.markierung,Vector3(q.x,y,q.y),Vector3(0.18,0.012,4.0),bas,0.0)
-				for o in [-0.25,0.25]:var q=p+nn*o;L.box(gelb,Vector3(q.x,y,q.y),Vector3(0.15,0.012,3.05),bas,0.0)
+				for o in [-0.25,0.25]:var q=p+nn*o;L.box(gelb,Vector3(q.x,y,q.y),Vector3(0.15,0.012,2.95),bas,0.0)
 				if fmod(s,6.0)<3.0:
 					for o in [-r.w-0.6,r.w+0.6]:
 						var q=p+nn*o;L.box(L.M.metall,Vector3(q.x,y+0.55,q.y),Vector3(0.08,0.3,3.1),bas,0.0)
@@ -1800,6 +1816,17 @@ func platten():
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
 		_gelegt_dazu(GW,um)
+		# Villen: Pflanztröge vor der Gartenmauer stehen auf dem Gehweg -> dort kein Pflaster darunter
+		if String(pl[0]).begins_with("nd_villa_"):
+			var vi=int(String(pl[0]).get_slice("_",2));var o0=5.0;var o1=15.0
+			if vi%3==2:o0=-7.4;o1=9.2
+			for seg in [[-15.0,o0],[o1,15.0]]:
+				if seg[1]-seg[0]<0.6:continue
+				var tr=PackedVector2Array()
+				for c in [Vector3(seg[0],0,0.0),Vector3(seg[1],0,0.0),Vector3(seg[1],0,0.78),Vector3(seg[0],0,0.78)]:
+					var w=xf*c;tr.append(Vector2(w.x,w.z))
+				if Geometry2D.is_polygon_clockwise(tr):tr.reverse()
+				_gelegt_dazu(GW,tr)
 	var jr={}   # Straße -> [[Knotenindex, Mitte, R]]
 	for ji in JUNC.size():
 		var j=JUNC[ji]

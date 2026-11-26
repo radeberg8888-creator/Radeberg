@@ -25,6 +25,7 @@ var INSTG:={}          # Schlüssel -> {Kachel -> PackedFloat32Array (12 Zahlen 
 var _im_haus:=false;var _haus_inst:=[]
 var MODUL_SCHATTEN:={} # Schlüssel -> wirft Schatten
 var weit_modul:=140.0
+var MODUL_WEIT:={}   # Schlüssel -> eigene Sichtweite (Kleinteile 60–90 m)
 var FERN_HAUS:=[]     # [Grundriss, Höhe, Wandfarbe, Fußhöhe] für die Fernansicht der Fassadenhäuser
 # Fernansicht: jedes Haus als Block (Wände + Dach, Vertexfarben, ein Material), in großen Feldern, ab weit_detail sichtbar
 func fern_haeuser(ziel:Node3D,feld:=600.0,von:=280.0,bis:=2400.0):
@@ -469,7 +470,7 @@ func _module_aus():
 			mm.instance_count=buf.size()/12;mm.buffer=buf
 			var mi=MultiMeshInstance3D.new();mi.multimesh=mm;mi.name="K_%s_%d_%d"%[key,tk.x,tk.y];welt.add_child(mi)
 			mi.set_meta("puffer",buf)
-			mi.visibility_range_end=weit_modul;mi.visibility_range_end_margin=15.0
+			mi.visibility_range_end=MODUL_WEIT.get(key,weit_modul);mi.visibility_range_end_margin=15.0
 			if not MODUL_SCHATTEN.get(key,false):mi.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	INSTG.clear()
 func _kopie_ok(xf:Transform3D)->bool:
@@ -2942,12 +2943,16 @@ func _markierungen():
 		while s<L-1.0:
 			var b=_bei_s(r.P,r.S,s);var p:Vector2=b[0];var t:Vector2=b[1]
 			if not _nah_kreuzung(p,1.0):
+				# Durchgehende Linien bestehen aus 2,6-m-Stücken im 2,5-m-Takt: sie überlappten sich (in Kurven
+				# als Splitter) in gleicher Höhe -> doppelte Fläche. Jetzt im Wechsel 1,2 cm höher, Striche kürzer
+				# als der Takt; Zebrastreifen/Haltelinien liegen darüber.
+				var yl=0.026+0.012*(int(round(s/2.5))%2)
 				if r.typ=="allee":
-					for sd in [-0.12,0.12]:_quer(p,t,sd,0.0,0.12,2.6)
+					for sd in [-0.12,0.12]:_quer(p,t,sd,0.0,0.12,2.6,yl)
 					if fmod(s,8.0)<2.6:
-						for sd in [-1,1]:_quer(p,t,sd*3.5,0.0,0.12,3.0)
-				elif r.typ!="einbahn" and fmod(s,6.0)<2.6:_quer(p,t,0.0,0.0,0.14,3.0)
-				for sd in [-1,1]:_quer(p,t,sd*(r.w-0.6),0.0,0.12,2.6)
+						for sd in [-1,1]:_quer(p,t,sd*3.5,0.0,0.12,2.4)
+				elif r.typ!="einbahn" and fmod(s,6.0)<2.6:_quer(p,t,0.0,0.0,0.14,2.4)
+				for sd in [-1,1]:_quer(p,t,sd*(r.w-0.6),0.0,0.12,2.6,yl)
 			s+=2.5
 		if r.typ=="einbahn":
 			s=12.0
@@ -2978,11 +2983,11 @@ func _markierungen():
 				ZEBRAS.append(p)
 				var lat=-r.w+0.7
 				while lat<r.w-0.6:
-					_quer(p,t,lat,0.0,0.5,3.0,0.027);lat+=1.0
+					_quer(p,t,lat,0.0,0.5,3.0,0.052);lat+=1.0
 				var b2=_bei_s(r.P,r.S,s+dir*2.6)
 				var seite=-dir if r.typ!="einbahn" else 0
-				if r.typ=="einbahn":_quer(b2[0],b2[1],0.0,0.0,r.w*2.0-0.6,0.4,0.027)
-				else:_quer(b2[0],b2[1],seite*r.w*0.5,0.0,r.w-0.4,0.4,0.027)
+				if r.typ=="einbahn":_quer(b2[0],b2[1],0.0,0.0,r.w*2.0-0.6,0.4,0.052)
+				else:_quer(b2[0],b2[1],seite*r.w*0.5,0.0,r.w-0.4,0.4,0.052)
 
 func _ampeln():
 	for k in JN:

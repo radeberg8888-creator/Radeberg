@@ -497,7 +497,8 @@ func _k_reihe(w:float,d:float,i:int):
 	L._haus(_P(0,0,2.2),w-0.2,hd,AUSSEN,{"stock":stock,"laden":false})
 	var H=3.7+(stock-1)*3.15
 	K.haupt(_P(0,H*0.5,2.2+hd*0.5),Vector3(w-0.2,H,hd),Basis(),Color(0.62,0.33,0.25),Color(0.35,0.33,0.33))
-	for k in 4:L.box(L.M.stein,_P(w*0.25,0.1+k*0.2,2.2-0.35-k*0.35),Vector3(1.6,0.2+k*0.4,0.35),Basis(),0.02)
+	# Eingangsstufen mit eigener Kollision (zu schmal für die automatische -> Kollision lag 16 cm tiefer)
+	for k in 4:L.box(L.M.stein,_P(w*0.25,0.1+k*0.2,2.2-0.35-k*0.35),Vector3(1.6,0.2+k*0.4,0.35),Basis(),0.02);L.koll_box(_P(w*0.25,0.1+k*0.2,2.2-0.35-k*0.35),Vector3(1.6,0.2+k*0.4,0.35))
 	L.box(L.M.metall,_P(-w*0.25,0.5,1.0),Vector3(0.6,1.0,0.6),Basis(),0.02)
 	_zaeune(w,d,false,0.0)
 	if i%3==0:GL.graffiti(_P(rng.randf_range(-2,2),1.4,2.15),AUSSEN,0.6)
@@ -812,6 +813,69 @@ func _setzen(kit:String,F:Vector2,t:Vector2,n:Vector2)->Transform3D:
 	if K.KITS.has(sk):PLATZ.append([sk,xf])
 	for pk in K.KITS[kit].park:PARK.append([pk[0],xf*pk[1]])
 	return xf
+# ---------- Kleinteile für Ghetto und Wohnviertel (Abschnitt 8a) ----------
+# Mülltonnen, Fahrräder, Pflanzkübel am Gehwegrand vor dem Grundstück; Wäscheleinen in freien Lücken (Ghetto).
+# Als Kopien (MultiMesh, Sichtweite 75 m) – kosten fast nichts. _deko_auf_boden setzt sie auf die echte Fläche.
+var N_DETAIL:={}
+func _detail(key:String,p:Vector2,yaw:float,bau:Callable):
+	var a=L.hoehen_an;L.hoehen_an=false
+	L.MODUL_WEIT[key]=75.0
+	L._modul(key,Transform3D(Basis(Vector3.UP,yaw),Vector3(p.x,L.FY(p.x,p.y)+L.KB,p.y)),bau,false)
+	L.hoehen_an=a
+	N_DETAIL[key]=N_DETAIL.get(key,0)+1
+func _details(st:String,kit:String,Fm:Vector2,tt:Vector2,n:Vector2,w:float,d:float):
+	var yaw=atan2(-n.x,-n.y)   # +Z zur Straße
+	var rand=Fm-n*0.75          # 0,45 m innerhalb der Gehweg-Außenkante
+	var x=rng.randf_range(-w*0.5+1.0,w*0.5-1.0)
+	var z=rng.randf()
+	var arm=st=="ghetto"
+	if z<(0.5 if arm else 0.35):_detail("d_tonnen_"+("g" if arm else "w"),rand+tt*x,yaw,func():_d_tonnen(arm))
+	elif z<(0.7 if arm else 0.55):_detail("d_rad",rand+tt*x,yaw+PI*0.5,func():_d_rad())
+	elif z<0.85:_detail("d_kuebel",rand+tt*x,yaw,func():_d_kuebel())
+	# Wäscheleine zwischen Haus und Nachbar: nur, wenn neben dem Grundstück noch Platz ist (Lücke im Bau-Raster)
+	if arm and rng.randf()<0.25 and _rechteck_ok(Fm+tt*(w*0.5+2.6)+n*2.5,tt,n,1.6,5.2):
+		_belegen(Fm+tt*(w*0.5+2.6)+n*2.5,tt,n,1.6,5.2)
+		_detail("d_waesche",Fm+tt*(w*0.5+2.6)+n*5.0,yaw+PI*0.5,func():_d_waesche())
+func _d_tonnen(arm:bool):
+	var farben=[Color(0.18,0.32,0.22),Color(0.35,0.36,0.38),Color(0.2,0.3,0.55),Color(0.55,0.42,0.18)]
+	for k in 2:
+		var c=Vector3(-0.36+k*0.72,0,0);var m=L._toon(farben[(k*2+(1 if arm else 0))%4])
+		L.box(m,c+Vector3(0,0.5,0),Vector3(0.58,1.0,0.68),Basis(),0.03)
+		L.box(L._toon(farben[(k*2+(1 if arm else 0))%4].darkened(0.25)),c+Vector3(0,1.03,0.02),Vector3(0.62,0.06,0.74),Basis(),0.02)
+		for sx in [-0.22,0.22]:L.zyl(L.M.dunkel,c+Vector3(sx,0.06,-0.36),c+Vector3(sx,0.06,-0.30),0.07,1.0)
+	if arm:L.kugel(L._toon(Color(0.12,0.12,0.13)),Vector3(0.9,0.22,0.1),Vector3(0.28,0.22,0.24),1.06)   # Müllsack daneben
+	L.koll_box(Vector3(0,0.5,0),Vector3(1.32,1.0,0.7))
+func _d_rad():
+	var rahmen=L._toon([Color(0.75,0.15,0.12),Color(0.15,0.35,0.7),Color(0.15,0.15,0.16)][rng.randi()%3])
+	var reifen=L.M.dunkel
+	for sx in [-0.52,0.52]:
+		# Rad als Ring aus acht Stäben
+		for a in 8:
+			var w0=a*TAU/8.0;var w1=(a+1)*TAU/8.0
+			L.zyl(reifen,Vector3(sx+cos(w0)*0.33,0.34+sin(w0)*0.33,0),Vector3(sx+cos(w1)*0.33,0.34+sin(w1)*0.33,0),0.025,1.0)
+	L.zyl(rahmen,Vector3(-0.52,0.34,0),Vector3(0.05,0.62,0),0.022,1.0)
+	L.zyl(rahmen,Vector3(0.05,0.62,0),Vector3(0.52,0.34,0),0.022,1.0)
+	L.zyl(rahmen,Vector3(-0.1,0.34,0),Vector3(0.05,0.62,0),0.022,1.0)
+	L.zyl(rahmen,Vector3(0.05,0.62,0),Vector3(0.0,0.82,0),0.02,1.0)
+	L.box(L.M.dunkel,Vector3(0.0,0.84,0),Vector3(0.22,0.05,0.1),Basis(),0.0)   # Sattel
+	L.zyl(rahmen,Vector3(0.45,0.34,0),Vector3(0.42,0.9,0),0.02,1.0)
+	L.zyl(L.M.dunkel,Vector3(0.42,0.9,-0.25),Vector3(0.42,0.9,0.25),0.018,1.0)   # Lenker
+func _d_kuebel():
+	L.box(L._toon(Color(0.55,0.33,0.22)),Vector3(0,0.3,0),Vector3(0.7,0.6,0.7),Basis(),0.03)
+	L.box(L._toon(Color(0.3,0.22,0.15)),Vector3(0,0.61,0),Vector3(0.6,0.04,0.6),Basis(),0.0)
+	L.kugel(L._toon(Color(0.22,0.45,0.2)),Vector3(0,0.95,0),Vector3(0.42,0.45,0.42),1.06)
+	L.koll_box(Vector3(0,0.3,0),Vector3(0.7,0.6,0.7))
+func _d_waesche():
+	var holz=L._toon(Color(0.45,0.33,0.22))
+	for sx in [-2.2,2.2]:
+		L.zyl(holz,Vector3(sx,0,0),Vector3(sx,1.9,0),0.05,1.0)
+		L.zyl(holz,Vector3(sx,1.85,-0.3),Vector3(sx,1.85,0.3),0.03,1.0)
+	for sz in [-0.25,0.25]:L.zyl(L.M.weiss,Vector3(-2.2,1.84,sz),Vector3(2.2,1.84,sz),0.006,1.0)
+	var farben=[Color(0.9,0.9,0.88),Color(0.75,0.2,0.2),Color(0.25,0.45,0.75),Color(0.95,0.8,0.3),Color(0.4,0.6,0.35)]
+	for k in 7:
+		var x=-1.8+k*0.6;var sz=-0.25 if k%2==0 else 0.25
+		L.box(L._toon(farben[k%5]),Vector3(x,1.5,sz),Vector3(0.42,0.62,0.02),Basis(),0.0)
+	L.koll_box(Vector3(-2.2,0.95,0),Vector3(0.12,1.9,0.12));L.koll_box(Vector3(2.2,0.95,0),Vector3(0.12,1.9,0.12))
 func _wahl(st:String,typ:String)->String:
 	var l=KITLISTE.get(st+"/"+typ,[])
 	if l.is_empty():l=KITLISTE["ghetto/"+typ] if KITLISTE.has("ghetto/"+typ) else KITLISTE["ghetto/busch"]
@@ -892,10 +956,11 @@ func grundstuecke():
 				var Fm=F+t*k.w*0.5
 				_belegen(Fm,tt,n,k.w,k.d)
 				var xf=_setzen(kit,Fm,tt,n)
+				if st in ["ghetto","sued"]:_details(st,kit,Fm,tt,n,k.w,k.d)
 				if kit.begins_with("lager_kauf") or kit.begins_with("autohandel"):
 					IMMO.append({"art":"lager" if kit.begins_with("lager") else "autohandel","xf":xf,"stil":st})
 				s+=k.w+0.6
-	print("SUED FAIL ",FAIL);print("SUED Grundstücke an Straßen ",PLATZ.size()," ",Time.get_ticks_msec()-t0," ms")
+	print("SUED FAIL ",FAIL);print("SUED Grundstücke an Straßen ",PLATZ.size()," ",Time.get_ticks_msec()-t0," ms");print("SUED Kleinteile ",N_DETAIL)
 # Hinterland: Originalhäuser als Vorlage, danach Füllstücke
 # Tuning-Werkstatt (Halle 20 x 26 m) an einer Ghetto-Straße reservieren; gebaut wird sie im Spiel (scripts/spiel/garage.gd)
 var DIENSTE:=[]   # {art, F, yaw} lokale Wachen (Polizei, Feuerwehr, Taxi)
