@@ -1938,8 +1938,10 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 	# Knoten (Kreuzungsplatte + 12 m Auslauf): das Gelände muss überall unter der tiefsten Fahrbahn in seiner
 	# Nähe liegen – das 10-m-Raster spannt sonst über die Mulde der Platte und sticht durch den Asphalt.
 	# Je Rasterpunkt: niedrigste Fahrbahnhöhe (Knotenarme) im Umkreis von 15 m, minus 0,3 m.
+	# Abgelöst durch das genaue Absenken unter jedem gelegten Belagdreieck (unten): die pauschale Knotenabsenkung
+	# grub auch Rasenstreifen zwischen den Belägen bis 1 m tief ab (Lücken, Gehweg ohne Kollision).
 	var nk=0
-	for jn in NO.JUNC:
+	for jn in ([] if true else NO.JUNC):
 		var c:Vector2=jn.p+NO.C;var R=float(jn.r)+3.0+12.0+ST
 		var pkt=[]   # [Punkt, Y] der Arme im Umkreis
 		for ri in [jn.a,jn.b]:
