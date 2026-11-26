@@ -139,11 +139,12 @@ func gehwege():
 				var a0=P[i]+n0*r.w;var a1=P[i+1]+n1*r.w;var b0=P[i]+n0*(r.w+r.sw);var b1=P[i+1]+n1*(r.w+r.sw)
 				# nicht in fremde Fahrbahnen hinein (Kreuzungen bleiben frei)
 				if auf_fahrbahn((a0+b1)*0.5,ri,0.6) or auf_fahrbahn(b0,ri,0.3) or auf_fahrbahn(b1,ri,0.3) or auf_fahrbahn(a0,ri,0.3) or auf_fahrbahn(a1,ri,0.3):continue
-				L.hex(L.M.pflaster,[Vector3(a0.x,-0.1,a0.y),Vector3(a1.x,-0.1,a1.y),Vector3(b1.x,-0.1,b1.y),Vector3(b0.x,-0.1,b0.y),
+				# Unterkante 0,8 m tief (vorher 0,1 m: am Hafen hing sie 21 cm über tieferem Boden – Wand_schwebt)
+				L.hex(L.M.pflaster,[Vector3(a0.x,-0.8,a0.y),Vector3(a1.x,-0.8,a1.y),Vector3(b1.x,-0.8,b1.y),Vector3(b0.x,-0.8,b0.y),
 					Vector3(a0.x,KB,a0.y),Vector3(a1.x,KB,a1.y),Vector3(b1.x,KB,b1.y),Vector3(b0.x,KB,b0.y)],0.0)
 				# Bordsteinkante
 				var c0=P[i]+n0*(r.w+0.18);var c1=P[i+1]+n1*(r.w+0.18)
-				L.hex(L.M.stein,[Vector3(a0.x,-0.1,a0.y),Vector3(a1.x,-0.1,a1.y),Vector3(c1.x,-0.1,c1.y),Vector3(c0.x,-0.1,c0.y),
+				L.hex(L.M.stein,[Vector3(a0.x,-0.8,a0.y),Vector3(a1.x,-0.8,a1.y),Vector3(c1.x,-0.8,c1.y),Vector3(c0.x,-0.8,c0.y),
 					Vector3(a0.x,KB+0.01,a0.y),Vector3(a1.x,KB+0.01,a1.y),Vector3(c1.x,KB+0.01,c1.y),Vector3(c0.x,KB+0.01,c0.y)],0.012)
 
 # Gehweg-/Grundfläche als durchgehende Platte (Kachel minus Fahrbahnen), Bordsteinecken gerundet

@@ -2793,7 +2793,8 @@ func _gebaeude_roh(lot:PackedVector2Array,aussen:PackedVector2Array,innen:Array,
 	var sw=_st(wand,true)
 	for i in n:
 		var p=lot[i];var q=lot[(i+1)%n];var t=(q-p).normalized();var o=Vector3(t.y,0,-t.x)*sg
-		var A=Vector3(p.x,y0-0.05,p.y);var B=Vector3(q.x,y0-0.05,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
+		# Wand 0,8 m in den Boden (vorher 5 cm: am Hang hing die Unterkante bis 15 cm über dem Gelände)
+		var A=Vector3(p.x,y0-0.8,p.y);var B=Vector3(q.x,y0-0.8,q.y);var C=Vector3(q.x,y1,q.y);var D=Vector3(p.x,y1,p.y)
 		_tri(sw,A,B,C,o);_tri(sw,A,C,D,o)
 	var idx=Geometry2D.triangulate_polygon(lot)
 	var sd=_st(M.dach,true)
