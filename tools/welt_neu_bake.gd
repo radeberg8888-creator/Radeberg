@@ -1973,7 +1973,10 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				if NO.LOT[j]!=0:hz=ynah+NO.H0-0.3
 				if H[j]>hz:H[j]=hz;nk+=1
 	print("STRASSEN Knotengelände abgesenkt ",nk)
-	# Grundregel zuletzt: unter jeder Fahrbahn liegen alle vier Gitterpunkte der Rasterzelle unter dem Belag
+	# Grundregel zuletzt: unter jeder Fahrbahn liegt das Gelände (genau so dreieckig wie im Spiel) unter dem Belag.
+	# Früher wurden alle vier Gitterpunkte der 10-m-Zelle auf Belaghöhe gesetzt -> daneben entstanden bis 1 m tiefe
+	# Gräben (Lücken zwischen Gehwegen, fehlende Kollision am Gehwegrand). Jetzt nur die drei Ecken des Dreiecks
+	# unter dem Punkt, und nur um so viel, wie dort fehlt.
 	# (Fahrbahn alle 2 m, auf ganzer Breite abgetastet) – sonst spannt das 10-m-Raster durch den Asphalt
 	var nz2=0
 	for r in NO.ROADS:
@@ -1986,13 +1989,7 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				for q in [-1.0,-0.5,0.0,0.5,1.0]:
 					var p=a+t2*s+nn*q*r.w
 					if STADT.has_point(p):continue
-					var gi=int(floor((p.x-X0)/ST));var gk=int(floor((p.y-Z0)/ST))
-					for dk in 2:
-						for di in 2:
-							var ii=gi+di;var kk=gk+dk
-							if ii<0 or kk<0 or ii>=nx or kk>=nz:continue
-							var j=kk*nx+ii
-							if H[j]>y:H[j]=y;nz2+=1
+					if _senken(H,p,y,X0,Z0,ST,nx,nz):nz2+=1
 				s+=2.0
 	print("STRASSEN Zellen unter Fahrbahn gesenkt ",nz2)
 	# Dasselbe für jedes tatsächlich gelegte Belagdreieck (Fahrbahn, Einmündungsangleich, Gehweg, Platz, Weg):
@@ -2007,14 +2004,21 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				var p3=A+(B-A)*(float(u)/max(m,1))+(Cc-A)*(float(v)/max(m,1))
 				var p=Vector2(p3.x,p3.z)+NO.C
 				if STADT.has_point(p):continue
-				var gi=int(floor((p.x-X0)/ST));var gk=int(floor((p.y-Z0)/ST))
-				for dk in 2:
-					for di in 2:
-						var ii=gi+di;var kk=gk+dk
-						if ii<0 or kk<0 or ii>=nx or kk>=nz:continue
-						var j=kk*nx+ii
-						if H[j]>y:H[j]=y;nz3+=1
+				if _senken(H,p,y,X0,Z0,ST,nx,nz):nz3+=1
 	print("STRASSEN Zellen unter Belagdreiecken gesenkt ",nz3)
+
+func _senken(H:PackedFloat32Array,p:Vector2,y:float,X0:float,Z0:float,ST:float,nx:int,nz:int)->bool:
+	var fx=(p.x-X0)/ST;var fz=(p.y-Z0)/ST
+	var i=clampi(int(fx),0,nx-2);var k=clampi(int(fz),0,nz-2);var u=fx-i;var v=fz-k
+	var j=k*nx+i;var ec:Array;var h:float
+	if u+v<=1.0:
+		ec=[j,j+1,j+nx];h=H[j]+u*(H[j+1]-H[j])+v*(H[j+nx]-H[j])
+	else:
+		ec=[j+nx+1,j+nx,j+1];h=H[j+nx+1]+(1.0-u)*(H[j+nx]-H[j+nx+1])+(1.0-v)*(H[j+1]-H[j+nx+1])
+	if h<=y:return false
+	var dd=h-y
+	for e in ec:H[e]-=dd
+	return true
 
 # ================= Stadt-Deko auf den Boden =================
 # Laternen, Bänke, Bäume, Mülleimer, Hydranten … wurden mit der Feldhöhe an ihrem Fußpunkt gesetzt. Der Gehweg
