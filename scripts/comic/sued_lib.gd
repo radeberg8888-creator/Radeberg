@@ -795,6 +795,8 @@ func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
 			if not maske(p):FAIL.maske+=1;return false
 			if z>0.5 and frei(p)<-0.2:FAIL.frei+=1;return false
 			z+=2.0
+		# Hinterkante auch prüfen (2-m-Schritte endeten bis 2 m davor -> Bausätze überlappten hinten)
+		if _belegt(F+t*x+n*(d-0.3)):FAIL.occ+=1;return false
 	return true
 func _belegen(F:Vector2,t:Vector2,n:Vector2,w:float,d:float):
 	var x=-w*0.5+0.3
@@ -830,7 +832,7 @@ func _details(st:String,kit:String,Fm:Vector2,tt:Vector2,n:Vector2,w:float,d:flo
 	var z=rng.randf()
 	var arm=st=="ghetto"
 	if z<(0.5 if arm else 0.35):_detail("d_tonnen_"+("g" if arm else "w"),rand+tt*x,yaw,func():_d_tonnen(arm))
-	elif z<(0.7 if arm else 0.55):_detail("d_rad",rand+tt*x,yaw+PI*0.5,func():_d_rad())
+	elif z<(0.7 if arm else 0.55):_detail("d_rad",rand+tt*x,yaw,func():_d_rad())   # längs zum Bordstein
 	elif z<0.85:_detail("d_kuebel",rand+tt*x,yaw,func():_d_kuebel())
 	# Wäscheleine zwischen Haus und Nachbar: nur, wenn neben dem Grundstück noch Platz ist (Lücke im Bau-Raster)
 	if arm and rng.randf()<0.25 and _rechteck_ok(Fm+tt*(w*0.5+2.6)+n*2.5,tt,n,1.6,5.2):

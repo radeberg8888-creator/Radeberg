@@ -950,7 +950,13 @@ func _k_einfam(i:int,lang:bool):
 		var gp=_P(-3.0,0,d-2.8)
 		L.zyl(T(Color(0.95,0.95,0.92)),gp,gp+Vector3(0,0.75,0),0.6,1.0)
 		L.zyl(T(Color(0.9,0.9,0.88)),gp,gp+Vector3(0,2.2,0),0.04,1.0)
-		L.kugel(T([Color(0.85,0.3,0.25),Color(0.25,0.5,0.75)][i%4/2]),gp+Vector3(0,2.25,0),Vector3(1.3,0.28,1.3),1.04)
+		# Schirm als flacher Kegel (die abgeplattete Kugel hatte senkrechte Randflächen ohne Halt: Wand_schwebt)
+		var sm=L._st(T([Color(0.85,0.3,0.25),Color(0.25,0.5,0.75)][i%4/2]))
+		var sp=gp+Vector3(0,2.42,0)
+		for a in 10:
+			var w0=a*TAU/10.0;var w1=(a+1)*TAU/10.0
+			var r0=gp+Vector3(cos(w0)*1.3,2.12,sin(w0)*1.3);var r1=gp+Vector3(cos(w1)*1.3,2.12,sin(w1)*1.3)
+			L._tri(sm,sp,r0,r1,Vector3.UP);L._tri(sm,sp,r1,r0,Vector3.DOWN)
 	else:
 		var sp=_P(2.5,0,d-3.0)
 		for sx in [-1.0,1.0]:_mb(Color(0.45,0.32,0.2),sp+Vector3(sx*1.0,1.0,0),Vector3(0.12,2.0,0.12),Basis(Vector3.FORWARD,sx*0.15),0.0)
@@ -1300,7 +1306,14 @@ var KNAST_WAND:=[]   # für Geometrie
 func _platz_bei(kit:String,welt:Vector2,yaw:float,flach:=-1.0):
 	var k=K.KITS[kit];var aussen=Vector2(sin(yaw),cos(yaw));var n=-aussen;var t=Vector2(-n.y,n.x)
 	var F=welt-C-n*k.d*0.5
-	if _belegt(F+n*k.d*0.5):return
+	# ganze Fläche prüfen, nicht nur die Mitte (Sonderort-Gebäude standen sonst in schon gesetzten Häusern)
+	var x=-k.w*0.5+0.7
+	while x<=k.w*0.5-0.7+0.01:
+		var z=0.3
+		while z<=k.d-0.3+0.01:
+			if _belegt(F+t*x+n*z):return
+			z+=1.5
+		x+=1.5
 	_belegen(F,t,n,k.w,k.d)
 	var xf=_setzen(kit,F,t,n)
 	if flach>-1000.0:

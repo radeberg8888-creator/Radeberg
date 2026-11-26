@@ -698,7 +698,8 @@ func _haus(front:Vector3,w:float,d:float,aussen:Vector3,opt:Dictionary):
 	var wand:Material=M.ziegel[rng.randi()%M.ziegel.size()] if ziegel else M.putz[rng.randi()%M.putz.size()]
 	var b=Basis(rechts,oben,aussen)
 	var mitte=front-aussen*(d*0.5)+Vector3(0,H*0.5,0)
-	box(wand,mitte,Vector3(w,H,d),b,0.04)
+	# Wand 0,6 m in den Boden: am Hang/Plattenrand hing die Unterkante sonst bis 15 cm über dem Gelände
+	box(wand,mitte-Vector3(0,0.3,0),Vector3(w,H+0.6,d),b,0.04)
 	# Dach: Teerdach, Attika
 	box(M.dach,mitte+Vector3(0,H*0.5+0.02,0),Vector3(w-0.5,0.06,d-0.5),b,0.0)
 	var stil={"ziegel":ziegel,"wand":wand,"glas":M.glas[rng.randi()%M.glas.size()],"tuer":M.tuer[rng.randi()%M.tuer.size()],
@@ -2371,6 +2372,10 @@ func _platte_k(poly:PackedVector2Array,y0:float,y1:float,oben:Material,seite:Mat
 				var pa=p+n*0.7;var qa=q+n*0.7
 				var E=Vector3(pa.x,0.0,pa.y);var F=Vector3(qa.x,0.0,qa.y)
 				KOLL_F.append_array([D,C,F,D,F,E])
+				# unter dem Fuß der Auffahrt bleibt die Kante bis zum Plattenboden fest (sonst offener Spalt unter
+				# dem Gehweg, wo daneben tiefer liegender Boden anschließt)
+				var P0=Vector3(p.x,0.0,p.y);var Q0=Vector3(q.x,0.0,q.y)
+				KOLL_F.append_array([A,B,Q0,A,Q0,P0])
 			else:KOLL_F.append_array([A,B,C,A,C,D])
 	koll_an=a_k
 
