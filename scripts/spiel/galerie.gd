@@ -677,12 +677,36 @@ func _schwebe_lauf():
 				for fr in 3:await get_tree().process_frame
 				await _foto("Fund_%s_%d_%s"%[name,nr,f[0].replace(" ","_").replace("/","-")])
 				nr+=1
-		# Beleg (Abschnitt 6): je Viertel ein Bild von der Straße und eines aus der Luft
+		# Beleg (Abschnitt 6): je Viertel ein Bild von der Straße und eines aus der Luft – immer bei Tag
+		spiel.zeit=11.0*60.0
 		await _ort("Viertel_"+name,mitte)
+		await _nah_kleinteile(mitte)
 	print("SCHWEBT GESAMT ",gesamt)
 	# Prototyp Villa-Mauern
+	spiel.zeit=11.0*60.0
 	var vp=Vector2(-1634,-8994);cam.global_position=Vector3(vp.x,G_h(vp)+20,vp.y);await _laden(vp)
 	await _villa_fotos(Vector3(vp.x,G_h(vp),vp.y))
+# Nahbilder der Kleinteile (Abschnitt 8a): je Art einmal pro Lauf, bei Tag, aus 4 m
+var _nah_fertig:={}
+func _nah_kleinteile(mitte:Vector2):
+	for art in ["K_d_tonnen_g","K_d_rad","K_d_kuebel","K_d_waesche"]:
+		if _nah_fertig.has(art):continue
+		var best=null;var bd=1e9
+		for m in get_tree().root.find_children(art+"*","MultiMeshInstance3D",true,false):
+			if m.multimesh==null:continue
+			for i in m.multimesh.instance_count:
+				var gx:Transform3D=m.global_transform*m.multimesh.get_instance_transform(i)
+				var d=Vector2(gx.origin.x,gx.origin.z).distance_to(mitte)
+				if d<bd and d<260.0:bd=d;best=gx
+		if best==null:continue
+		_nah_fertig[art]=true
+		var b:Basis=best.basis.orthonormalized();var o:Vector3=best.origin
+		var weit=7.0 if art=="K_d_waesche" else 4.0
+		var cp=o+b.z*weit+b.x*1.5+Vector3(0,1.6,0)
+		spiel.spieler.global_position=o+b.z*30.0+Vector3(0,1,0)
+		cam.look_at_from_position(cp,o+Vector3(0,0.6,0));cam.current=true
+		for fr in 5:await get_tree().process_frame
+		await _foto("Nah_"+art.substr(2))
 var _gk=null
 func _gelaende_koerper():
 	if _gk==null:_gk=spiel.welt.get_node_or_null("Kollision")

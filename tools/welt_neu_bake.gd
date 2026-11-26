@@ -917,6 +917,8 @@ func _autobahn_bauen():
 		var S:PackedFloat32Array=a.S;var Lg=S[S.size()-1];var s=1.0
 		while s<Lg-1.0:
 			var e=L._bei_s(P,S,s);var p:Vector2=e[0];var t:Vector2=e[1];var rn=L._rn(t);var h=_ab_hoehe(p)+0.01
+			# 2,6-m-Stücke im 2,5-m-Takt überlappen: im Wechsel 1,2 cm höher (sonst doppelte Fläche)
+			h+=0.012*(int(round(s/2.5))%2)
 			for sd in [-1,1]:
 				for lat in [0.9,a.w-0.9]:
 					var c=p+rn*lat*sd;L.box(L.M.markierung,Vector3(c.x,h,c.y),Vector3(0.15,0.012,2.6),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)

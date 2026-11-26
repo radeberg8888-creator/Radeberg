@@ -864,7 +864,8 @@ func _ef_fenster(pos:Vector3,yaw:float,laden:Color,b:=1.1,h:=1.5):
 	_mb(Color(0.14,0.2,0.28),pos+vor*0.1,Vector3(b,h,0.04),r,0.0)
 	_mb(weiss,pos+vor*0.13,Vector3(0.07,h,0.04),r,0.0);_mb(weiss,pos+vor*0.13,Vector3(b,0.07,0.04),r,0.0)
 	_mb(weiss,pos+vor*0.12+Vector3(0,-h*0.5-0.1,0),Vector3(b+0.4,0.08,0.22),r,0.0)
-	for sx in [-1.0,1.0]:_mb(laden,pos+vor*0.08+r*Vector3(sx*(b*0.5+0.33),0,0),Vector3(0.42,h+0.1,0.05),r,0.015)
+	# Fensterläden liegen an der Wand an (vorher 5,5 cm Luft dahinter)
+	for sx in [-1.0,1.0]:_mb(laden,pos+vor*0.035+r*Vector3(sx*(b*0.5+0.33),0,0),Vector3(0.42,h+0.1,0.05),r,0.015)
 func _k_einfam(i:int,lang:bool):
 	var d=24.0 if lang else 16.0
 	var gras=[Color(0.42,0.6,0.28),Color(0.46,0.62,0.3),Color(0.4,0.56,0.27)][i%3]
