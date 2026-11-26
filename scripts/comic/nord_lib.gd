@@ -506,6 +506,10 @@ func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
 		var z=0.0
 		while z<=d+0.01:
 			if _im_gehwegband(F+t*x+n*z):FAIL.rect+=1;return false
+			# auch dichter (1,5 m) und bis zur Hinterkante gegen schon belegte Grundstücke (Süd-Prüfung: 2-m-Schritte, Hinterkante
+			# bis 2 m ungeprüft -> Einfamilienhaus
+			# ragte in einen Laden, Wand_schwebt/Haus_offen im Ladeninneren)
+			if _belegt(F+t*clampf(x,-w*0.5+0.7,w*0.5-0.7)+n*clampf(z,0.3,d-0.3)):FAIL.occ+=1;return false
 			z+=1.5
 		if _im_gehwegband(F+t*x+n*d):FAIL.rect+=1;return false
 	return true

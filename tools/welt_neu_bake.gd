@@ -1163,6 +1163,10 @@ func _natur(NL):
 			if kit=="":continue
 			if art==2 and N.rng.randf()<0.2:continue   # Stadtgrün etwas lockerer
 			var sc=N.rng.randf_range(0.85,1.25)
+			# Felsen/Steine am Hang auf die tiefste Stelle unter ihrem Rand (sonst schwebt die Talseite)
+			if "fels" in kit or "stein" in kit:
+				for o in [Vector2(2,0),Vector2(-2,0),Vector2(0,2),Vector2(0,-2),Vector2(1.4,1.4),Vector2(-1.4,1.4),Vector2(1.4,-1.4),Vector2(-1.4,-1.4)]:
+					h=min(h,_natur_h(NL,w+o*sc))
 			var xf=Transform3D(Basis(Vector3.UP,N.rng.randf()*TAU).scaled(Vector3.ONE*sc),Vector3(p.x,h-NL.H0-0.1,p.y))
 			NL.PLATZ.append([kit,xf]);st[kit.split("_")[1]]=st.get(kit.split("_")[1],0)+1
 			var fk=N.ist_baum(kit)
