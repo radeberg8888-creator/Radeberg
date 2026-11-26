@@ -1366,6 +1366,9 @@ func _norden()->Dictionary:
 					var qw=xf*q;var qq=Vector2(qw.x,qw.z)+C
 					hy=min(hy,_end_h(HN,qq)-NL.H0-0.1)
 				if kn.begins_with("nt_"):hy-=0.15
+				# Felsen tiefer einsetzen: das Spielgelände ist fein dreieckig, das Rechengitter grob -> am Steilhang
+				# lag der Fuß bis 0,56 m über dem sichtbaren Boden
+				if "fels" in kn:hy-=0.6
 			else:
 				# große Bausätze (Villa, Hof, Laden): auf den höchsten Geländepunkt der Grundfläche (höchstens 30 cm
 				# über der Mitte), sonst sticht das Gelände am Rand ein paar Zentimeter durch Rasen und Terrasse;

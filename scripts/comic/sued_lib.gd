@@ -441,7 +441,7 @@ func _k_holz(w:float,d:float,farbe:Color,i:int,lang:bool):
 		else:GL.reifen(hof,3);GL.muellsack(hof+RECHTS*1.5)
 	elif i%2==0:GL.auto_wrack(_P(ex,0,9.0),rng.randf_range(-0.2,0.2))
 	# Kleinteile (8a): Tonnen im Vorgarten neben der Einfahrt, Fahrrad am Einfahrtsrand
-	if i%3!=1:_d_tonnen(_P(hx+3.3,0,1.1),true);_zaehle("tonnen")
+	if i%3!=1:_d_tonnen(_P(hx+3.3,0,1.9),true);_zaehle("tonnen")   # hinter dem Zaun, nicht in ihm
 	if i%2==1:_d_rad(_P(ex-1.0,0,1.6));_zaehle("rad")
 	_zaeune(w,d,true,ex)
 	if lang and i%4==1:L._park(Transform3D(Basis(Vector3.UP,PI),_P(ex,0.0,6.0)),["c_wartburg","c_muscle","c_e30","c_luxus","c_trabant"][i%5])

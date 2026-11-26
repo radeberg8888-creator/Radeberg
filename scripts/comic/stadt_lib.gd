@@ -625,8 +625,9 @@ func _strassen():
 			box(M.pflaster,Vector3(sx*(x0+x1)*0.5,KB*0.5-0.05,sz*(z0+z1)*0.5),Vector3(x1-x0,KB+0.1,z1-z0),Basis(),0.0)
 			box(M.pflaster,Vector3(sx*(z0+z1)*0.5,KB*0.5-0.05,sz*(x0+x1+SW)*0.5),Vector3(z1-z0,KB+0.1,x1-x0-SW),Basis(),0.0)
 			# Bordsteine
-			box(M.stein,Vector3(sx*(RW+x1)*0.5,KB*0.5-0.04,sz*(RW+0.15)),Vector3(x1-RW,KB+0.1,0.3),Basis(),0.02)
-			box(M.stein,Vector3(sx*(RW+0.15),KB*0.5-0.04,sz*(RW+x1)*0.5),Vector3(0.3,KB+0.1,x1-RW),Basis(),0.02)
+			# 0,6 m tiefer in den Boden (Oberkante gleich): am Hafen hing die Unterkante 21 cm über dem Boden
+			box(M.stein,Vector3(sx*(RW+x1)*0.5,KB*0.5-0.34,sz*(RW+0.15)),Vector3(x1-RW,KB+0.7,0.3),Basis(),0.02)
+			box(M.stein,Vector3(sx*(RW+0.15),KB*0.5-0.34,sz*(RW+x1)*0.5),Vector3(0.3,KB+0.7,x1-RW),Basis(),0.02)
 			# Hinterhof-Fläche hinter den Häusern (im Hofblock Asphalt statt Rasen, kommt aus _hof)
 			if not (sx==1 and sz==1):box(M.gras,Vector3(sx*(RW+SW+ENDE)*0.5,0.05,sz*(RW+SW+ENDE)*0.5),Vector3(ENDE-RW-SW,0.1,ENDE-RW-SW),Basis(),0.0)
 	# Markierungen: Mittellinie gestrichelt, Zebrastreifen, Haltelinien
