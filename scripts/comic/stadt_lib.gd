@@ -3161,7 +3161,7 @@ func _autobahn():
 		var b=_bei_s(P,S,s);var p:Vector2=b[0];var t:Vector2=b[1];var rn=_rn(t)
 		for sd in [-1,1]:
 			for lat in [0.9,w-0.9]:
-				var c=p+rn*lat*sd;box(M.markierung,Vector3(c.x,H_AB+0.01,c.y),Vector3(0.15,0.012,2.6),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
+				var c=p+rn*lat*sd;box(M.markierung,Vector3(c.x,H_AB+0.01,c.y),Vector3(0.15,0.012,2.45),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
 			if fmod(s,12.0)<2.6:
 				var c=p+rn*4.9*sd;box(M.markierung,Vector3(c.x,H_AB+0.01,c.y),Vector3(0.15,0.012,4.5),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
 		s+=2.5
@@ -3217,7 +3217,7 @@ func _rampen():
 			var i=rp.S.bsearch(s);i=clamp(i,1,rp.P.size()-1)
 			var t=(rp.P[i]-rp.P[i-1]).normalized();var rn=_rn(t);var h=max(rp.H[i],0.03)
 			for sd in [-1,1]:
-				var c=rp.P[i]+rn*(rp.w-0.5)*sd;box(M.markierung,Vector3(c.x,h+0.012,c.y),Vector3(0.14,0.012,2.6),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
+				var c=rp.P[i]+rn*(rp.w-0.5)*sd;box(M.markierung,Vector3(c.x,h+0.012,c.y),Vector3(0.14,0.012,2.45),Basis(Vector3.UP,atan2(t.x,t.y)),0.0)
 			s+=2.5
 
 # ---------- Autos ----------
@@ -3698,7 +3698,7 @@ func _langtunnel_k():
 		var bas=Basis(Vector3.UP,atan2(t.x,t.y))*Basis(Vector3.RIGHT,-atan2(H[min(i+1,n-1)]-H[max(i-1,0)],5.0))
 		if fmod(s,6.0)<2.6:box(M.markierung,Vector3(p.x,h+0.02,p.y),Vector3(0.15,0.012,3.0),bas,0.0)
 		for sd in [-1,1]:
-			var c=p+rn*(w-0.35)*sd;box(M.markierung,Vector3(c.x,h+0.02,c.y),Vector3(0.14,0.012,2.6),bas,0.0)
+			var c=p+rn*(w-0.35)*sd;box(M.markierung,Vector3(c.x,h+0.02,c.y),Vector3(0.14,0.012,2.45),bas,0.0)
 		if h+wh+0.4<-0.3 and fmod(s,7.5)<2.6:
 			for sd in [-1,1]:
 				var c=p+rn*2.4*sd;box(M.lampe,Vector3(c.x,h+wh-0.06,c.y),Vector3(0.35,0.08,1.8),bas,0.0)
