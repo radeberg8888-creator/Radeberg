@@ -1842,6 +1842,10 @@ func platten():
 	for pl in PLATZ:
 		var kk=K.KITS.get(pl[0],null)
 		if kk==null or kk.w<6.0:continue
+		# Natur (Bäume, Fernwald, Felsen, Totholz) hat keine Bodenplatte: ihr Umriss schnitt sonst 1277-mal den Gehweg ab
+		# (Rasen/Gelände ohne Gehweg und ohne Kollision 0,6 m unter der Straße)
+		var kn=String(pl[0])
+		if kn.begins_with("nt_") or kn.begins_with("ld_") or kn.begins_with("nd_fels") or kn.begins_with("nd_kaktus"):continue
 		var xf:Transform3D=pl[1];var um=PackedVector2Array()
 		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
