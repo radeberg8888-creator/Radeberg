@@ -668,6 +668,18 @@ func _schwebe_lauf():
 		_diag_gelaende(mitte,name)
 		_pruef_kopien(mitte,260.0)
 		_pruef_gehwege(mitte,260.0)
+		# Diagnose: Gehweg-Fund nach Nachladen an der Stelle selbst noch einmal prüfen (fehlt er wirklich oder war
+		# dort nur der Weltteil nicht geladen?). Der Fund bleibt stehen, es wird nur dazugeschrieben.
+		var gw_f=FUNDE.filter(func(f):return f.size()>4 and String(f[1])=="ohne_Kollision")
+		if not gw_f.is_empty():
+			for f in gw_f:
+				var pp:Vector3=f[3]
+				await _laden(Vector2(pp.x,pp.z))
+				var rr=_strahl(pp+Vector3(0,1.5,0),pp-Vector3(0,1.0,0),true)
+				var txt="NICHTS" if rr.is_empty() else "%.2f %s"%[rr.position.y,str(rr.collider.get_parent().name)+"/"+str(rr.collider.name)]
+				print("GW_NACHPRUEF ",name," ",pp," -> ",txt)
+				f[4]=String(f[4])+" | nach Nachladen: "+txt
+			await _laden(mitte)
 		# Statistik (Abschnitt 6): wie viele verschiedene Häuser/Villen stehen im Viertel
 		var kitarten={};var n_h=0
 		for m in spiel.welt.find_children("*","MultiMeshInstance3D",true,false):
