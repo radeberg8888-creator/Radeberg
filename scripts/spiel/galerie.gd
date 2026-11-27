@@ -797,7 +797,7 @@ func _pruef_gehwege(mitte:Vector2,radius:float):
 				if rs.is_empty():continue
 				var ys=rs.position.y
 				# nur echtes Fehlen zählt (Treffer auf das Gelände statt auf eine Gehweg-/Platten-Kollision)
-				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)+" Straße:"+str(r.get("n","?"))+" w:"+str(w)+" sw:"+str(sw)+" i:"+str(i)+"/"+str(P.size())+" P:"+str(P[i])+" stadt:"+str(r.get("stadt","-"))+" Fahrbahn-h0:"+str(snapped(h0,0.01))+" Treffer:"+str(snapped(ys,0.01))+_gw_diag(ai,r)])
+				if ys<h0-0.08 and rs.collider==_gelaende_koerper():FUNDE.append(["Gehweg","ohne_Kollision",h0-ys,Vector3(ai.x,h0,ai.y),str(rs.collider.get_parent().name)+" Straße:"+str(r.get("n","?"))+" w:"+str(w)+" sw:"+str(sw)+" i:"+str(i)+"/"+str(P.size())+" P:"+str(P[i])+" stadt:"+str(r.get("stadt","-"))+" Fahrbahn-h0:"+str(snapped(h0,0.01))+" Treffer:"+str(snapped(ys,0.01))+_gw_diag(ai,r),Vector3(ai.x,h0+7.0,ai.y)-Vector3(n.x,0,n.y)*sd*3.0])   # Bild schräg von oben, von der Fahrbahn her
 				var rg=_strahl(Vector3(ao.x,ys+3.0,ao.y),Vector3(ao.x,ys-30.0,ao.y))
 				if rg.is_empty():continue
 				var yg=rg.position.y
