@@ -361,9 +361,9 @@ func kits_bauen():
 		if K.KITS.has(sn):continue
 		var g=gr[sn]
 		var fb=func():
-			# 18 m tief (vorher 10 m): an der Hafenkante reicht der Grund des Beckens über 14 m tiefer
+			# 20 m tief (vorher 10, dann 18 m): an der Hafenkante reicht der Grund des Beckens über 14 m tiefer
 			# Sichtkörper und Kollision deckungsgleich (Kollision lag 0,23 m höher -> Unterkante "schwebte" darüber)
-			var mz=Vector3((g[0]+g[1])*0.5,KB-9.02,(g[2]+g[3])*0.5);var gs=Vector3(g[1]-g[0]-0.04,18.0,g[3]-g[2]-0.04)
+			var mz=Vector3((g[0]+g[1])*0.5,KB-10.02,(g[2]+g[3])*0.5);var gs=Vector3(g[1]-g[0]-0.04,20.0,g[3]-g[2]-0.04)
 			L.box(T(Color(0.6,0.57,0.52)),mz,gs,Basis(),0.0)
 			L.koll_box(mz,gs)
 		_kit("dienst","sockel",sn,g[1]-g[0],g[3]-g[2],fb)
