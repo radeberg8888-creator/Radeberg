@@ -1534,12 +1534,15 @@ func _gelegt_bei(g:Dictionary,q:PackedVector2Array)->Array:
 	return out
 var _gelegt_n:=0
 var GW:={}   # schon gelegte Gehwegflächen (20-m-Zellen)
+var _letzt_fremd:=[]
+const GW_DBG:=[Vector2(1630.43,-7491.32),Vector2(-1598.89,-9272.53),Vector2(1063.86,-6063.33)]   # Diagnose: Gehweg fehlt dort
 # Dreieck legen, aber nur dort, wo noch keine Fläche derselben Art liegt (Höhe aus der Ebene des Dreiecks)
 func _tri_frei(so,A:Vector3,B:Vector3,C:Vector3,g:Dictionary):
 	var q=PackedVector2Array([Vector2(A.x,A.z),Vector2(B.x,B.z),Vector2(C.x,C.z)])
 	var d=(B.z-C.z)*(A.x-C.x)+(C.x-B.x)*(A.z-C.z)
 	if abs(d)<1e-6:return
 	var fremd=_gelegt_bei(g,q)
+	_letzt_fremd=fremd
 	_gelegt_dazu(g,q)
 	if fremd.is_empty():L._tri(so,A,B,C,Vector3.UP);return
 	if Geometry2D.is_polygon_clockwise(q):q.reverse()
@@ -1910,6 +1913,12 @@ func platten():
 				var ai:Vector2=q0+n0*(r.w-0.5);var ci:Vector2=q1+n1*(r.w-0.5)
 				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(ci.x,y1,ci.y),Vector3(c1.x,y1,c1.y),GW)
 				_tri_frei(so,Vector3(ai.x,y0,ai.y),Vector3(c1.x,y1,c1.y),Vector3(a1.x,y0,a1.y),GW)
+				for dp in GW_DBG:
+					if (a1+C).distance_to(dp)<9.0 or (c1+C).distance_to(dp)<9.0:
+						var fr=[]
+						for f in _letzt_fremd:
+							fr.append(Array(f).slice(0,4).map(func(v):return v+C))
+						print("GW_DBG ",dp," Str ",ri," i ",i," a1 ",a1+C," c1 ",c1+C," w ",r.w," sw ",r.sw," fremd ",fr.size()," ",fr)
 				# Außenkante bis ins Gelände nur dort, wo die Straßen-Schürze fehlt (nahe Kreuzungen) – sonst doppelte Wand
 				var mo=(a1+c1)*0.5
 				if nah_kreuzung(mo,2.0) or auf_fahrbahn(mo,ri,0.8):
