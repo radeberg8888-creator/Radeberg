@@ -684,6 +684,12 @@ func _schwebe_lauf():
 		PR.sammeln(mitte,200.0)
 		var t1=Time.get_ticks_msec()
 		PR.pruefen(mitte,200.0,FUNDE)
+		# Diagnose Gehweg ohne Kollision: welche sichtbaren Flächen liegen an der Stelle (Höhe, Name)?
+		for f in FUNDE:
+			if f.size()>4 and String(f[1])=="ohne_Kollision":
+				var pp:Vector3=f[3];var sichtbar=[]
+				for hv in PR.hoehen(pp.x,pp.z):sichtbar.append("%.2f %s"%[hv[0],PR._kurz(PR.BO[hv[1]])])
+				f[4]=String(f[4])+" | sichtbar dort: "+(", ".join(sichtbar) if not sichtbar.is_empty() else "NICHTS")
 		print("PRUEFUNG ",name," Boden-Dreiecke ",PR.BO.size()," Wände ",PR.VO.size()," Kanten ",PR.KANTEN.size()," sammeln ",t1-t0," ms prüfen ",Time.get_ticks_msec()-t1," ms")
 		gesamt+=FUNDE.size()
 		var arten={}
