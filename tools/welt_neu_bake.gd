@@ -1331,6 +1331,13 @@ func _norden()->Dictionary:
 	var weg=0
 	for c in flach.get_children():
 		var teile=c.name.split("_");var key=Vector2i(int(teile[teile.size()-2]),int(teile[teile.size()-1]))
+		if "@" in String(c.name) or teile.size()<3:print("NORD_NAME_UMBENANNT ",c.name," -> Kachel ",key)
+		if c is MeshInstance3D and c.mesh!=null:
+			var ab:AABB=c.mesh.get_aabb()
+			for dp in NL.GW_DBG:
+				var lp=dp-NL.C
+				if lp.x>=ab.position.x and lp.x<=ab.end.x and lp.y>=ab.position.z and lp.y<=ab.end.z and c.material_override==L.M.pflaster:
+					print("NORD_DBG_MESH ",dp," in ",c.name," Kachel ",key," in_stadt ",in_stadt.call(key)," AABB ",ab)
 		flach.remove_child(c)
 		if in_stadt.call(key):c.free();weg+=1;continue
 		kachel.call(key).add_child(c)
@@ -1404,6 +1411,10 @@ func _norden()->Dictionary:
 	var KK={}
 	for i in range(0,KF.size(),3):
 		var key=schl.call((KF[i]+KF[i+1]+KF[i+2])/3.0)
+		for dp in NL.GW_DBG:
+			var lp=dp-NL.C
+			if Geometry2D.point_is_inside_triangle(lp,Vector2(KF[i].x,KF[i].z),Vector2(KF[i+1].x,KF[i+1].z),Vector2(KF[i+2].x,KF[i+2].z)):
+				print("NORD_DBG_KOLL ",dp," y ",KF[i].y," Kachel ",key," in_stadt ",in_stadt.call(key))
 		if in_stadt.call(key):continue
 		if not KK.has(key):KK[key]=PackedVector3Array()
 		KK[key].append_array([KF[i],KF[i+1],KF[i+2]])
