@@ -1319,9 +1319,16 @@ func _platz_bei(kit:String,welt:Vector2,yaw:float,flach:=-1.0):
 			var z=0.3
 			while z<=k.d-0.3+0.01:
 				if _belegt(F+t*x+n*z):ok=false;nur_band=false;break
-				if _im_gehwegband(F+t*x+n*z):ok=false;break
 				z+=1.5
 			x+=1.5
+		# Gehwegband über den ganzen Umriss bis an die Kanten/Ecken prüfen (der Belegt-Test spart 0,7/0,3 m Rand aus;
+		# so ragte eine Ecke bis 0,7 m in den Gehweg, der dort abgeschnitten wurde -> Rasen ohne Kollision am Gehweg)
+		if ok:
+			var nx=int(ceil(k.w/1.5));var nz=int(ceil(k.d/1.5))
+			for ix in nx+1:
+				for iz in nz+1:
+					if not ok:break
+					if _im_gehwegband(F+t*(-k.w*0.5+k.w*ix/nx)+n*(k.d*iz/nz)):ok=false
 		if ok:frei=true;break
 		if not nur_band:break
 	if not frei:return
@@ -1955,9 +1962,12 @@ func _gehweg_ecken(so)->int:
 			else:
 				var K=Geometry2D.line_intersects_line(j1,-e1.d,j2,-e2.d)
 				var O=Geometry2D.line_intersects_line(a1,-e1.d,a2,-e2.d)
-				if K==null or O==null:continue
-				if (K-c).length()>(i1-c).length()*1.6 or (O-c).length()>(a1-c).length()*1.8:continue
-				poly=[j1,K,j2,a2,O,a1];hs=[e1.i.y,ym,e2.i.y,e2.o.y,ym,e1.o.y]
+				if K==null or O==null or (K-c).length()>(i1-c).length()*1.6 or (O-c).length()>(a1-c).length()*1.8:
+					# spitzer Winkel (Schnittpunkte weit weg): Lücke zwischen den Bandenden als Viereck schließen statt
+					# offen zu lassen (Rasenkeil zwischen den Gehwegen); Überlappung schneidet _tri_frei ab
+					poly=[j1,j2,a2,a1];hs=[e1.i.y,e2.i.y,e2.o.y,e1.o.y]
+				else:
+					poly=[j1,K,j2,a2,O,a1];hs=[e1.i.y,ym,e2.i.y,e2.o.y,ym,e1.o.y]
 			var mid=Vector2.ZERO
 			for q in poly:mid+=q
 			mid/=poly.size()
