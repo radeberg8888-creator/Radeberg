@@ -1277,6 +1277,16 @@ func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector
 				for y in ausschneiden(t,e[0]):
 					if not Geometry2D.is_polygon_clockwise(y):t2.append(y)
 			teile=t2
+	for dp in dbg_punkte:
+		if Geometry2D.is_point_in_polygon(dp,q):
+			var hits=[]
+			for zk in zell:
+				for e in boden_frei.get(zk,[]):
+					if e[2]==mk and abs(e[1]-ym)<=0.03 and Geometry2D.is_point_in_polygon(dp,e[0]):hits.append([e[1],Array(e[0])])
+			var rest=false
+			for t in teile:
+				if Geometry2D.is_point_in_polygon(dp,t):rest=true
+			print("FREI_DBG ",dp," y ",ym," getroffen ",getroffen," Punkt im Rest ",rest," Register-Treffer ",hits)
 	if not getroffen:
 		_frei_eintragen(q,ym,mk,bb,zell)
 		return false
@@ -1306,6 +1316,7 @@ func _frei_eintragen(poly,ym:float,mk:int,bb:Rect2,zell:Array):
 	for zk in zell:
 		if not boden_frei.has(zk):boden_frei[zk]=[]
 		boden_frei[zk].append([poly,ym,mk,bb])
+var dbg_punkte:=[]   # Diagnose (lokale xz)
 var tri_log=null   # Bake: gelegte waagerechte Belagdreiecke mitschreiben (Gelände darunter absenken)
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)

@@ -1287,7 +1287,7 @@ func _norden()->Dictionary:
 	NL.KITLISTE=SU.KITLISTE.duplicate(true)
 	NL.laden("res://assets/data/karte_nord.json",Rect2(insel.position-C,insel.size),[Rect2(STADT.position-C,STADT.size).grow(20)])
 	var n0=L.KOLL_F.size();var p0=L.PFOSTEN.size()
-	L.boden_frei={};L._frei_st=L.st;L._frei_mat=L.M.pflaster.get_instance_id()   # keine übereinander gelegten waagerechten Flächen gleichen Materials (bis Nord fertig)
+	L.boden_frei={};L._frei_st=L.st;L._frei_mat=L.M.pflaster.get_instance_id();L.dbg_punkte=NL.GW_DBG.map(func(v):return v-NL.C)   # keine übereinander gelegten waagerechten Flächen gleichen Materials (bis Nord fertig)
 	NL.zwischenstrassen();NL.kreuzungen();NL._knoten_plateau();NL.kits_bauen();NL.sonderorte()
 	N=load("res://scripts/comic/natur_lib.gd").new(L,K,G0);N.kits_bauen()
 	KN=load("res://scripts/comic/knast_lib.gd").new(L,K);KN.kits_bauen()
