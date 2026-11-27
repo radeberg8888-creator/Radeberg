@@ -386,6 +386,9 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 				var u2=_weiter_unten(Vector3(q.x,unten-0.04,q.z))
 				if u2>=unten-0.01:break
 				unten=u2
+			# Kante liegt mehr als 1 m tief im Gelände (Fundament/Sockel unter dem Boden): von nirgends zu sehen
+			# (vom Nutzer so freigegeben: "wenn man es nicht sieht, ist es ok")
+			if unten<G.G_h(Vector2(p.x+nv.x*0.5,p.z+nv.z*0.5))-1.0:continue
 			var r=G._strahl(Vector3(q.x,unten+0.3,q.z),Vector3(q.x,unten-40.0,q.z),true)
 			if r.is_empty():continue
 			var luft=unten-r.position.y

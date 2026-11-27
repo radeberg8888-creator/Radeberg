@@ -1846,6 +1846,12 @@ func platten():
 		for c in [Vector3(-kk.w*0.5,0,0),Vector3(kk.w*0.5,0,0),Vector3(kk.w*0.5,0,-kk.d),Vector3(-kk.w*0.5,0,-kk.d)]:
 			var w=xf*c;um.append(Vector2(w.x,w.z))
 		if Geometry2D.is_polygon_clockwise(um):um.reverse()
+		# Diagnose: welche Bausätze ragen ins Gehwegband (schneiden dort den Gehweg ab)?
+		for ci in 4:
+			var pa:Vector2=um[ci];var pb:Vector2=um[(ci+1)%4];var drin=false
+			for st in 9:
+				if _im_gehwegband(pa.lerp(pb,st/8.0)):drin=true;break
+			if drin:print("GW_IM_BAND ",pl[0]," bei ",(um[0]+um[2])*0.5+C);break
 		_gelegt_dazu(GW,um)
 		# Villen: Pflanztröge vor der Gartenmauer stehen auf dem Gehweg -> dort kein Pflaster darunter
 		if String(pl[0]).begins_with("nd_villa_"):

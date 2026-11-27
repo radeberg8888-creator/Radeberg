@@ -110,11 +110,55 @@ func _ort(name:String,ziel:Vector2):
 	await _foto(name+"_1_strasse")
 	print("LEISTUNG ",name," Straße: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 	await _leistung_verkehr(name)
+	await _szene(name,p,t,r)
 	var h=Vector3(p.x,_boden(p),p.y)
 	cam.look_at_from_position(h+Vector3(-t.x*90+n.x*60,95,-t.y*90+n.y*60),h);spiel.env.fog_enabled=false
 	await _foto(name+"_2_luft")
 	print("LEISTUNG ",name," Luft: Zeichenaufrufe ",Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)," Dreiecke ",Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)," Objekte ",Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 
+# Testbilder für den Nutzer: je Viertel 5 Bilder mit Leben (Verkehr, Passanten, geparkte Autos, Häuser), bei Tag
+func _naechster(liste:Array,p:Vector2,maxd:=120.0):
+	var best=null;var bd=maxd
+	for o in liste:
+		if not is_instance_valid(o) or not o is Node3D or not o.is_inside_tree():continue
+		var d=Vector2(o.global_position.x,o.global_position.z).distance_to(p)
+		if d<bd:bd=d;best=o
+	return best
+func _szene(name:String,p:Vector2,t:Vector2,r):
+	var alt=spiel.st.e.get("grafik4",1)
+	spiel.st.e.grafik4=2;spiel.einstellungen_anwenden()
+	await get_tree().create_timer(4.0).timeout
+	var n=Vector2(-t.y,t.x);var nr=0
+	# 1) Straße mit Verkehr, Blick längs der Straße vom Gehweg
+	var a=p-t*10.0+n*(r.w+1.5);var z=p+t*45.0
+	cam.look_at_from_position(Vector3(a.x,_boden(a)+1.7,a.y),Vector3(z.x,_boden(z)+1.5,z.y));cam.current=true;spiel.env.fog_enabled=true
+	await _foto(name+"_Szene_1_Strasse")
+	# 2) Passant aus der Nähe, 3) fahrendes Auto, 4) geparktes Auto vor Häusern
+	var ziele=[["Passant",_naechster(spiel.passanten,p),4.5,1.6],["Auto",_naechster(spiel.verkehr,p),9.0,2.2],["Geparkt",_naechster(spiel.geparkt,p),8.0,2.5]]
+	nr=2
+	for zi in ziele:
+		var o=zi[1];var bild=name+"_Szene_%d_%s"%[nr,zi[0]];nr+=1
+		if o==null:
+			print("GALERIE ",bild," – nichts in der Nähe, Straßenblick statt dessen")
+			var b=p+n*(r.w+1.0)+t*(nr*6.0);var c=b+t*25.0-n*6.0
+			cam.look_at_from_position(Vector3(b.x,_boden(b)+1.7,b.y),Vector3(c.x,_boden(c)+1.2,c.y))
+		else:
+			var op:Vector3=o.global_position
+			# freie Kameraposition im Kreis um das Ziel
+			var cp=op+Vector3(zi[2],zi[3],0)
+			for k in 12:
+				var d=Vector3(cos(k*PI/6.0+0.4),0,sin(k*PI/6.0+0.4))
+				var kand=op+d*zi[2]
+				kand.y=max(op.y,_boden(Vector2(kand.x,kand.z)))+zi[3]
+				if _strahl(op+Vector3(0,1.0,0),kand,true).is_empty():cp=kand;break
+			cam.look_at_from_position(cp,op+Vector3(0,0.9,0))
+		for f in 3:await get_tree().process_frame
+		await _foto(bild)
+	# 5) Halbtotale über die Häuser (Straße, Autos, Leute, Dächer)
+	var h=p-t*30.0+n*25.0
+	cam.look_at_from_position(Vector3(h.x,_boden(h)+22.0,h.y),Vector3(p.x+t.x*20.0,_boden(p),p.y+t.y*20.0))
+	await _foto(name+"_Szene_5_Uebersicht")
+	spiel.st.e.grafik4=alt;spiel.einstellungen_anwenden()
 # Leistung MIT Verkehr, geparkten Autos und Passanten bei Grafikstufe Hoch (2) und Ultra (3), gleicher Blick wie Straßenbild
 func _leistung_verkehr(name:String):
 	var alt=spiel.st.e.get("grafik4",1)
