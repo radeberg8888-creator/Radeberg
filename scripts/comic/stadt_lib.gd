@@ -1277,16 +1277,22 @@ func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector
 				for y in ausschneiden(t,e[0]):
 					if not Geometry2D.is_polygon_clockwise(y):t2.append(y)
 			teile=t2
-	for zk in zell:
-		if not boden_frei.has(zk):boden_frei[zk]=[]
-		boden_frei[zk].append([q,ym,mk,bb])
-	if not getroffen:return false
+	if not getroffen:
+		_frei_eintragen(q,ym,mk,bb,zell)
+		return false
 	# Reststücke in der Ebene des Dreiecks legen
 	var d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z)
 	if abs(d)<1e-9:return true
 	_frei_innen=true
 	for t in teile:
 		var ix=dreiecke(t)
+		# nur eintragen, was wirklich gelegt wird: vorher stand das ganze Dreieck im Register, auch wenn sein Rest-
+		# stück nicht zerlegt werden konnte -> spätere Gehwegstücke wurden gegen eine unsichtbare Fläche abgeschnitten
+		# (Gehweg fehlte, Gelände 0,6 m tiefer)
+		if ix.size()>=3:
+			var tb=Rect2(t[0],Vector2.ZERO)
+			for v in t:tb=tb.expand(v)
+			_frei_eintragen(t,ym,mk,tb,zell)
 		for k in range(0,ix.size(),3):
 			var pp=[]
 			for m in 3:
@@ -1296,6 +1302,10 @@ func _boden_frei_legen(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector
 			_tri(s,pp[0],pp[1],pp[2],aussen)
 	_frei_innen=false
 	return true
+func _frei_eintragen(poly,ym:float,mk:int,bb:Rect2,zell:Array):
+	for zk in zell:
+		if not boden_frei.has(zk):boden_frei[zk]=[]
+		boden_frei[zk].append([poly,ym,mk,bb])
 var tri_log=null   # Bake: gelegte waagerechte Belagdreiecke mitschreiben (Gelände darunter absenken)
 func _tri(s:SurfaceTool,a:Vector3,b:Vector3,c:Vector3,aussen:Vector3,na=null,nb=null,nc=null):
 	var cr=(b-a).cross(c-a)
