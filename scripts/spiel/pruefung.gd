@@ -430,7 +430,7 @@ func pruefen(mitte:Vector2,radius:float,FUNDE:Array):
 					var key=Vector2i(int(h.pos.x/4.0),int(h.pos.z/4.0))
 					if gesehen.has(key):continue
 					gesehen[key]=true
-					FUNDE.append([NAMEN[VO[h.ti]],"Haus_offen",h.dist,h.pos,"Blick von "+str(Vector3(p.x,y,p.y)),Vector3(p.x,y,p.y)])
+					FUNDE.append([NAMEN[VO[h.ti]],"Haus_offen",h.dist,h.pos,"Blick von "+str(Vector3(p.x,y,p.y))+(" | lokal Treffer "+str((KXF[VO[h.ti]].affine_inverse()*h.pos).snapped(Vector3.ONE*0.01))+" Richtung lokal "+str((KXF[VO[h.ti]].basis.inverse()*dir).snapped(Vector3.ONE*0.01)) if KXF[VO[h.ti]]!=null else ""),Vector3(p.x,y,p.y)])
 	# f) Dinge im Himmel
 	for m in G.spiel.welt.find_children("*","GeometryInstance3D",true,false):
 		if not m.is_visible_in_tree():continue

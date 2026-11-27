@@ -553,6 +553,7 @@ func _mesh_aus(k:String):
 			v.y+=(FY(v.x,v.z) if (nur_feld or v.y<KB+0.03) else Y_at(v.x,v.z));V[i]=v
 		arr[Mesh.ARRAY_VERTEX]=V
 	var m=mats[k]
+	if m==M.pflaster or m==M.asphalt:arr=_t_stoss_reparieren(arr)
 	if kachel<=0.0:
 		var am=ArrayMesh.new();am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arr);_mi(am,m,0.0)
 		return
@@ -580,6 +581,88 @@ func _mesh_aus(k:String):
 		if CO!=null:a2[Mesh.ARRAY_COLOR]=e[3]
 		if U2!=null:a2[Mesh.ARRAY_TEX_UV2]=e[4]
 		var am=_mesh_kompakt(a2);_mi(am,m,weit).name="M_%s_%d_%d"%[k,key.x,key.y]
+# T-Stöße schließen: liegt ein Eckpunkt eines Dreiecks genau auf der Kante eines anderen (Gehwegstücke, an Fahrbahn und
+# Grundstücken geschnitten), rastert die GPU die Kante nicht lückenlos -> Punktlinien/Haarrisse ("Lücke"). Solche Dreiecke
+# werden um die Punkte auf ihren Kanten erweitert (Fächer um den Schwerpunkt) – gleiche Fläche, gemeinsame Eckpunkte.
+var T_STOSS_N:=0
+func _t_stoss_reparieren(arr:Array)->Array:
+	var V:PackedVector3Array=arr[Mesh.ARRAY_VERTEX];var N=arr[Mesh.ARRAY_NORMAL];var UV=arr[Mesh.ARRAY_TEX_UV]
+	var CO=arr[Mesh.ARRAY_COLOR];var U2=arr[Mesh.ARRAY_TEX_UV2];var I=arr[Mesh.ARRAY_INDEX]
+	var cnt=I.size() if I!=null and I.size()>0 else V.size()
+	if cnt<6 or cnt>3000000:return arr
+	var ix=func(t:int)->int:return I[t] if I!=null and I.size()>0 else t
+	const Z:=2.0
+	var gr={}
+	for i in V.size():
+		var c=Vector2i(floori(V[i].x/Z),floori(V[i].z/Z))
+		if not gr.has(c):gr[c]=PackedInt32Array()
+		gr[c].append(i)
+	var oV=[];var oN=[];var oUV=[];var oCO=[];var oU2=[]   # normale Arrays: Packed-Arrays kämen als Kopie in _t_ecke an
+	var neu=0
+	for t in range(0,cnt,3):
+		var ia=[ix.call(t),ix.call(t+1),ix.call(t+2)]
+		var A=V[ia[0]];var B=V[ia[1]];var Cc=V[ia[2]]
+		var poly=[];var hat=false
+		for e in 3:
+			var p0:Vector3=V[ia[e]];var p1:Vector3=V[ia[(e+1)%3]]
+			poly.append(p0)
+			var L2=p0.distance_squared_to(p1)
+			if L2<0.0004:continue
+			var auf=[];var gesehen={}
+			var schritte=int(ceil(sqrt(L2)/Z))+1
+			for sch in schritte+1:
+				var q=p0.lerp(p1,float(sch)/schritte)
+				var c0=Vector2i(floori(q.x/Z),floori(q.z/Z))
+				for dx in range(-1,2):
+					for dz in range(-1,2):
+						var cc=c0+Vector2i(dx,dz)
+						if gesehen.has(cc) or not gr.has(cc):continue
+						gesehen[cc]=true
+						for vi in gr[cc]:
+							var v:Vector3=V[vi]
+							var tt=(v-p0).dot(p1-p0)/L2
+							if tt<=0.0005 or tt>=0.9995:continue
+							if v.distance_squared_to(p0.lerp(p1,tt))>0.0000025:continue
+							var dup=false
+							for o in auf:
+								if absf(o[0]-tt)*sqrt(L2)<0.001:dup=true;break
+							if not dup:auf.append([tt,v])
+			if not auf.is_empty():
+				hat=true
+				auf.sort_custom(func(x,y):return x[0]<y[0])
+				for o in auf:poly.append(o[1])
+		var pts=[A,B,Cc]
+		if hat:
+			neu+=1
+			var mz=(A+B+Cc)/3.0;var fan=[]
+			for i in poly.size():fan.append([mz,poly[i],poly[(i+1)%poly.size()]])
+			for f in fan:
+				for q in f:_t_ecke(q,A,B,Cc,ia,N,UV,CO,U2,oV,oN,oUV,oCO,oU2)
+		else:
+			for q in pts:_t_ecke(q,A,B,Cc,ia,N,UV,CO,U2,oV,oN,oUV,oCO,oU2)
+	T_STOSS_N+=neu
+	if neu==0:return arr
+	var a2=[];a2.resize(Mesh.ARRAY_MAX)
+	a2[Mesh.ARRAY_VERTEX]=PackedVector3Array(oV);a2[Mesh.ARRAY_NORMAL]=PackedVector3Array(oN)
+	if UV!=null and UV.size()>0:a2[Mesh.ARRAY_TEX_UV]=PackedVector2Array(oUV)
+	if CO!=null and CO.size()>0:a2[Mesh.ARRAY_COLOR]=PackedColorArray(oCO)
+	if U2!=null and U2.size()>0:a2[Mesh.ARRAY_TEX_UV2]=PackedVector2Array(oU2)
+	return a2
+func _t_ecke(q:Vector3,A:Vector3,B:Vector3,Cc:Vector3,ia:Array,N,UV,CO,U2,oV:Array,oN:Array,oUV:Array,oCO:Array,oU2:Array):
+	var bc=_bary(q,A,B,Cc)
+	oV.append(q)
+	if N!=null and N.size()>0:oN.append((N[ia[0]]*bc.x+N[ia[1]]*bc.y+N[ia[2]]*bc.z).normalized())
+	else:oN.append(Vector3.UP)
+	if UV!=null and UV.size()>0:oUV.append(UV[ia[0]]*bc.x+UV[ia[1]]*bc.y+UV[ia[2]]*bc.z)
+	if CO!=null and CO.size()>0:oCO.append(CO[ia[0]]*bc.x+CO[ia[1]]*bc.y+CO[ia[2]]*bc.z)
+	if U2!=null and U2.size()>0:oU2.append(U2[ia[0]]*bc.x+U2[ia[1]]*bc.y+U2[ia[2]]*bc.z)
+func _bary(p:Vector3,a:Vector3,b:Vector3,c:Vector3)->Vector3:
+	var v0=b-a;var v1=c-a;var v2=p-a
+	var d00=v0.dot(v0);var d01=v0.dot(v1);var d11=v1.dot(v1);var d20=v2.dot(v0);var d21=v2.dot(v1)
+	var den=d00*d11-d01*d01
+	if absf(den)<1e-12:return Vector3(1,0,0)
+	var v=(d11*d20-d01*d21)/den;var w=(d00*d21-d01*d20)/den
+	return Vector3(1.0-v-w,v,w)
 var kein_schatten:={}   # Materialien flacher Bodenflächen (Fahrbahn, Bankett): werfen keinen Schatten
 func _mi(am:Mesh,m:Material,weit:float):
 	var mi=MeshInstance3D.new();mi.mesh=am;mi.material_override=m;welt.add_child(mi)
@@ -591,6 +674,7 @@ func _r2(v:Vector3)->Vector3i:return Vector3i(roundi(v.x*1000.0),roundi(v.y*1000
 func _fertig(mit_kopien:=true):
 	for k in st.keys():_mesh_aus(k)
 	st.clear();_TRI_DA.clear()
+	if T_STOSS_N>0:print("T-Stoesse geschlossen ",T_STOSS_N)
 	if mit_kopien:_module_aus()
 # ---------------- Umgebung ----------------
 func _umgebung():

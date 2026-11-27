@@ -1631,7 +1631,7 @@ func _gelaende_und_daten(ND:Dictionary):
 			# Karte auf einer anderen Höhe als der Asphalt
 			var p:Vector2=r.P[i];Q.append(p+C);Hh.append(H0+(float(r.Y[i]) if r.has("Y") and i<r.Y.size() else NO.hy(p))+0.06)
 			Tg.append((r.P[min(i+1,r.P.size()-1)]-r.P[max(i-1,0)]).normalized());tf.append(false);el.append(false)
-		roads.append({"lane_x":r.w*(0.5 if r.get("orig","")=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":Tg,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true,"belag":r.get("belag","asphalt")})
+		roads.append({"lane_x":r.w*(0.5 if r.get("orig","")=="autobahn" else 0.36),"name":r.n,"typ":r.typ,"P":Q,"h":Hh,"T":Tg,"w":r.w,"sw":r.sw,"med":0.2 if r.typ in ["allee","autobahn"] else 0.0,"tunnel_flags":tf,"elev":el,"lanes":1,"wear":0.3,"closed":false,"sued":true,"belag":r.get("belag","asphalt"),"stadt":r.get("stadt",true)})
 	for j in NO.JUNC:
 		junctions.append({"p":j.p+C,"h":H0+NO.hy(j.p)+0.07,"r":j.r,"a":basis_n+j.a,"b":basis_n+j.b,"rail":false})
 	# ---- Parkplätze (sparsam), Läden
