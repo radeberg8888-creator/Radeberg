@@ -1,0 +1,77 @@
+Lauf 128 – 8d0c20751bc6c2e6e9949e75977d9efb48aa71cd
+LEISTUNG Viertel_Innenstadt Straße: Zeichenaufrufe 978.0 Dreiecke 1653988.0 Objekte 978.0
+LEISTUNG_VERKEHR Viertel_Innenstadt Stufe Hoch: Zeichenaufrufe 950.0 Dreiecke 1652144.0 Autos 13 geparkt 5 Passanten 56
+LEISTUNG_VERKEHR Viertel_Innenstadt Stufe Ultra: Zeichenaufrufe 980.0 Dreiecke 1675932.0 Autos 16 geparkt 5 Passanten 62
+LEISTUNG Viertel_Innenstadt Luft: Zeichenaufrufe 1160.0 Dreiecke 1482699.0 Objekte 1160.0
+LEISTUNG Viertel_Altstadt Straße: Zeichenaufrufe 1325.0 Dreiecke 1773979.0 Objekte 1325.0
+LEISTUNG_VERKEHR Viertel_Altstadt Stufe Hoch: Zeichenaufrufe 1285.0 Dreiecke 1737691.0 Autos 16 geparkt 1 Passanten 70
+LEISTUNG_VERKEHR Viertel_Altstadt Stufe Ultra: Zeichenaufrufe 1285.0 Dreiecke 1737691.0 Autos 20 geparkt 1 Passanten 76
+LEISTUNG Viertel_Altstadt Luft: Zeichenaufrufe 927.0 Dreiecke 940497.0 Objekte 927.0
+LEISTUNG Viertel_Nordstadt Straße: Zeichenaufrufe 816.0 Dreiecke 1602122.0 Objekte 816.0
+LEISTUNG_VERKEHR Viertel_Nordstadt Stufe Hoch: Zeichenaufrufe 816.0 Dreiecke 1602122.0 Autos 11 geparkt 1 Passanten 76
+LEISTUNG_VERKEHR Viertel_Nordstadt Stufe Ultra: Zeichenaufrufe 838.0 Dreiecke 1629388.0 Autos 11 geparkt 1 Passanten 82
+LEISTUNG Viertel_Nordstadt Luft: Zeichenaufrufe 831.0 Dreiecke 1517910.0 Objekte 831.0
+LEISTUNG Viertel_Oststadt Straße: Zeichenaufrufe 1081.0 Dreiecke 1888155.0 Objekte 1081.0
+LEISTUNG_VERKEHR Viertel_Oststadt Stufe Hoch: Zeichenaufrufe 1050.0 Dreiecke 1859387.0 Autos 12 geparkt 2 Passanten 82
+LEISTUNG_VERKEHR Viertel_Oststadt Stufe Ultra: Zeichenaufrufe 1078.0 Dreiecke 1888495.0 Autos 16 geparkt 2 Passanten 89
+LEISTUNG Viertel_Oststadt Luft: Zeichenaufrufe 1110.0 Dreiecke 1266673.0 Objekte 1110.0
+LEISTUNG Viertel_Suedstadt Straße: Zeichenaufrufe 722.0 Dreiecke 1104084.0 Objekte 722.0
+LEISTUNG_VERKEHR Viertel_Suedstadt Stufe Hoch: Zeichenaufrufe 794.0 Dreiecke 1143016.0 Autos 12 geparkt 2 Passanten 89
+LEISTUNG_VERKEHR Viertel_Suedstadt Stufe Ultra: Zeichenaufrufe 755.0 Dreiecke 1128018.0 Autos 13 geparkt 2 Passanten 90
+LEISTUNG Viertel_Suedstadt Luft: Zeichenaufrufe 984.0 Dreiecke 1241851.0 Objekte 984.0
+LEISTUNG Viertel_Ghetto Straße: Zeichenaufrufe 733.0 Dreiecke 792829.0 Objekte 733.0
+LEISTUNG_VERKEHR Viertel_Ghetto Stufe Hoch: Zeichenaufrufe 845.0 Dreiecke 845819.0 Autos 14 geparkt 5 Passanten 90
+LEISTUNG_VERKEHR Viertel_Ghetto Stufe Ultra: Zeichenaufrufe 846.0 Dreiecke 857377.0 Autos 19 geparkt 5 Passanten 90
+LEISTUNG Viertel_Ghetto Luft: Zeichenaufrufe 801.0 Dreiecke 999061.0 Objekte 801.0
+LEISTUNG Viertel_Strand Straße: Zeichenaufrufe 642.0 Dreiecke 1269667.0 Objekte 642.0
+LEISTUNG_VERKEHR Viertel_Strand Stufe Hoch: Zeichenaufrufe 683.0 Dreiecke 1288211.0 Autos 7 geparkt 2 Passanten 90
+LEISTUNG_VERKEHR Viertel_Strand Stufe Ultra: Zeichenaufrufe 683.0 Dreiecke 1288211.0 Autos 10 geparkt 2 Passanten 90
+LEISTUNG Viertel_Strand Luft: Zeichenaufrufe 688.0 Dreiecke 744646.0 Objekte 688.0
+LEISTUNG Viertel_Industrie Straße: Zeichenaufrufe 535.0 Dreiecke 582880.0 Objekte 535.0
+LEISTUNG_VERKEHR Viertel_Industrie Stufe Hoch: Zeichenaufrufe 608.0 Dreiecke 653536.0 Autos 4 geparkt 2 Passanten 90
+LEISTUNG_VERKEHR Viertel_Industrie Stufe Ultra: Zeichenaufrufe 534.0 Dreiecke 588844.0 Autos 6 geparkt 2 Passanten 90
+LEISTUNG Viertel_Industrie Luft: Zeichenaufrufe 427.0 Dreiecke 400989.0 Objekte 427.0
+LEISTUNG Viertel_Hafen Straße: Zeichenaufrufe 336.0 Dreiecke 332279.0 Objekte 336.0
+LEISTUNG_VERKEHR Viertel_Hafen Stufe Hoch: Zeichenaufrufe 305.0 Dreiecke 317183.0 Autos 1 geparkt 1 Passanten 90
+LEISTUNG_VERKEHR Viertel_Hafen Stufe Ultra: Zeichenaufrufe 305.0 Dreiecke 317183.0 Autos 2 geparkt 1 Passanten 90
+LEISTUNG Viertel_Hafen Luft: Zeichenaufrufe 253.0 Dreiecke 290203.0 Objekte 253.0
+LEISTUNG Viertel_Wohnviertel_West Straße: Zeichenaufrufe 1006.0 Dreiecke 1855146.0 Objekte 1006.0
+LEISTUNG_VERKEHR Viertel_Wohnviertel_West Stufe Hoch: Zeichenaufrufe 981.0 Dreiecke 1853000.0 Autos 19 geparkt 13 Passanten 90
+LEISTUNG_VERKEHR Viertel_Wohnviertel_West Stufe Ultra: Zeichenaufrufe 945.0 Dreiecke 1809978.0 Autos 19 geparkt 13 Passanten 90
+LEISTUNG Viertel_Wohnviertel_West Luft: Zeichenaufrufe 1307.0 Dreiecke 1558896.0 Objekte 1322.0
+LEISTUNG Viertel_Sonnenhuegel Straße: Zeichenaufrufe 964.0 Dreiecke 1264878.0 Objekte 980.0
+LEISTUNG_VERKEHR Viertel_Sonnenhuegel Stufe Hoch: Zeichenaufrufe 964.0 Dreiecke 1264878.0 Autos 4 geparkt 2 Passanten 90
+LEISTUNG_VERKEHR Viertel_Sonnenhuegel Stufe Ultra: Zeichenaufrufe 791.0 Dreiecke 1263438.0 Autos 8 geparkt 2 Passanten 90
+LEISTUNG Viertel_Sonnenhuegel Luft: Zeichenaufrufe 852.0 Dreiecke 1351753.0 Objekte 852.0
+LEISTUNG Viertel_Ostvorort Straße: Zeichenaufrufe 703.0 Dreiecke 821529.0 Objekte 703.0
+LEISTUNG_VERKEHR Viertel_Ostvorort Stufe Hoch: Zeichenaufrufe 663.0 Dreiecke 806529.0 Autos 2 geparkt 1 Passanten 90
+LEISTUNG_VERKEHR Viertel_Ostvorort Stufe Ultra: Zeichenaufrufe 662.0 Dreiecke 802065.0 Autos 1 geparkt 1 Passanten 90
+LEISTUNG Viertel_Ostvorort Luft: Zeichenaufrufe 375.0 Dreiecke 398670.0 Objekte 375.0
+LEISTUNG Viertel_Wueste_Staubwinkel Straße: Zeichenaufrufe 380.0 Dreiecke 467990.0 Objekte 380.0
+LEISTUNG_VERKEHR Viertel_Wueste_Staubwinkel Stufe Hoch: Zeichenaufrufe 380.0 Dreiecke 467990.0 Autos 6 geparkt 5 Passanten 90
+LEISTUNG_VERKEHR Viertel_Wueste_Staubwinkel Stufe Ultra: Zeichenaufrufe 380.0 Dreiecke 467990.0 Autos 6 geparkt 5 Passanten 90
+LEISTUNG Viertel_Wueste_Staubwinkel Luft: Zeichenaufrufe 419.0 Dreiecke 434184.0 Objekte 435.0
+LEISTUNG Viertel_JVA Straße: Zeichenaufrufe 377.0 Dreiecke 280930.0 Objekte 385.0
+LEISTUNG_VERKEHR Viertel_JVA Stufe Hoch: Zeichenaufrufe 343.0 Dreiecke 245390.0 Autos 1 geparkt 2 Passanten 90
+LEISTUNG_VERKEHR Viertel_JVA Stufe Ultra: Zeichenaufrufe 416.0 Dreiecke 366531.0 Autos 1 geparkt 3 Passanten 90
+LEISTUNG Viertel_JVA Luft: Zeichenaufrufe 98.0 Dreiecke 270785.0 Objekte 106.0
+LEISTUNG Viertel_Nord_Kueste Straße: Zeichenaufrufe 267.0 Dreiecke 517910.0 Objekte 267.0
+LEISTUNG_VERKEHR Viertel_Nord_Kueste Stufe Hoch: Zeichenaufrufe 268.0 Dreiecke 526290.0 Autos 11 geparkt 5 Passanten 90
+LEISTUNG_VERKEHR Viertel_Nord_Kueste Stufe Ultra: Zeichenaufrufe 276.0 Dreiecke 530138.0 Autos 12 geparkt 5 Passanten 90
+LEISTUNG Viertel_Nord_Kueste Luft: Zeichenaufrufe 416.0 Dreiecke 516560.0 Objekte 416.0
+LEISTUNG Viertel_Nord_Villen Straße: Zeichenaufrufe 594.0 Dreiecke 894227.0 Objekte 594.0
+LEISTUNG_VERKEHR Viertel_Nord_Villen Stufe Hoch: Zeichenaufrufe 645.0 Dreiecke 932585.0 Autos 8 geparkt 27 Passanten 90
+LEISTUNG_VERKEHR Viertel_Nord_Villen Stufe Ultra: Zeichenaufrufe 541.0 Dreiecke 858627.0 Autos 10 geparkt 27 Passanten 90
+LEISTUNG Viertel_Nord_Villen Luft: Zeichenaufrufe 1138.0 Dreiecke 1224958.0 Objekte 1138.0
+LEISTUNG Viertel_Nord_Feuerwache Straße: Zeichenaufrufe 404.0 Dreiecke 569041.0 Objekte 420.0
+LEISTUNG_VERKEHR Viertel_Nord_Feuerwache Stufe Hoch: Zeichenaufrufe 405.0 Dreiecke 576453.0 Autos 12 geparkt 16 Passanten 90
+LEISTUNG_VERKEHR Viertel_Nord_Feuerwache Stufe Ultra: Zeichenaufrufe 479.0 Dreiecke 617653.0 Autos 14 geparkt 16 Passanten 90
+LEISTUNG Viertel_Nord_Feuerwache Luft: Zeichenaufrufe 725.0 Dreiecke 1007290.0 Objekte 725.0
+LEISTUNG Viertel_Nordbucht Straße: Zeichenaufrufe 194.0 Dreiecke 772451.0 Objekte 194.0
+LEISTUNG_VERKEHR Viertel_Nordbucht Stufe Hoch: Zeichenaufrufe 194.0 Dreiecke 772451.0 Autos 0 geparkt 0 Passanten 90
+LEISTUNG_VERKEHR Viertel_Nordbucht Stufe Ultra: Zeichenaufrufe 194.0 Dreiecke 772451.0 Autos 0 geparkt 0 Passanten 90
+LEISTUNG Viertel_Nordbucht Luft: Zeichenaufrufe 189.0 Dreiecke 719422.0 Objekte 189.0
+LEISTUNG Viertel_Berg Straße: Zeichenaufrufe 223.0 Dreiecke 561702.0 Objekte 223.0
+LEISTUNG_VERKEHR Viertel_Berg Stufe Hoch: Zeichenaufrufe 223.0 Dreiecke 561702.0 Autos 0 geparkt 0 Passanten 90
+LEISTUNG_VERKEHR Viertel_Berg Stufe Ultra: Zeichenaufrufe 223.0 Dreiecke 561702.0 Autos 0 geparkt 0 Passanten 90
+LEISTUNG Viertel_Berg Luft: Zeichenaufrufe 141.0 Dreiecke 428832.0 Objekte 141.0
