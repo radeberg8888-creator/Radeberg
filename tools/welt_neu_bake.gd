@@ -1601,6 +1601,7 @@ func _gelaende_und_daten(ND:Dictionary):
 	_kits_einschneiden(H,NO.H0)
 	HG=H
 	_gelaende(H,nx,nz,X0,Z0,ST)
+	_bankette(H,NO,nx,nz,X0,Z0,ST)
 	_natur_fern()
 	_karte_bild(H,nx,nz,X0,Z0,ST)
 	_wasser()
@@ -1756,6 +1757,107 @@ func _farbe(i:int,k:int,h:float)->Color:
 	# im Spiel hellen Licht + Dunst die Farben auf -> Gelände etwas dunkler und satter
 	var g=c.v;c.v=g*0.82;c.s=min(c.s*1.12,1.0)
 	return c
+var GEL_MAT:ShaderMaterial
+# Bankett: Das Gelände-Raster hat 10 m Maschen und trifft die Straßenkante darum nur grob – daneben blieb eine
+# Stufe von 0,3–1 m mit sichtbarer Seitenwand (Straße wirkt wie auf einem Damm). Jetzt läuft entlang jeder
+# Straße außerhalb der Stadt ein Streifen aus Geländefläche (gleiches Material, gleiche Farbe) von der
+# Gehweg-/Fahrbahnkante schräg bis genau auf das Gelände (Höhe dreiecksgenau wie Netz und Kollision).
+# Ausgespart: Grundstücke, andere Straßen/Gehwege, Wasser, Stadt.
+func _bankette(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float):
+	var ST_B={};var KOLL=PackedVector3Array();var n_seg=0;var n_flach=0;var n_weg=0
+	var gitter=func(w:Vector2)->int:
+		var i=clampi(int(round((w.x-X0)/ST)),0,nx-1);var k=clampi(int(round((w.y-Z0)/ST)),0,nz-1)
+		return k*nx+i
+	var frei=func(w:Vector2)->bool:
+		if STADT.grow(10.0).has_point(w):return false
+		var j=gitter.call(w)
+		if NO.LOT[j]!=0 or H[j]<0.3:return false
+		return not NO._im_gehwegband(w-NO.C)
+	for r in NO.ROADS:
+		if not r.has("Y"):continue
+		var P0:PackedVector2Array=r.P;var Y0:PackedFloat32Array=r.Y
+		if P0.size()<2:continue
+		# alle 4 m ein Punkt, damit die Außenkante dem Gelände folgt
+		var P=PackedVector2Array();var Y=PackedFloat32Array()
+		for i in P0.size()-1:
+			var lg=P0[i].distance_to(P0[i+1]);var nst=max(1,int(ceil(lg/4.0)))
+			for s2 in nst:
+				P.append(P0[i].lerp(P0[i+1],float(s2)/nst));Y.append(lerp(Y0[i],Y0[i+1],float(s2)/nst))
+		P.append(P0[P0.size()-1]);Y.append(Y0[Y0.size()-1])
+		var rand=float(r.w)+(float(r.sw) if r.stadt else 0.0)
+		var oben=(0.10 if r.stadt else 0.05)
+		for sd in [-1.0,1.0]:
+			var vorher=null   # [innen, außen] des letzten Punkts
+			for i in P.size():
+				var t=(P[min(i+1,P.size()-1)]-P[max(i-1,0)]).normalized()
+				var n=Vector2(-t.y,t.x)*sd
+				var w=P[i]+NO.C
+				var pi=w+n*rand;var yi=Y[i]+NO.H0+oben-0.03
+				var dh=yi-_tri_h(H,pi.x+n.x*2.0,pi.y+n.y*2.0)
+				var B=clamp(absf(dh)*2.5+1.0,1.5,12.0)
+				var po=null
+				for f in [1.0,0.6,0.35]:
+					var q=pi+n*(B*f)
+					if frei.call(q) and frei.call(pi+n*(B*f*0.5)):po=q;break
+				if po==null or not frei.call(pi+n*0.3):vorher=null;n_weg+=1;continue
+				var yo=_tri_h(H,po.x,po.y)-0.04
+				var cur=[Vector3(pi.x-n.x*0.06,yi,pi.y-n.y*0.06),Vector3(po.x,yo,po.y),gitter.call(po),absf(yi-yo)<0.06]
+				if vorher!=null and not (vorher[3] and cur[3]) and vorher[0].distance_to(cur[0])<9.0:
+					var key=Vector2i(int(floor(cur[0].x/KACHEL)),int(floor(cur[0].z/KACHEL)))
+					if not ST_B.has(key):
+						var neu_st=SurfaceTool.new();neu_st.begin(Mesh.PRIMITIVE_TRIANGLES);ST_B[key]=neu_st
+					var st2:SurfaceTool=ST_B[key]
+					var A=vorher[0];var Bo=vorher[1];var Cn=cur[0];var Do=cur[1]
+					for tri in [[A,Bo,Do],[A,Do,Cn]]:
+						var nn=(tri[1]-tri[0]).cross(tri[2]-tri[0])
+						if nn.length_squared()<1e-6:continue
+						nn=nn.normalized()
+						if nn.y>0.0:tri=[tri[0],tri[2],tri[1]]   # Godot: Vorderseite im Uhrzeigersinn, wie das Geländenetz
+						else:nn=-nn
+						for v in tri:
+							var jj=gitter.call(Vector2(v.x,v.z))
+							st2.set_color(_farbe(jj%nx,jj/nx,v.y));st2.set_normal(nn);st2.add_vertex(v)
+						KOLL.append_array(tri)
+					n_seg+=1
+				elif vorher!=null and vorher[3] and cur[3]:n_flach+=1
+				vorher=cur
+	# Wendehammer: Bankett rund um den Gehwegring
+	for wd in NO.WENDE:
+		var c:Vector2=wd[0]+NO.C;var RA:float=wd[2];var yi:float=wd[3]+NO.H0-0.03;var N=28;var ring=[]
+		for k in N+1:
+			var u=Vector2(cos(k*TAU/N),sin(k*TAU/N));var pi=c+u*RA
+			var dh=yi-_tri_h(H,pi.x+u.x*2.0,pi.y+u.y*2.0);var B=clamp(absf(dh)*2.5+1.0,1.5,12.0)
+			var po=pi+u*B
+			if not frei.call(po) or not frei.call(pi+u*(B*0.5)):ring.append(null);continue
+			ring.append([Vector3(pi.x-u.x*0.06,yi,pi.y-u.y*0.06),Vector3(po.x,_tri_h(H,po.x,po.y)-0.04,po.y)])
+		for k in N:
+			if ring[k]==null or ring[k+1]==null:continue
+			var key=Vector2i(int(floor(c.x/KACHEL)),int(floor(c.y/KACHEL)))
+			if not ST_B.has(key):
+				var neu2=SurfaceTool.new();neu2.begin(Mesh.PRIMITIVE_TRIANGLES);ST_B[key]=neu2
+			var st3:SurfaceTool=ST_B[key]
+			var A=ring[k][0];var Bo=ring[k][1];var Cn=ring[k+1][0];var Do=ring[k+1][1]
+			for tri in [[A,Bo,Do],[A,Do,Cn]]:
+				var nn=(tri[1]-tri[0]).cross(tri[2]-tri[0])
+				if nn.length_squared()<1e-6:continue
+				nn=nn.normalized()
+				if nn.y>0.0:tri=[tri[0],tri[2],tri[1]]   # Godot: Vorderseite im Uhrzeigersinn, wie das Geländenetz
+				else:nn=-nn
+				for v in tri:
+					var jj=gitter.call(Vector2(v.x,v.z))
+					st3.set_color(_farbe(jj%nx,jj/nx,v.y));st3.set_normal(nn);st3.add_vertex(v)
+				KOLL.append_array(tri)
+			n_seg+=1
+	var knoten=Node3D.new();knoten.name="Bankett";W.add_child(knoten)
+	for key in ST_B:
+		var mi=MeshInstance3D.new();mi.mesh=ST_B[key].commit();mi.material_override=GEL_MAT;mi.name="Bankett_%d_%d"%[key.x,key.y]
+		mi.visibility_range_end=600.0;knoten.add_child(mi)
+	var kb=StaticBody3D.new();kb.name="BankettKollision";knoten.add_child(kb)
+	var a=0
+	while a<KOLL.size():
+		var cp=ConcavePolygonShape3D.new();cp.backface_collision=true;cp.set_faces(KOLL.slice(a,min(a+180000,KOLL.size())))
+		var cs=CollisionShape3D.new();cs.shape=cp;kb.add_child(cs);a+=180000
+	print("BANKETT Abschnitte ",n_seg," bündig ",n_flach," ausgespart ",n_weg," Dreiecke ",KOLL.size()/3," Kacheln ",ST_B.size())
 func _gelaende(H:PackedFloat32Array,nx:int,nz:int,X0:float,Z0:float,ST:float):
 	var mat=ShaderMaterial.new();var sh=Shader.new();sh.code="""shader_type spatial;
 render_mode diffuse_toon,specular_disabled;
@@ -1766,7 +1868,7 @@ void fragment(){
 	float a=texture(rausch,wp.xz/9.0).r;float b=texture(rausch,wp.xz/53.0).r;
 	ALBEDO=COLOR.rgb*(0.84+0.22*a+0.12*(b-0.5));ROUGHNESS=1.0;
 }"""
-	mat.shader=sh
+	mat.shader=sh;GEL_MAT=mat
 	var tex=NoiseTexture2D.new();tex.width=256;tex.height=256;tex.seamless=true;tex.generate_mipmaps=true
 	var fn=FastNoiseLite.new();fn.frequency=0.03;fn.fractal_octaves=3;tex.noise=fn
 	ResourceSaver.save(tex,ZIEL+"gelaende_rausch.res");tex.take_over_path(ZIEL+"gelaende_rausch.res")

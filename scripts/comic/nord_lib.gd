@@ -1795,6 +1795,37 @@ func fahrbahnen():
 func _vt(P:PackedVector2Array,i:int)->Vector2:
 	var a=P[max(i-1,0)];var b=P[min(i+1,P.size()-1)]
 	return (b-a).normalized()
+# Wendehammer statt stumpfem Ende: runde Asphaltfläche (r = w+3, mind. 8 m) mit umlaufendem Gehweg und Bordstein.
+# Nur wenn rundum Platz ist (kein Grundstück, keine andere Straße); sonst bleibt die U-Form.
+var WENDE:=[]   # [Mitte (lokal), Innenradius Gehweg, Außenradius, Gehweghöhe (lokal)] – für das Bankett im Bake
+func _wendehammer(ri:int,p0:Vector2,d:Vector2,y0:float,so,sk)->bool:
+	var r=ROADS[ri];var w=float(r.w);var sw=float(r.sw)
+	var R=max(w+3.0,8.0);var c=p0+d*(R-w*0.5);var RA=R+sw
+	for k in 24:
+		var u=Vector2(cos(k*TAU/24.0),sin(k*TAU/24.0))
+		for rr in [R*0.5,R,RA+1.5]:
+			var q=c+u*rr
+			if (q-p0).dot(d)<0.5:continue
+			if _belegt(q) or auf_fahrbahn(q,ri,0.5):return false
+			if rr>R and _im_gehwegband(q) and (q-p0).dot(d)>sw+1.0:return false
+	var yf=y0+0.06;var ys=y0+0.11
+	var sa=L._st(L.M.asphalt if r.get("belag","asphalt")=="asphalt" else belag_mat(r.belag),true)
+	var N=28
+	for k in N:
+		var u0=Vector2(cos(k*TAU/N),sin(k*TAU/N));var u1=Vector2(cos((k+1)*TAU/N),sin((k+1)*TAU/N))
+		_tri_frei(sa,Vector3(c.x,yf,c.y),Vector3(c.x+u1.x*R,yf,c.y+u1.y*R),Vector3(c.x+u0.x*R,yf,c.y+u0.y*R),FB_GELEGT)
+	for k in N:
+		var u0=Vector2(cos(k*TAU/N),sin(k*TAU/N));var u1=Vector2(cos((k+1)*TAU/N),sin((k+1)*TAU/N))
+		var a0=c+u0*R;var a1=c+u1*R;var b0=c+u0*RA;var b1=c+u1*RA
+		_tri_frei(so,Vector3(a0.x,ys,a0.y),Vector3(a1.x,ys,a1.y),Vector3(b1.x,ys,b1.y),GW)
+		_tri_frei(so,Vector3(a0.x,ys,a0.y),Vector3(b1.x,ys,b1.y),Vector3(b0.x,ys,b0.y),GW)
+		# Bordstein-Stirnseite zur Fahrbahn (nur jenseits des Straßenendes, sonst steht sie auf der Fahrbahn)
+		if (a0-p0).dot(d)>0.3 and (a1-p0).dot(d)>0.3:
+			var inn=Vector3(-(u0.x+u1.x),0,-(u0.y+u1.y)).normalized()
+			L._tri(sk,Vector3(a0.x,ys,a0.y),Vector3(a1.x,ys,a1.y),Vector3(a1.x,yf-0.05,a1.y),inn)
+			L._tri(sk,Vector3(a0.x,ys,a0.y),Vector3(a1.x,yf-0.05,a1.y),Vector3(a0.x,yf-0.05,a0.y),inn)
+	WENDE.append([c,R,RA,ys])
+	return true
 # Sackgasse: Gehweg läuft um das Fahrbahnende herum (U-Form), mit Kante bis ins Gelände
 func _sackgassen_enden(so,sk,jr:Dictionary)->int:
 	var n_e=0
@@ -1812,6 +1843,7 @@ func _sackgassen_enden(so,sk,jr:Dictionary)->int:
 			# keine echte Sackgasse, wenn dort eine andere Straße weiterläuft oder anschließt
 			if auf_fahrbahn(P[e]+d*(r.w*0.6+1.0),ri,0.5) or auf_fahrbahn(P[e]+d*(r.w*0.6+r.sw*0.5),ri,0.5):continue
 			var nn=Vector2(-d.y,d.x);var y=Y[e]+0.11;var ex=r.w*0.6;var w=r.w;var sw=r.sw
+			if _wendehammer(ri,P[e],d,Y[e],so,sk):n_e+=1;continue
 			var Q=func(a:Vector2,b:Vector2,c:Vector2,dd:Vector2):
 				_tri_frei(so,Vector3(a.x,y,a.y),Vector3(b.x,y,b.y),Vector3(c.x,y,c.y),GW)
 				_tri_frei(so,Vector3(a.x,y,a.y),Vector3(c.x,y,c.y),Vector3(dd.x,y,dd.y),GW)
