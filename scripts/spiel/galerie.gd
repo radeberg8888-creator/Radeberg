@@ -20,6 +20,7 @@ func start(sp):
 	if nur=="figur":await _figur();get_tree().quit();return
 	if nur=="nord":await _nordstaedte();get_tree().quit();return
 	if nur=="schweben":await _schwebe_lauf();get_tree().quit();return
+	if nur=="berg":await _berg_analyse();get_tree().quit();return
 	if nur=="stil":await _stilprobe();get_tree().quit();return
 	if nur=="stil2":await _stilprobe2();get_tree().quit();return
 	if nur=="punkt":
@@ -88,6 +89,49 @@ func _foto(name:String):
 	for k in 5:await get_tree().process_frame
 	await get_tree().create_timer(0.4).timeout
 	get_viewport().get_texture().get_image().save_png(OUT+name+".png");print("FOTO ",name)
+# Analyse Bergstraße: dieselbe Stelle wie Berg-Szene 5, dann schrittweise weiter weg, von oben und von vier Seiten;
+# dazu Höhenprofil Straße vs. Gelände (wie tief liegt die Straße im Berg?)
+func _berg_analyse():
+	var ziel=Vector2(-600,-7000)
+	var S=spiel.welt.S;var best=null;var bd=1e9
+	for ri in S.roads.size():
+		var r=S.roads[ri]
+		if r.typ in ["autobahn","rampe"]:continue
+		for i in range(2,r.P.size()-2,3):
+			var d=r.P[i].distance_to(ziel)
+			if d<bd:bd=d;best=[r,i]
+	var r=best[0];var i0=best[1];var p:Vector2=r.P[i0];var t:Vector2=r.T[i0];var n=Vector2(-t.y,t.x)
+	spiel.welt.viertel_jetzt(p)
+	spiel.spieler.global_position=Vector3(p.x,_boden(p)+0.5,p.y);spiel.spieler.velocity=Vector3.ZERO
+	for k in 30:await get_tree().process_frame
+	await get_tree().create_timer(4.0).timeout
+	spiel.zeit=11*60
+	spiel.env.fog_enabled=false
+	cam.far=6000.0
+	print("BERG Straße ",r.get("name","?")," typ ",r.typ," w ",r.w," Punkt ",p," i ",i0)
+	# Höhenprofil: Straße, Gelände in der Mitte und 15/30/60 m seitlich
+	for i in range(max(0,i0-60),min(r.P.size(),i0+60),4):
+		var q:Vector2=r.P[i];var nq=Vector2(-r.T[i].y,r.T[i].x);var hs=[]
+		for o in [-60.0,-30.0,-15.0,0.0,15.0,30.0,60.0]:
+			var w=q+nq*o;hs.append(snappedf(spiel.welt.G.h_at(w.x,w.y)-r.h[i],0.1))
+		print("BERG_PROFIL i ",i," P ",q.snapped(Vector2.ONE)," Straße ",snappedf(r.h[i],0.1)," Gelände rel. bei -60/-30/-15/0/15/30/60 m: ",hs," Boden ",snappedf(_boden(q)-r.h[i],0.1))
+	var tz=p+t*20.0;var ziel3=Vector3(tz.x,_boden(tz),tz.y)
+	var h0=p-t*30.0+n*25.0;var c0=Vector3(h0.x,_boden(h0)+22.0,h0.y)
+	var nr=1
+	for f in [1.0,2.5,5.0,10.0]:
+		var c=ziel3+(c0-ziel3)*f
+		c.y=max(c.y,ziel3.y+22.0*f)
+		cam.look_at_from_position(c,ziel3);cam.current=true
+		await _foto("Berg_Analyse_%d_Abstand_x%s"%[nr,str(f)]);nr+=1
+	cam.look_at_from_position(ziel3+Vector3(1,250,1),ziel3);await _foto("Berg_Analyse_%d_von_oben_250m"%nr);nr+=1
+	cam.look_at_from_position(ziel3+Vector3(1,700,1),ziel3);await _foto("Berg_Analyse_%d_von_oben_700m"%nr);nr+=1
+	for k in 4:
+		var d=Vector3(cos(k*PI/2.0),0,sin(k*PI/2.0))
+		cam.look_at_from_position(ziel3+d*160.0+Vector3(0,70,0),ziel3)
+		await _foto("Berg_Analyse_%d_Seite_%d"%[nr,k]);nr+=1
+	# auf Straßenhöhe längs der Straße (was ein Fahrer sieht)
+	var a=p-t*20.0;cam.look_at_from_position(Vector3(a.x,_boden(a)+1.8,a.y),Vector3(tz.x,_boden(tz)+1.5,tz.y))
+	await _foto("Berg_Analyse_%d_Fahrersicht"%nr)
 func _ort(name:String,ziel:Vector2):
 	# nächste Straße (keine Autobahn) suchen, Blick entlang der Straße
 	var S=spiel.welt.S;var best=null;var bd=1e9
