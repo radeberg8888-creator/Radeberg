@@ -383,13 +383,15 @@ func _profil(Q:PackedVector2Array,S:Array,typ:String,stadt:bool)->PackedFloat32A
 	for i in n:roh[i]=hy(Q[i])
 	if stadt:return roh
 	# Längsprofil: gleitender Mittelwert, dann Steigung begrenzen
-	var fen={"autobahn":110.0,"rampe":40.0,"land":45.0,"piste":30.0}.get(typ,40.0)
+	# Landstraßen folgen dem Gelände enger (kürzeres Glättungsfenster, etwas mehr Steigung): vorher schnitten sie am
+	# Berg bis 20 m tiefe Schluchten mit senkrechten Wänden ins Gelände bzw. lagen auf hohen Dämmen
+	var fen={"autobahn":110.0,"rampe":40.0,"land":28.0,"piste":20.0}.get(typ,28.0)
 	var a=0;var b=0;var summe=0.0
 	for i in n:
 		while b<n and S[b]<=S[i]+fen:summe+=roh[b];b+=1
 		while S[a]<S[i]-fen:summe-=roh[a];a+=1
 		Y[i]=summe/max(b-a,1)
-	var gmax={"autobahn":0.07,"rampe":0.09,"land":0.12,"piste":0.15}.get(typ,0.12)
+	var gmax={"autobahn":0.07,"rampe":0.09,"land":0.15,"piste":0.18}.get(typ,0.15)
 	for durch in 2:
 		for i in range(1,n):Y[i]=clamp(Y[i],Y[i-1]-gmax*(S[i]-S[i-1]),Y[i-1]+gmax*(S[i]-S[i-1]))
 		for i in range(n-2,-1,-1):Y[i]=clamp(Y[i],Y[i+1]-gmax*(S[i+1]-S[i]),Y[i+1]+gmax*(S[i+1]-S[i]))

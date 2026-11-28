@@ -2023,7 +2023,7 @@ func _strassen_korridor(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,
 				s+=3.0
 				if STADT.has_point(p):continue
 				var dh=abs(y-G0._bilin(H,p.x,p.y))
-				var R=kern+(14.0 if r.stadt else clamp(dh*2.5+10.0,16.0,70.0))
+				var R=kern+(14.0 if r.stadt else clamp(dh*2.5+10.0,16.0,120.0))   # flachere Böschung bei großem Höhenunterschied (Berg)
 				for k in range(max(int((p.y-R-Z0)/ST),0),min(int((p.y+R-Z0)/ST)+2,nz)):
 					for ii in range(max(int((p.x-R-X0)/ST),0),min(int((p.x+R-X0)/ST)+2,nx)):
 						var w=Vector2(X0+ii*ST,Z0+k*ST);var d=w.distance_to(p)
