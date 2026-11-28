@@ -515,6 +515,18 @@ func _rechteck_ok(F:Vector2,t:Vector2,n:Vector2,w:float,d:float)->bool:
 			if _belegt(F+t*clampf(x,-w*0.5+0.7,w*0.5-0.7)+n*clampf(z,0.3,d-0.3)):FAIL.occ+=1;return false
 			z+=1.5
 		if _im_gehwegband(F+t*x+n*d):FAIL.rect+=1;return false
+	# Höhe wie in _setzen (Vorderkante bündig zur Straße). Liegt an Seiten/Rückseite eine andere Straße deutlich
+	# höher/tiefer, gäbe es dort eine Stützmauer bzw. Rasenwand neben der Straße – dann lieber kein Haus.
+	var sy=strasse_y(F);var h=hy(F)*0.6+hy(F+n*d*0.5)*0.4
+	if sy[2]>=0 and sy[0]<ROADS[sy[2]].w+ROADS[sy[2]].sw+(14.0 if d>=28.0 else 8.0):h=sy[1]+0.1
+	var umriss=[]
+	var xx=-w*0.5
+	while xx<=w*0.5+0.01:umriss.append(F+t*xx+n*d);xx+=3.0
+	var zz=0.0
+	while zz<=d+0.01:umriss.append(F-t*w*0.5+n*zz);umriss.append(F+t*w*0.5+n*zz);zz+=3.0
+	for q in umriss:
+		var s2=strasse_y(q)
+		if s2[2]>=0 and s2[0]<ROADS[s2[2]].w+ROADS[s2[2]].sw+4.0 and absf(s2[1]+0.1-h)>1.2:FAIL.rect+=1;return false
 	return true
 func _im_gehwegband(p:Vector2)->bool:
 	var k=Vector2i(int(floor(p.x/20.0)),int(floor(p.y/20.0)))

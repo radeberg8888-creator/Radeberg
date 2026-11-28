@@ -1794,21 +1794,26 @@ func _bankette(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float)
 				var w=P[i]+NO.C
 				var pi=w+n*rand;var yi=Y[i]+NO.H0+oben-0.03
 				var dh=yi-_tri_h(H,pi.x+n.x*2.0,pi.y+n.y*2.0)
+				# nur Damm bis 4 m und flache Einschnitte: in tiefen Einschnitten (Berg) spannte der Streifen als
+				# schräge Riesenfläche quer durch die Luft zur Felswand
+				if dh>4.0 or dh<-1.5:vorher=null;n_weg+=1;continue
 				var B=clamp(absf(dh)*2.5+1.0,1.5,12.0)
 				var po=null
 				for f in [1.0,0.6,0.35]:
 					var q=pi+n*(B*f)
 					if frei.call(q) and frei.call(pi+n*(B*f*0.5)):po=q;break
 				if po==null or not frei.call(pi+n*0.3):vorher=null;n_weg+=1;continue
-				var yo=_tri_h(H,po.x,po.y)-0.04
-				var cur=[Vector3(pi.x-n.x*0.06,yi,pi.y-n.y*0.06),Vector3(po.x,yo,po.y),gitter.call(po),absf(yi-yo)<0.06]
+				var yo=_tri_h(H,po.x,po.y)+0.02
+				# Mittelpunkt: nie unter dem Gelände (sonst sticht das Gelände zwischen den Punkten durch)
+				var pm=(pi+po)*0.5;var ym=max((yi+yo)*0.5,_tri_h(H,pm.x,pm.y)+0.03)
+				var cur=[Vector3(pi.x-n.x*0.06,yi,pi.y-n.y*0.06),Vector3(po.x,yo,po.y),gitter.call(po),absf(yi-yo)<0.06,Vector3(pm.x,ym,pm.y)]
 				if vorher!=null and not (vorher[3] and cur[3]) and vorher[0].distance_to(cur[0])<9.0:
 					var key=Vector2i(int(floor(cur[0].x/KACHEL)),int(floor(cur[0].z/KACHEL)))
 					if not ST_B.has(key):
 						var neu_st=SurfaceTool.new();neu_st.begin(Mesh.PRIMITIVE_TRIANGLES);ST_B[key]=neu_st
 					var st2:SurfaceTool=ST_B[key]
-					var A=vorher[0];var Bo=vorher[1];var Cn=cur[0];var Do=cur[1]
-					for tri in [[A,Bo,Do],[A,Do,Cn]]:
+					var A=vorher[0];var Bo=vorher[1];var Cn=cur[0];var Do=cur[1];var Am=vorher[4];var Cm=cur[4]
+					for tri in [[A,Am,Cm],[A,Cm,Cn],[Am,Bo,Do],[Am,Do,Cm]]:
 						var nn=(tri[1]-tri[0]).cross(tri[2]-tri[0])
 						if nn.length_squared()<1e-6:continue
 						nn=nn.normalized()
@@ -1827,9 +1832,10 @@ func _bankette(H:PackedFloat32Array,NO,nx:int,nz:int,X0:float,Z0:float,ST:float)
 		for k in N+1:
 			var u=Vector2(cos(k*TAU/N),sin(k*TAU/N));var pi=c+u*RA
 			var dh=yi-_tri_h(H,pi.x+u.x*2.0,pi.y+u.y*2.0);var B=clamp(absf(dh)*2.5+1.0,1.5,12.0)
+			if dh>4.0 or dh<-1.5:ring.append(null);continue
 			var po=pi+u*B
 			if not frei.call(po) or not frei.call(pi+u*(B*0.5)):ring.append(null);continue
-			ring.append([Vector3(pi.x-u.x*0.06,yi,pi.y-u.y*0.06),Vector3(po.x,_tri_h(H,po.x,po.y)-0.04,po.y)])
+			ring.append([Vector3(pi.x-u.x*0.06,yi,pi.y-u.y*0.06),Vector3(po.x,_tri_h(H,po.x,po.y)+0.02,po.y)])
 		for k in N:
 			if ring[k]==null or ring[k+1]==null:continue
 			var key=Vector2i(int(floor(c.x/KACHEL)),int(floor(c.y/KACHEL)))
